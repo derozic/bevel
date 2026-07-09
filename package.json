@@ -1,0 +1,30 @@
+{
+  "name": "bevel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BEVEL — multi-tenant workspace channels for humans and agents",
+  "packageManager": "pnpm@10.15.1",
+  "scripts": {
+    "dev": "nx run-many -t dev --projects=web,admin,realtime --parallel=3",
+    "dev:web": "nx dev web",
+    "dev:admin": "nx dev admin",
+    "dev:realtime": "nx dev realtime",
+    "build": "nx run-many -t build --all",
+    "lint": "nx run-many -t lint --all",
+    "typecheck": "nx run-many -t typecheck --all",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\""
+  },
+  "devDependencies": {
+    "@nx/js": "^21.2.0",
+    "@nx/next": "^21.2.0",
+    "@nx/node": "^21.2.0",
+    "nx": "^21.2.0",
+    "prettier": "^3.8.3",
+    "typescript": "^5.8.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "next-auth": "5.0.0-beta.31"
+    }
+  }
+}

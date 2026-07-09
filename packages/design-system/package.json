@@ -1,0 +1,11 @@
+{
+  "name": "@bevel/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BEVEL design tokens, themes, motion, and typography",
+  "type": "module",
+  "exports": {
+    "./tokens.css": "./src/tokens.css",
+    "./themes.css": "./src/themes.css"
+  }
+}

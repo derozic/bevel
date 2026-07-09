@@ -1,0 +1,15 @@
+:root {
+  --bevel-accent: var(--tenant-accent, #7c5cff);
+  --bevel-accent-muted: color-mix(in srgb, var(--bevel-accent) 70%, #000);
+  --bevel-bg: #0c0c0e;
+  --bevel-surface: #141418;
+  --bevel-surface-raised: #1c1c22;
+  --bevel-border: #2a2a32;
+  --bevel-text: #f4f4f5;
+  --bevel-text-muted: #a1a1aa;
+  --bevel-radius-sm: 0.375rem;
+  --bevel-radius-md: 0.5rem;
+  --bevel-radius-lg: 0.75rem;
+  --bevel-font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --bevel-font-mono: "JetBrains Mono", ui-monospace, monospace;
+}

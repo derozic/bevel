@@ -1,0 +1,24 @@
+@import "tailwindcss";
+@import "@bevel/design-system/tokens.css";
+@import "@bevel/design-system/themes.css";
+@import "@bevel/realtime-client/styles/fleet-chat.css";
+@import "../styles/bevel-workspace.css";
+
+@theme {
+  --color-background: var(--bevel-bg);
+  --color-surface: var(--bevel-surface);
+  --color-border: var(--bevel-border);
+  --color-text: var(--bevel-text);
+  --color-text-muted: var(--bevel-text-muted);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bevel-bg);
+  color: var(--bevel-text);
+  font-family: var(--bevel-font-sans);
+}

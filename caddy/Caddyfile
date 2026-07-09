@@ -1,0 +1,26 @@
+# Local multi-tenant routing for BEVEL dev.
+# Requires: caddy trust (for lvh.me HTTPS)
+
+{
+  auto_https disable_redirects
+}
+
+demo.bevel.lvh.me {
+  reverse_proxy 127.0.0.1:43200
+}
+
+acme.bevel.lvh.me {
+  reverse_proxy 127.0.0.1:43200
+}
+
+admin.bevel.lvh.me {
+  reverse_proxy 127.0.0.1:43201
+}
+
+realtime.bevel.lvh.me {
+  reverse_proxy 127.0.0.1:43208
+}
+
+docs.bevel.lvh.me {
+  reverse_proxy 127.0.0.1:43202
+}

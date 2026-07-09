@@ -1,0 +1,7 @@
+[data-tenant-theme] {
+  --tenant-accent: var(--bevel-accent);
+}
+
+[data-tenant-theme='acme'] {
+  --tenant-accent: #22c55e;
+}
