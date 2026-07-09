@@ -1,0 +1,46 @@
+tenant: 2x4m
+name: 2x4m Agents
+domain: bevel.agents.2x4m.lvh.me
+hosts:
+  - agents.2x4m.lvh.me
+
+brand:
+  theme: ./theme.json
+  product_name: 2x4m Agents
+
+features:
+  async_streams: true
+  live_sessions: true
+  analytics: true
+  channels: true
+  direct_messages: true
+  agent_dispatch: true
+  work_mode: true
+  custom_branding: true
+
+auth:
+  mode: google
+  allowed_domains:
+    - derozic.com
+  require_github_for_work: true
+
+realtime:
+  namespace: 2x4m
+  presence: true
+  url: https://realtime.bevel.lvh.me
+
+transports:
+  asyncStream:
+    kind: async-stream
+    protocol: sse
+  liveBidirectional:
+    kind: live-bidirectional
+    protocol: websocket
+
+deployment:
+  preview_url: https://bevel.agents.2x4m.lvh.me
+  production_url: https://bevel.agents.2x4m.cc
+  target: vercel
+
+work_repos:
+  - derozic/2x4m

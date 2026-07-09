@@ -1,0 +1,35 @@
+tenant: 2ndbrain
+name: 2ndBrain
+domain: bevel.2ndbrain.lvh.me
+hosts:
+  - 2ndbrain.lvh.me
+
+brand:
+  theme: ./theme.json
+  product_name: 2ndBrain
+
+features:
+  async_streams: true
+  live_sessions: true
+  analytics: true
+  channels: true
+  direct_messages: true
+  agent_dispatch: true
+  work_mode: false
+
+auth:
+  mode: google
+  allowed_domains:
+    - derozic.com
+
+realtime:
+  namespace: 2ndbrain
+  presence: true
+  url: https://realtime.bevel.lvh.me
+
+deployment:
+  preview_url: https://bevel.2ndbrain.lvh.me
+  target: vercel
+
+work_repos:
+  - derozic/2ndbrain-mono
