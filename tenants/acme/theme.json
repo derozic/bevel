@@ -1,0 +1,8 @@
+{
+  "accent": "#22c55e",
+  "background": "#0c0c0e",
+  "surface": "#141418",
+  "text": "#f4f4f5",
+  "font_sans": "Inter, ui-sans-serif, system-ui, sans-serif",
+  "radius": "0.75rem"
+}

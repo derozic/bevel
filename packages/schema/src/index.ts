@@ -1,3 +1,6 @@
 export * from './tenant'
 export * from './domain'
 export * from './events'
+export * from './transport'
+export * from './declarative-tenant'
+export * from './doctor'

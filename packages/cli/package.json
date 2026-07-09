@@ -1,0 +1,25 @@
+{
+  "name": "@bevel/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BEVEL control plane CLI — doctor, validate, preview",
+  "type": "module",
+  "bin": {
+    "bevel": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bevel/tenant-config": "workspace:*",
+    "@bevel/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  },
+  "nx": {
+    "name": "cli"
+  }
+}

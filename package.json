@@ -12,14 +12,18 @@
     "build": "nx run-many -t build --all",
     "lint": "nx run-many -t lint --all",
     "typecheck": "nx run-many -t typecheck --all",
-    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
+    "bevel": "pnpm exec tsx packages/cli/src/index.ts",
+    "doctor": "pnpm bevel doctor"
   },
   "devDependencies": {
+    "@bevel/cli": "workspace:*",
     "@nx/js": "^21.2.0",
     "@nx/next": "^21.2.0",
     "@nx/node": "^21.2.0",
     "nx": "^21.2.0",
     "prettier": "^3.8.3",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.3"
   },
   "pnpm": {

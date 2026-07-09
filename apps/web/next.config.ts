@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     '@bevel/ui',
     '@bevel/schema',
     '@bevel/analytics',
+    '@bevel/async-stream',
   ],
 }
 

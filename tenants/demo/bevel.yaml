@@ -1,0 +1,39 @@
+tenant: demo
+name: BEVEL Demo
+domain: demo.bevel.lvh.me
+
+brand:
+  theme: ./theme.json
+  product_name: BEVEL
+
+features:
+  async_streams: true
+  live_sessions: true
+  analytics: true
+  agent_dispatch: true
+  work_mode: true
+
+auth:
+  mode: google
+  allowed_domains:
+    - derozic.com
+
+realtime:
+  namespace: demo
+  presence: true
+  url: https://realtime.bevel.lvh.me
+
+transports:
+  asyncStream:
+    kind: async-stream
+    protocol: sse
+  liveBidirectional:
+    kind: live-bidirectional
+    protocol: websocket
+
+deployment:
+  preview_url: https://demo.bevel.lvh.me
+  target: vercel
+
+work_repos:
+  - derozic/bevel

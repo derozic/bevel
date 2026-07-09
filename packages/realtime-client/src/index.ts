@@ -1,3 +1,8 @@
+/**
+ * Live bidirectional transport (WebSocket) — chat, presence, shared sessions.
+ * Isolated behind services/realtime; not coupled to Vercel/Cloudflare host WS beta.
+ * For one-way updates use @bevel/async-stream (SSE). For A/V use @bevel/feature-webrtc.
+ */
 export {
   FleetProvider,
   useFleet,

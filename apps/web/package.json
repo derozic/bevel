@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@bevel/analytics": "workspace:*",
+    "@bevel/async-stream": "workspace:*",
     "@bevel/auth": "workspace:*",
     "@bevel/design-system": "workspace:*",
     "@bevel/realtime-client": "workspace:*",

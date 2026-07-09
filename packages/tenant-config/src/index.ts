@@ -15,4 +15,15 @@ export {
   lookupTenantBySlug,
   listTenants,
   isPlatformHost,
+  refreshTenantRegistry,
 } from './registry'
+export {
+  loadDeclarativeTenant,
+  loadCompiledTenant,
+  loadThemeTokens,
+  compileTenant,
+  listTenantSlugs,
+  resolveTenantsRoot,
+  tenantConfigPath,
+} from './loader'
+export { runDoctor, formatDoctorReport, type DoctorOptions } from './doctor'

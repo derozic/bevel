@@ -1,0 +1,45 @@
+tenant: acme
+name: Acme Corp
+domain: bevel.acme.com
+hosts:
+  - bevel.acme.lvh.me
+
+brand:
+  logo: ./logo.svg
+  theme: ./theme.json
+  product_name: Acme Workspace
+
+features:
+  async_streams: true
+  live_sessions: true
+  analytics: true
+  channels: true
+  direct_messages: true
+  agent_dispatch: true
+  work_mode: false
+  custom_branding: true
+  live_media: false
+
+auth:
+  mode: magic-link
+  allowed_domains:
+    - acme.com
+
+realtime:
+  namespace: acme
+  presence: true
+
+transports:
+  asyncStream:
+    kind: async-stream
+    protocol: sse
+  liveBidirectional:
+    kind: live-bidirectional
+    protocol: websocket
+    isolatedService: realtime
+
+deployment:
+  preview_url: https://bevel.acme.lvh.me
+  target: vercel
+
+work_repos: []

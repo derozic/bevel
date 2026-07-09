@@ -10,7 +10,10 @@
     ".": "./src/index.ts",
     "./tenant": "./src/tenant.ts",
     "./domain": "./src/domain.ts",
-    "./events": "./src/events.ts"
+    "./events": "./src/events.ts",
+    "./transport": "./src/transport.ts",
+    "./declarative-tenant": "./src/declarative-tenant.ts",
+    "./doctor": "./src/doctor.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

@@ -1,53 +1,99 @@
 # BEVEL
 
-Multi-tenant workspace channels for humans and agents.
+Multi-tenant workspace channels for humans and agents — a **platform**, not a bespoke deployment.
 
-BEVEL is a standalone product (extracted from the 2x4m/agents stack) with a first-class **tenant/domain contract**, separate **realtime transport**, and an **operator console** for custom domain setup.
+Every customer domain, theme, auth rule, realtime namespace, and deployment target is **declared**, **validated**, **previewed**, and **released** through the same control plane.
 
 ## Monorepo layout
 
 ```
 bevel/
+  tenants/           # Declarative customer surfaces (bevel.yaml + theme.json)
   apps/
-    web/           # Next.js tenant app (Host → tenant)
-    admin/         # Operator console (domain CNAME, tenants)
-    docs/          # Developer documentation
+    web/             # Next.js tenant app (Host → tenant)
+    admin/           # Operator console
+    docs/            # Developer documentation
   services/
-    realtime/      # Colyseus websocket / presence / sessions
-    events/        # Async events, queues, webhooks
-    domains/       # Custom domain verification
+    realtime/        # WebSocket — live bidirectional (isolated)
+    events/          # Async events, queues, webhooks
+    domains/         # Custom domain verification
   packages/
-    tenant-config/ # getTenantFromRequest() + middleware
-    schema/        # Zod contracts
-    realtime-client/
-    auth/
-    ui/
-    design-system/
-    analytics/
-    config/
-    sdk/
+    tenant-config/   # Loader + getTenantFromRequest() + doctor
+    async-stream/    # SSE — one-way server → client
+    realtime-client/ # WebSocket browser client
+    feature-webrtc/  # Optional A/V module (not general realtime)
+    cli/             # bevel doctor, validate, list
+    schema/          # Zod contracts
+    auth/ ui/ …
 ```
+
+## Transport layers
+
+| Layer | Use for | Transport | Package |
+|-------|---------|-----------|---------|
+| **1. Async stream** | AI responses, progress, notifications, activity feeds, long jobs | SSE / streamed HTTP | `@bevel/async-stream` |
+| **2. Live bidirectional** | Chat, presence, collaboration, shared sessions | WebSocket | `services/realtime` + `@bevel/realtime-client` |
+| **3. Live media** | Audio / video / screen only | WebRTC + signaling | `@bevel/feature-webrtc` (opt-in) |
+
+WebSocket runtime stays isolated behind `services/realtime` so the app is not married to one host's implementation (Vercel Functions WS beta, Cloudflare, standalone Node).
+
+## Declarative tenant onboarding
+
+Each customer is a folder under `tenants/`:
+
+```yaml
+# tenants/acme/bevel.yaml
+tenant: acme
+domain: bevel.acme.com
+hosts:
+  - bevel.acme.lvh.me          # preview / local alias
+
+brand:
+  logo: ./logo.svg
+  theme: ./theme.json
+
+features:
+  async_streams: true
+  live_sessions: true
+  analytics: true
+
+auth:
+  mode: magic-link
+  allowed_domains:
+    - acme.com
+
+realtime:
+  namespace: acme
+  presence: true
+```
+
+Then validate the full surface:
+
+```bash
+pnpm bevel doctor acme
+```
+
+```
+✓ Tenant config valid — bevel.acme.com
+✓ Domain CNAME configured — bevel.acme.com → cname.bevel.com
+✓ SSL active — https://bevel.acme.lvh.me
+✓ Theme tokens valid — accent #22c55e
+✓ Realtime namespace provisioned — namespace "acme" · transport websocket
+✓ Auth policy valid — mode: magic-link
+✓ Preview deployment healthy — https://bevel.acme.lvh.me
+```
+
+Offline (config + theme only): `pnpm bevel doctor acme --offline`
 
 ## Tenant resolution
-
-Following the [Next.js multi-tenant guide](https://nextjs.org/docs/app/guides/multi-tenant), tenants resolve from the `Host` header at middleware:
-
-```
-Host: bevel.theirdomain.com
-  → tenant lookup
-  → theme / config / features
-  → auth policy
-  → realtime namespace
-  → render tenant app
-```
-
-Developer API:
 
 ```ts
 import { getTenantFromRequest } from '@bevel/tenant-config'
 
 const tenant = await getTenantFromRequest()
 ```
+
+`Host` → tenant lookup → theme / features / auth / realtime namespace → render.
 
 Custom domains: `bevel.theirdomain.com CNAME cname.bevel.com`
 
@@ -56,33 +102,25 @@ Custom domains: `bevel.theirdomain.com CNAME cname.bevel.com`
 ```bash
 pnpm install
 cp .env.example .env
+pnpm bevel list
+pnpm bevel doctor demo --offline
 
-# Terminal 1 — apps + services
 ./scripts/dev.sh
-
-# Terminal 2 — HTTPS routing (optional)
-caddy run --config caddy/Caddyfile
+caddy run --config caddy/Caddyfile   # optional HTTPS
 ```
 
 | Surface | Dev URL |
 |---------|---------|
 | Tenant (demo) | https://demo.bevel.lvh.me |
+| Tenant (acme) | https://bevel.acme.lvh.me |
 | Admin | https://admin.bevel.lvh.me |
 | Realtime | https://realtime.bevel.lvh.me |
-| Docs | https://docs.bevel.lvh.me |
 
 ## Tooling
 
-- **pnpm** workspaces
-- **Nx** task orchestration (`nx dev web`, `nx build --all`)
-- **Next.js 15** App Router on Vercel/Cloudflare-style edge deployment
-- **Colyseus** realtime in `services/realtime` (not in the Next.js bundle)
-
-## Migration notes
-
-UI and chat client code migrated from `@derozic/fleet-ui` → `@bevel/realtime-client`.  
-Realtime server migrated from `agents/apps/realtime` → `services/realtime`.  
-Admin UX patterns borrowed from decli; auth/Radix patterns from 2x4m.
+- **pnpm** workspaces + **Nx** task graph
+- **Next.js 15** multi-tenant app (edge middleware)
+- **bevel** CLI — control plane for validate / doctor / list
 
 ## License
 

@@ -1,62 +1,10 @@
 import type { Tenant } from '@bevel/schema'
-
-/** Seed tenants for local dev and platform defaults. Production loads from domains service / KV. */
-const DEMO_TENANT: Tenant = {
-  id: 'tenant_demo',
-  slug: 'demo',
-  name: 'BEVEL Demo',
-  host: 'demo.bevel.lvh.me',
-  status: 'active',
-  auth: {
-    providers: ['google', 'github'],
-    allowedEmailDomains: ['derozic.com'],
-    requireGitHubForWork: false,
-  },
-  features: {
-    channels: true,
-    directMessages: true,
-    agentDispatch: true,
-    workMode: true,
-    customBranding: false,
-  },
-  theme: {
-    accent: '#7c5cff',
-    productName: 'BEVEL',
-  },
-  realtime: {
-    namespace: 'demo',
-    url: process.env.REALTIME_URL ?? 'https://realtime.bevel.lvh.me',
-  },
-  workRepos: ['derozic/bevel'],
-}
-
-const ACME_TENANT: Tenant = {
-  id: 'tenant_acme',
-  slug: 'acme',
-  name: 'Acme Corp',
-  host: 'bevel.acme.lvh.me',
-  status: 'active',
-  auth: {
-    providers: ['google'],
-    allowedEmailDomains: ['acme.com'],
-    requireGitHubForWork: false,
-  },
-  features: {
-    channels: true,
-    directMessages: true,
-    agentDispatch: true,
-    workMode: false,
-    customBranding: true,
-  },
-  theme: {
-    accent: '#22c55e',
-    productName: 'Acme Workspace',
-  },
-  realtime: {
-    namespace: 'acme',
-  },
-  workRepos: [],
-}
+import {
+  listTenantSlugs,
+  loadCompiledTenant,
+  loadDeclarativeTenant,
+  resolveTenantsRoot,
+} from './loader'
 
 const PLATFORM_HOSTS = new Set([
   'bevel.com',
@@ -76,15 +24,41 @@ function parseDevTenantOverrides(): Map<string, string> {
   return map
 }
 
-const TENANTS_BY_HOST = new Map<string, Tenant>([
-  [DEMO_TENANT.host.toLowerCase(), DEMO_TENANT],
-  [ACME_TENANT.host.toLowerCase(), ACME_TENANT],
-])
+function buildRegistry(): {
+  byHost: Map<string, Tenant>
+  bySlug: Map<string, Tenant>
+} {
+  const byHost = new Map<string, Tenant>()
+  const bySlug = new Map<string, Tenant>()
+  const root = resolveTenantsRoot()
 
-const TENANTS_BY_SLUG = new Map<string, Tenant>([
-  [DEMO_TENANT.slug, DEMO_TENANT],
-  [ACME_TENANT.slug, ACME_TENANT],
-])
+  for (const slug of listTenantSlugs(root)) {
+    try {
+      const tenant = loadCompiledTenant(slug, root)
+      const declarative = loadDeclarativeTenant(slug, root)
+      bySlug.set(slug, tenant)
+      byHost.set(tenant.host.toLowerCase(), tenant)
+      for (const alias of declarative.hosts ?? []) {
+        byHost.set(alias.toLowerCase().split(':')[0], tenant)
+      }
+    } catch (err) {
+      console.warn(`[tenant-config] skip ${slug}:`, err)
+    }
+  }
+
+  return { byHost, bySlug }
+}
+
+let cache: { byHost: Map<string, Tenant>; bySlug: Map<string, Tenant> } | null = null
+
+function registry() {
+  if (!cache) cache = buildRegistry()
+  return cache
+}
+
+export function refreshTenantRegistry(): void {
+  cache = buildRegistry()
+}
 
 export function isPlatformHost(host: string): boolean {
   const normalized = host.toLowerCase().split(':')[0]
@@ -93,17 +67,18 @@ export function isPlatformHost(host: string): boolean {
 
 export function lookupTenantByHost(host: string): Tenant | null {
   const normalized = host.toLowerCase().split(':')[0]
+  const { byHost, bySlug } = registry()
   const overrideSlug = parseDevTenantOverrides().get(normalized)
   if (overrideSlug) {
-    return TENANTS_BY_SLUG.get(overrideSlug) ?? null
+    return bySlug.get(overrideSlug) ?? null
   }
-  return TENANTS_BY_HOST.get(normalized) ?? null
+  return byHost.get(normalized) ?? null
 }
 
 export function lookupTenantBySlug(slug: string): Tenant | null {
-  return TENANTS_BY_SLUG.get(slug) ?? null
+  return registry().bySlug.get(slug) ?? null
 }
 
 export function listTenants(): Tenant[] {
-  return Array.from(TENANTS_BY_SLUG.values())
+  return Array.from(registry().bySlug.values())
 }
