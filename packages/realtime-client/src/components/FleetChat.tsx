@@ -72,6 +72,10 @@ export type FleetChatProps = {
   fillViewport?: boolean
   showChannelToggle?: boolean
   onChannelToggle?: () => void
+  /** Bookmark jump target from conversation search */
+  focusMessageId?: string
+  /** Query string for in-thread highlight */
+  highlightQuery?: string
 }
 
 /** Hide legacy join/leave/welcome noise still in live room state. */
@@ -106,24 +110,62 @@ function sameParticipants(a: HumanParticipant[], b: HumanParticipant[]): boolean
   return key(a) === key(b)
 }
 
+function HighlightedText({ text, query }: { text: string; query?: string }) {
+  if (!query?.trim()) return <>{text}</>
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .filter((t) => t.length >= 2)
+  if (terms.length === 0) return <>{text}</>
+  try {
+    const re = new RegExp(`(${terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
+    const parts = text.split(re)
+    return (
+      <>
+        {parts.map((part, i) =>
+          terms.some((t) => t.toLowerCase() === part.toLowerCase()) ? (
+            <mark key={i} className="fleet-chat-mark">
+              {part}
+            </mark>
+          ) : (
+            <span key={i}>{part}</span>
+          ),
+        )}
+      </>
+    )
+  } catch {
+    return <>{text}</>
+  }
+}
+
 function MessageRow({
   m,
   agents,
   selfName,
+  focused,
+  highlightQuery,
 }: {
   m: ChatMsg
   agents: FleetAgent[]
   selfName: string
+  focused?: boolean
+  highlightQuery?: string
 }) {
+  const rowProps = {
+    id: `msg-${m.id}`,
+    'data-message-id': m.id,
+    'data-focused': focused ? 'true' : undefined,
+  } as const
+
   if (m.speakerType === 'system') {
     if (isEphemeralChannelNoise(m.body)) return null
     return (
-      <div className="fleet-chat-msg-row fleet-chat-msg-row--system">
+      <div className="fleet-chat-msg-row fleet-chat-msg-row--system" {...rowProps}>
         <div
           className="fleet-chat-msg-system"
           data-pending={m.status === 'pending' ? 'true' : undefined}
         >
-          {m.body}
+          <HighlightedText text={m.body} query={highlightQuery} />
         </div>
       </div>
     )
@@ -132,14 +174,20 @@ function MessageRow({
   if (m.speakerType === 'human') {
     const isSelf = m.speaker === selfName
     return (
-      <div className="fleet-chat-msg-row fleet-chat-msg-row--human">
+      <div className="fleet-chat-msg-row fleet-chat-msg-row--human" {...rowProps}>
         <HumanAvatar name={m.speaker} avatarUrl={m.speakerAvatar} size="md" />
         <div className="fleet-chat-bubble fleet-chat-bubble--human">
           {!isSelf ? (
             <p className="fleet-chat-msg-label">{m.speaker}</p>
           ) : null}
           <div className="fleet-chat-msg-body">
-            <ChatMessageBody text={m.body} />
+            {highlightQuery?.trim() ? (
+              <p className="whitespace-pre-wrap">
+                <HighlightedText text={m.body} query={highlightQuery} />
+              </p>
+            ) : (
+              <ChatMessageBody text={m.body} />
+            )}
           </div>
         </div>
       </div>
@@ -150,7 +198,7 @@ function MessageRow({
   const accent = accentStripeColor(agent?.accent) ?? agent?.accent
 
   return (
-    <div className="fleet-chat-msg-row fleet-chat-msg-row--agent">
+    <div className="fleet-chat-msg-row fleet-chat-msg-row--agent" {...rowProps}>
       {agent?.avatar ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={agent.avatar} alt="" className="fleet-chat-avatar" />
@@ -175,7 +223,13 @@ function MessageRow({
           {formatSpeaker(m.speaker, m.speakerType)}
         </p>
         <div className="fleet-chat-msg-body">
-          <ChatMessageBody text={m.body} />
+          {highlightQuery?.trim() ? (
+            <p className="whitespace-pre-wrap">
+              <HighlightedText text={m.body} query={highlightQuery} />
+            </p>
+          ) : (
+            <ChatMessageBody text={m.body} />
+          )}
         </div>
       </div>
     </div>
@@ -189,6 +243,8 @@ export function FleetChat({
   fillViewport = false,
   showChannelToggle = false,
   onChannelToggle,
+  focusMessageId,
+  highlightQuery,
 }: FleetChatProps) {
   const fleet = useFleet()
   const displayName = fleet.displayName
@@ -278,17 +334,45 @@ export function FleetChat({
   useEffect(() => {
     const el = threadRef.current
     if (!el) return
+    if (focusMessageId) return
     el.scrollTop = el.scrollHeight
-  }, [roomKey])
+  }, [roomKey, focusMessageId])
 
   useEffect(() => {
     const el = threadRef.current
     if (!el) return
+    if (focusMessageId) return
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     if (distanceFromBottom < 96) {
       el.scrollTop = el.scrollHeight
     }
-  }, [messages])
+  }, [messages, focusMessageId])
+
+  // Bookmark jump from conversation search → exact message + pulse
+  useEffect(() => {
+    if (!focusMessageId) return
+    const el = threadRef.current
+    if (!el) return
+    let attempts = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const tryScroll = () => {
+      const node = el.querySelector(
+        `[data-message-id="${CSS.escape(focusMessageId)}"]`,
+      ) as HTMLElement | null
+      if (node) {
+        node.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        node.setAttribute('data-focused', 'true')
+        window.setTimeout(() => node.setAttribute('data-focused', 'settled'), 2200)
+        return
+      }
+      attempts += 1
+      if (attempts < 40) timer = setTimeout(tryScroll, 100)
+    }
+    timer = setTimeout(tryScroll, 50)
+    return () => {
+      if (timer) clearTimeout(timer)
+    }
+  }, [focusMessageId, messages.length])
 
   useEffect(() => {
     if (connected) {
@@ -731,6 +815,8 @@ export function FleetChat({
               m={m}
               agents={catalog}
               selfName={displayName}
+              focused={focusMessageId === m.id}
+              highlightQuery={highlightQuery}
             />
           ))}
         </div>

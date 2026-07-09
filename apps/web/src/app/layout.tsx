@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import type { ReactNode } from 'react'
-import { getTenantFromRequest } from '@bevel/tenant-config'
+import type { CSSProperties, ReactNode } from 'react'
+import { getTenantFromRequest, tenantThemeCssVars } from '@bevel/tenant-config'
 import { AuthProvider } from '@bevel/auth/client'
 import './globals.css'
 
@@ -12,10 +12,15 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const tenant = await getTenantFromRequest()
   const themeAttr = tenant?.slug ?? 'default'
+  const themeStyle = tenantThemeCssVars(tenant) as CSSProperties
 
   return (
-    <html lang="en" data-tenant-theme={themeAttr}>
-      <body style={tenant?.theme.accent ? { ['--tenant-accent' as string]: tenant.theme.accent } : undefined}>
+    <html
+      lang="en"
+      data-tenant-theme={themeAttr}
+      data-theme={tenant?.theme.mode === 'light' ? 'day' : undefined}
+    >
+      <body style={themeStyle}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

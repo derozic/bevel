@@ -9,12 +9,16 @@ export function BevelChatPane({
   sessionId,
   sessionTitle,
   initialAgents,
+  focusMessageId,
+  highlightQuery,
 }: {
   roomMode?: 'channel' | 'session'
   channelSlug?: string
   sessionId?: string
   sessionTitle?: string
   initialAgents: string[]
+  focusMessageId?: string
+  highlightQuery?: string
 }) {
   const { openSidebar } = useBevelChatPane()
 
@@ -25,6 +29,8 @@ export function BevelChatPane({
       sessionId={sessionId}
       sessionTitle={sessionTitle}
       initialAgents={initialAgents}
+      focusMessageId={focusMessageId}
+      highlightQuery={highlightQuery}
       fillViewport
       showChannelToggle
       onChannelToggle={openSidebar}

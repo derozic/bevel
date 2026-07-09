@@ -6,6 +6,16 @@ import { listSessionSummaries, readRecording, summarizeRecording } from './recor
 import { AgentSession } from './rooms/AgentSession.js'
 import { FleetChannel } from './rooms/FleetChannel.js'
 import { FleetLobby } from './rooms/FleetLobby.js'
+import {
+  conversationSearchIndex,
+  rebuildConversationSearchIndex,
+} from './search-index.js'
+
+// Build search index from JSONL archives as soon as the process starts.
+const bootIndex = rebuildConversationSearchIndex()
+console.log(
+  `[search-index] ready — ${bootIndex.documents} messages across ${bootIndex.sessions} sessions`,
+)
 
 export const server = defineServer({
   rooms: {
@@ -18,7 +28,15 @@ export const server = defineServer({
     app.use(express.json())
 
     app.get('/health', (_req, res) => {
-      res.json({ status: 'ok', service: 'agents-realtime', colyseus: true })
+      res.json({
+        status: 'ok',
+        service: 'agents-realtime',
+        colyseus: true,
+        searchIndex: {
+          ready: conversationSearchIndex.isReady(),
+          documents: conversationSearchIndex.size,
+        },
+      })
     })
 
     app.get('/', (_req, res) => {
@@ -26,6 +44,7 @@ export const server = defineServer({
         service: 'Derozic Fleet Realtime',
         rooms: ['fleet_lobby', 'agent_session', 'fleet_channel'],
         matchmaker: '/matchmake',
+        search: '/api/search?q=',
       })
     })
 
@@ -49,6 +68,36 @@ export const server = defineServer({
         return
       }
       res.json({ sessionId: req.params.id, events })
+    })
+
+    /**
+     * Bookmark-style conversation search.
+     * Each hit includes href + messageId so the client can open the room and
+     * scroll to the exact line with query highlighting.
+     */
+    app.get('/api/search', requireRealtimeAuth, (req, res) => {
+      const q = typeof req.query.q === 'string' ? req.query.q : ''
+      const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : 25
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(Math.max(1, limitRaw), 50)
+        : 25
+
+      if (!conversationSearchIndex.isReady()) {
+        rebuildConversationSearchIndex()
+      }
+
+      const hits = conversationSearchIndex.search(q, { limit })
+      res.json({
+        q,
+        count: hits.length,
+        indexSize: conversationSearchIndex.size,
+        hits,
+      })
+    })
+
+    app.post('/api/search/rebuild', requireRealtimeAuth, (_req, res) => {
+      const result = rebuildConversationSearchIndex()
+      res.json({ ok: true, ...result })
     })
   },
 })

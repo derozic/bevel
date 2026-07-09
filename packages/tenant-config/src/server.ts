@@ -1,9 +1,9 @@
 import { headers } from 'next/headers'
 import { TenantSchema, type Tenant } from '@bevel/schema'
+import { TENANT_HEADER, TENANT_HOST_HEADER } from './constants'
 import { lookupTenantByHost, lookupTenantBySlug } from './registry'
 
-export const TENANT_HEADER = 'x-bevel-tenant'
-export const TENANT_HOST_HEADER = 'x-bevel-host'
+export { TENANT_HEADER, TENANT_HOST_HEADER }
 
 function normalizeHost(host: string): string {
   return host.toLowerCase().split(':')[0]

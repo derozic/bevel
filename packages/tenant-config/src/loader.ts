@@ -8,15 +8,28 @@ import {
   type DeclarativeTenant,
   type ThemeTokens,
 } from '@bevel/schema/declarative-tenant'
+
 import { TenantSchema, type Tenant } from '@bevel/schema/tenant'
 
 const moduleDir = dirname(fileURLToPath(import.meta.url))
 
 export function resolveTenantsRoot(): string {
-  return (
-    process.env.BEVEL_TENANTS_ROOT ??
-    resolve(moduleDir, '../../../tenants')
-  )
+  const fallback = resolve(moduleDir, '../../../tenants')
+  const fromEnv = process.env.BEVEL_TENANTS_ROOT
+  if (!fromEnv) return fallback
+
+  // Relative paths are cwd-sensitive (apps/web vs monorepo root). Prefer the
+  // path that actually contains tenant folders.
+  const candidates = [
+    resolve(fromEnv),
+    resolve(process.cwd(), fromEnv),
+    resolve(process.cwd(), '../..', fromEnv),
+    fallback,
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+  return fallback
 }
 
 export function tenantDir(slug: string, root = resolveTenantsRoot()): string {
@@ -75,11 +88,13 @@ export function compileTenant(
   declarative: DeclarativeTenant,
   root = resolveTenantsRoot(),
 ): Tenant {
-  let themeAccent = '#7c5cff'
-  let productName = declarative.brand.product_name
+  let tokens: ThemeTokens = {
+    accent: '#7c5cff',
+    mode: 'dark',
+  }
+  const productName = declarative.brand.product_name
   try {
-    const tokens = loadThemeTokens(declarative, root)
-    themeAccent = tokens.accent
+    tokens = loadThemeTokens(declarative, root)
   } catch {
     // doctor will surface theme issues
   }
@@ -99,6 +114,7 @@ export function compileTenant(
       providers: authModeToProviders(declarative.auth.mode),
       allowedEmailDomains: declarative.auth.allowed_domains,
       allowedEmails: declarative.auth.allowed_emails,
+      defaultForDomains: declarative.auth.default_for_domains,
       requireGitHubForWork: declarative.auth.require_github_for_work,
     },
     features: {
@@ -109,7 +125,15 @@ export function compileTenant(
       customBranding: declarative.features.custom_branding,
     },
     theme: {
-      accent: themeAccent,
+      accent: tokens.accent,
+      background: tokens.background,
+      surface: tokens.surface,
+      surfaceRaised: tokens.surface_raised,
+      text: tokens.text,
+      textMuted: tokens.text_muted,
+      border: tokens.border,
+      fontSans: tokens.font_sans,
+      mode: tokens.mode ?? 'dark',
       productName: productName ?? declarative.tenant,
       logoUrl: logoPath && existsSync(logoPath) ? `file://${logoPath}` : undefined,
     },

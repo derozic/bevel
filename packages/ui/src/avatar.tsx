@@ -11,7 +11,7 @@ export const Avatar = forwardRef<
   <AvatarPrimitive.Root
     ref={ref}
     className={cn(
-      'relative flex h-9 w-9 shrink-0 overflow-hidden rounded-full border border-[var(--bevel-border)]',
+      'relative flex size-9 shrink-0 overflow-hidden rounded-full border border-border',
       className,
     )}
     {...props}
@@ -25,7 +25,7 @@ export const AvatarImage = forwardRef<
 >(({ className, ...props }, ref) => (
   <AvatarPrimitive.Image
     ref={ref}
-    className={cn('aspect-square h-full w-full object-cover', className)}
+    className={cn('aspect-square size-full object-cover', className)}
     {...props}
   />
 ))
@@ -38,7 +38,7 @@ export const AvatarFallback = forwardRef<
   <AvatarPrimitive.Fallback
     ref={ref}
     className={cn(
-      'flex h-full w-full items-center justify-center bg-[var(--bevel-surface-raised)] text-sm text-[var(--bevel-text-muted)]',
+      'flex size-full items-center justify-center bg-surface-raised text-sm text-muted',
       className,
     )}
     {...props}

@@ -9,4 +9,4 @@ dist
 *.log
 .DS_Store
 coverage
-.vercel
+.verceltmp/

@@ -5,6 +5,7 @@ import { canDispatchWork, normalizeWorkRepo } from '../work-repos.js'
 import { appendChannelMessage, fetchChannel, fetchChannelMessages } from '../fleet-channel-api.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { recordEvent } from '../recording.js'
+import { conversationSearchIndex } from '../search-index.js'
 import { loadMergedRegistry } from '../registry-merge.js'
 import {
   AgentPresence,
@@ -128,6 +129,22 @@ export class FleetChannel extends Room {
       msg.status = row.status
       msg.ts = new Date(row.createdAt).getTime() || Date.now()
       this.pushMessage(msg)
+      // Seed search index only (do not re-append history into JSONL)
+      if (row.speakerType !== 'system' && row.body?.trim()) {
+        conversationSearchIndex.indexDocument({
+          key: `${this.channelSlug}::${row.id}`,
+          messageId: row.id,
+          sessionId: this.channelSlug,
+          kind: 'channel',
+          channelSlug: this.channelSlug,
+          speaker: row.speakerName,
+          speakerType: row.speakerType,
+          agentId: row.agentId,
+          body: row.body,
+          ts: msg.ts,
+        })
+        conversationSearchIndex.markReady()
+      }
     }
 
     // Channel copy lives in the client empty state — avoid welcome/join/leave chat noise.
@@ -238,6 +255,16 @@ export class FleetChannel extends Room {
     human.ts = Date.now()
     this.pushMessage(human)
 
+    recordEvent({
+      ts: human.ts,
+      sessionId: this.channelSlug,
+      type: 'message',
+      speaker: human.speaker,
+      speakerType: 'human',
+      body: text,
+      meta: { messageId: human.id, channelSlug: this.channelSlug, tags },
+    })
+
     void appendChannelMessage(this.channelSlug, {
       id: human.id,
       speakerId: human.speakerId,
@@ -290,6 +317,17 @@ export class FleetChannel extends Room {
     reply.status = 'final'
     reply.ts = Date.now()
     this.pushMessage(reply)
+
+    recordEvent({
+      ts: reply.ts,
+      sessionId: this.channelSlug,
+      type: 'agent_reply',
+      speaker: agentName,
+      speakerType: 'agent',
+      agentId: target,
+      body: output,
+      meta: { messageId: reply.id, channelSlug: this.channelSlug },
+    })
 
     void appendChannelMessage(this.channelSlug, {
       id: reply.id,

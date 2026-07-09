@@ -40,6 +40,32 @@
   min-height: 0;
 }
 
+/* Conversation search — jump target + term highlight */
+.fleet-chat-msg-row[data-focused='true'] {
+  animation: fleet-chat-focus-pulse 1.8s ease-out 1;
+}
+
+.fleet-chat-msg-row[data-focused='true'] .fleet-chat-bubble,
+.fleet-chat-msg-row[data-focused='settled'] .fleet-chat-bubble {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bevel-accent, #7c5cff) 55%, transparent);
+}
+
+.fleet-chat-mark {
+  background: color-mix(in srgb, var(--bevel-accent, #7c5cff) 35%, transparent);
+  color: inherit;
+  border-radius: 0.15rem;
+  padding: 0 0.1em;
+}
+
+@keyframes fleet-chat-focus-pulse {
+  0% {
+    background: color-mix(in srgb, var(--bevel-accent, #7c5cff) 22%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
 .fleet-chat-channels-btn {
   display: inline-flex;
   height: 1.75rem;

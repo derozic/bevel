@@ -4,12 +4,29 @@
 @import "@bevel/realtime-client/styles/fleet-chat.css";
 @import "../styles/bevel-workspace.css";
 
+/* Tailwind v4 theme — maps design tokens to utilities (bg-*, text-*, border-*, font-*) */
 @theme {
   --color-background: var(--bevel-bg);
   --color-surface: var(--bevel-surface);
+  --color-surface-raised: var(--bevel-surface-raised);
   --color-border: var(--bevel-border);
-  --color-text: var(--bevel-text);
-  --color-text-muted: var(--bevel-text-muted);
+  --color-foreground: var(--bevel-text);
+  --color-muted: var(--bevel-text-muted);
+  --color-accent: var(--bevel-accent);
+  --color-accent-muted: var(--bevel-accent-muted);
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  --font-sans: var(--bevel-font-sans);
+  --font-mono: var(--bevel-font-mono);
+
+  --radius-sm: var(--bevel-radius-sm);
+  --radius-md: var(--bevel-radius-md);
+  --radius-lg: var(--bevel-radius-lg);
+  --radius-xl: 1rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
 }
 
 html,
@@ -21,4 +38,47 @@ body {
   background: var(--bevel-bg);
   color: var(--bevel-text);
   font-family: var(--bevel-font-sans);
+}
+
+/* ── Marketing home (signature motion / masks only) ─────── */
+
+.bevel-home-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--bevel-border) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--bevel-border) 55%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, black 20%, transparent 75%);
+}
+
+.bevel-text-accent {
+  background: linear-gradient(
+    120deg,
+    var(--bevel-text) 0%,
+    var(--bevel-accent) 45%,
+    color-mix(in srgb, var(--bevel-accent) 70%, #fff) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bevel-channel-preview {
+  animation: bevel-preview-in 0.7s ease-out both;
+}
+
+@keyframes bevel-preview-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bevel-channel-preview {
+    animation: none;
+  }
 }

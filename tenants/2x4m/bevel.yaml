@@ -22,6 +22,12 @@ auth:
   mode: google
   allowed_domains:
     - derozic.com
+    - 2x4m.com
+  # Platform login (bevel.lvh.me): Workspace users on these domains land in 2x4m
+  # with that org's channels + history (Slack-like home workspace).
+  default_for_domains:
+    - derozic.com
+    - 2x4m.com
   require_github_for_work: true
 
 realtime:

@@ -13,9 +13,9 @@ fi
 source .env 2>/dev/null || true
 
 echo "Starting BEVEL stack (web, admin, realtime, domains)…"
-echo "  Tenant app:  https://demo.bevel.lvh.me:${WEB_PORT:-43200}"
-echo "  Admin:       https://admin.bevel.lvh.me:${ADMIN_PORT:-43201}"
-echo "  Realtime:    https://realtime.bevel.lvh.me:${REALTIME_PORT:-43208}"
+echo "  Tenant app:  https://bevel.lvh.me"
+echo "  Admin:       https://admin.bevel.lvh.me"
+echo "  Realtime:    https://realtime.bevel.lvh.me"
 echo "  Domains API: http://127.0.0.1:${DOMAINS_PORT:-43209}"
 
 pnpm exec nx run-many -t dev \

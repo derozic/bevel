@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@bevel/schema": "workspace:*",
+    "@bevel/tenant-config": "workspace:*",
     "jose": "^6.2.3"
   },
   "peerDependencies": {

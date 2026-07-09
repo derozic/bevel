@@ -39,6 +39,8 @@ export function ChannelChatShell({
   fillViewport = false,
   showChannelToggle = false,
   onChannelToggle,
+  focusMessageId,
+  highlightQuery,
 }: {
   roomMode?: 'channel' | 'session'
   channelSlug?: string
@@ -48,6 +50,8 @@ export function ChannelChatShell({
   fillViewport?: boolean
   showChannelToggle?: boolean
   onChannelToggle?: () => void
+  focusMessageId?: string
+  highlightQuery?: string
 }) {
   const { data: session, status } = useSession()
   const [workRepos, setWorkRepos] = useState<FleetWorkRepo[]>([])
@@ -173,6 +177,8 @@ export function ChannelChatShell({
         initialAgents={initialAgents}
         fillViewport={fillViewport}
         showChannelToggle={showChannelToggle}
+        focusMessageId={focusMessageId}
+        highlightQuery={highlightQuery}
         onChannelToggle={onChannelToggle}
       />
     </FleetProvider>

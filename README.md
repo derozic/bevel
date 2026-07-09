@@ -111,7 +111,7 @@ caddy run --config caddy/Caddyfile   # optional HTTPS
 
 | Surface | Dev URL |
 |---------|---------|
-| Tenant (demo) | https://demo.bevel.lvh.me |
+| Tenant (demo) | https://bevel.lvh.me |
 | Tenant (acme) | https://bevel.acme.lvh.me |
 | Admin | https://admin.bevel.lvh.me |
 | Realtime | https://realtime.bevel.lvh.me |

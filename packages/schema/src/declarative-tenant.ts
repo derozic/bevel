@@ -9,6 +9,11 @@ export const DeclarativeAuthSchema = z.object({
     .default('google'),
   allowed_domains: z.array(z.string()).optional(),
   allowed_emails: z.array(z.string().email()).optional(),
+  /**
+   * When several tenants allow the same email domain (common in local multi-product
+   * setups), these domains prefer this tenant as the home workspace after platform login.
+   */
+  default_for_domains: z.array(z.string()).optional(),
   require_github_for_work: z.boolean().default(false),
 })
 
@@ -69,10 +74,14 @@ export const ThemeTokensSchema = z.object({
   accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#7c5cff'),
   background: z.string().optional(),
   surface: z.string().optional(),
+  surface_raised: z.string().optional(),
   text: z.string().optional(),
+  text_muted: z.string().optional(),
+  border: z.string().optional(),
   font_sans: z.string().optional(),
   font_mono: z.string().optional(),
   radius: z.string().optional(),
+  mode: z.enum(['light', 'dark']).default('dark'),
 })
 
 export type ThemeTokens = z.infer<typeof ThemeTokensSchema>

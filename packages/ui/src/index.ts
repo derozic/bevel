@@ -11,3 +11,4 @@ export {
   DialogDescription,
 } from './dialog'
 export { Avatar, AvatarImage, AvatarFallback } from './avatar'
+export { Separator } from './separator'

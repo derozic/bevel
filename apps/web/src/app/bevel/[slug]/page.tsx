@@ -30,11 +30,11 @@ export default async function BevelChannelPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>
-  searchParams: Promise<{ agents?: string }>
+  searchParams: Promise<{ agents?: string; msg?: string; q?: string }>
 }) {
   const session = await auth()
   const { slug } = await params
-  const { agents: agentsParam } = await searchParams
+  const { agents: agentsParam, msg, q } = await searchParams
 
   if (slug === 'talk') {
     redirect(BEVEL_TALK_PATH)
@@ -48,11 +48,16 @@ export default async function BevelChannelPage({
 
   if (!session?.user) {
     redirect(
-      `/auth/signin?callbackUrl=${encodeURIComponent(bevelChannelPath(channelSlug))}`
+      `/login?callbackUrl=${encodeURIComponent(bevelChannelPath(channelSlug))}`
     )
   }
 
   return (
-    <BevelChatPane channelSlug={channelSlug} initialAgents={initialAgents} />
+    <BevelChatPane
+      channelSlug={channelSlug}
+      initialAgents={initialAgents}
+      focusMessageId={msg}
+      highlightQuery={q}
+    />
   )
 }

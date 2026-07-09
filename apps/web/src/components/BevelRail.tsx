@@ -26,6 +26,7 @@ import {
 import { DEFAULT_CHANNELS, type FleetChannelSummary } from '@/lib/fleet-channels'
 import type { SessionSummary } from '@/lib/realtime'
 import { BevelMark } from './BevelMark'
+import { ConversationSearch } from './ConversationSearch'
 import { CreateChannelModal } from './CreateChannelModal'
 
 function BevelRailFooter() {
@@ -214,6 +215,11 @@ export function BevelRail({
             {headerAction}
           </div>
         </div>
+        {status === 'authenticated' ? (
+          <div className="mt-2.5">
+            <ConversationSearch />
+          </div>
+        ) : null}
       </div>
 
       <div className="bevel-rail-nav">

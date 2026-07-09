@@ -1,6 +1,8 @@
 tenant: demo
 name: BEVEL Demo
-domain: demo.bevel.lvh.me
+domain: bevel.lvh.me
+hosts:
+  - demo.bevel.lvh.me
 
 brand:
   theme: ./theme.json
@@ -32,7 +34,7 @@ transports:
     protocol: websocket
 
 deployment:
-  preview_url: https://demo.bevel.lvh.me
+  preview_url: https://bevel.lvh.me
   target: vercel
 
 work_repos:

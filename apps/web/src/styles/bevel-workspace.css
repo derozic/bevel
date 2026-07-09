@@ -1,6 +1,7 @@
 /* BEVEL workspace — Slack-like full-viewport shell (mobile portrait → 4K) */
 
 :root {
+  --platform-nav-height: 3.5rem;
   --bevel-workspace-height: calc(100dvh - var(--platform-nav-height, 3.5rem));
   --bevel-rail-width: clamp(13rem, 18vw, 20rem);
 }

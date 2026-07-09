@@ -11,7 +11,8 @@
     "./dialog": "./src/dialog.tsx",
     "./dropdown-menu": "./src/dropdown-menu.tsx",
     "./avatar": "./src/avatar.tsx",
-    "./button": "./src/button.tsx"
+    "./button": "./src/button.tsx",
+    "./separator": "./src/separator.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

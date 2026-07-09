@@ -5,7 +5,13 @@
   "description": "BEVEL design tokens, themes, motion, and typography",
   "type": "module",
   "exports": {
-    "./tokens.css": "./src/tokens.css",
-    "./themes.css": "./src/themes.css"
+    "./tokens.css": {
+      "style": "./src/tokens.css",
+      "default": "./src/tokens.css"
+    },
+    "./themes.css": {
+      "style": "./src/themes.css",
+      "default": "./src/themes.css"
+    }
   }
 }
