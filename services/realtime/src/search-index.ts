@@ -64,7 +64,7 @@ const STOP = new Set([
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
-    .split(/[^a-z0-9_@#./+-]+/i)
+    .split(/[^a-z0-9_@#^./+-]+/i)
     .map((t) => t.trim())
     .filter((t) => t.length >= 2 && !STOP.has(t))
 }
@@ -82,10 +82,13 @@ function hrefFor(doc: SearchDocument, query: string): string {
   const q = encodeURIComponent(query)
   const msg = encodeURIComponent(doc.messageId)
   if (doc.kind === 'channel') {
-    const slug = doc.channelSlug ?? doc.sessionId
-    return `/bevel/${encodeURIComponent(slug)}?msg=${msg}&q=${q}`
+    const slug = (doc.channelSlug ?? doc.sessionId)
+      .toLowerCase()
+      .replace(/^[\^#]+/, '')
+    // Public short path: /^general?msg=&q= (middleware rewrites to /bevel/*)
+    return `/^${encodeURIComponent(slug)}?msg=${msg}&q=${q}`
   }
-  return `/bevel/session/${encodeURIComponent(doc.sessionId)}?msg=${msg}&q=${q}`
+  return `/session/${encodeURIComponent(doc.sessionId)}?msg=${msg}&q=${q}`
 }
 
 function snippetAround(body: string, terms: string[], max = 140): string {

@@ -32,9 +32,9 @@ export function memberLeft(name: string): string {
   return `${name} stepped out — derozic's still here if you need anything ♡`
 }
 
-/** BEVEL channel rooms — shorter, workspace-forward copy */
+/** BEVEL channel rooms — shorter, workspace-forward copy (`^` channel tag). */
 export function channelWelcome(channelSlug: string, agentNames: string[]): string {
-  const tag = `#${channelSlug}`
+  const tag = `^${channelSlug}`
   if (agentNames.length === 0) {
     return `${tag} is open — pick agents above, then post.`
   }
@@ -45,11 +45,11 @@ export function channelWelcome(channelSlug: string, agentNames: string[]): strin
 }
 
 export function channelMemberJoined(name: string, channelSlug: string): string {
-  return `${name} joined #${channelSlug}`
+  return `${name} joined ^${channelSlug}`
 }
 
 export function channelMemberLeft(name: string, channelSlug: string): string {
-  return `${name} left #${channelSlug}`
+  return `${name} left ^${channelSlug}`
 }
 
 export function pickAgent(agentNames: string[]): string {

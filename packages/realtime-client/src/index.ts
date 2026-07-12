@@ -13,12 +13,21 @@ export {
 } from './FleetProvider'
 export { AgentChip, type AgentChipProps } from './components/AgentChip'
 export { FleetChat, type FleetChatProps } from './components/FleetChat'
-export { formatFleetError } from './lib/format-error'
+export {
+  formatFleetError,
+  formatRoomErrorEvent,
+  sanitizeErrorText,
+} from './lib/format-error'
 export { BevelPoweredBy } from './components/BevelPoweredBy'
 export {
+  BEVEL_WORD,
+  BEVEL_TM,
   BEVEL_NAME,
   BEVEL_POWERED_BY_LABEL,
+  BEVEL_TRADEMARK_NOTICE,
   BEVEL_PRODUCT,
+  CHANNEL_TAG_PREFIX,
+  channelTag,
   type BevelProduct,
 } from './product/bevel'
 export {
@@ -34,6 +43,13 @@ export {
 } from './product/agent-chip-copy'
 export { HumanAvatar } from './components/HumanAvatar'
 export type { FleetAgent } from './types'
+export {
+  applyMention,
+  filterMentionCandidates,
+  mentionDraftAt,
+  mentionedAgentIds,
+  parseResolvedMentions,
+} from './lib/mentions'
 export { resolveRealtimeUrl } from './lib/realtime-client'
 export { formatSpeaker, SYSTEM_SPEAKER } from './lib/system-voice'
 export {

@@ -16,7 +16,8 @@ function secretKey(): Uint8Array | null {
   const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
   if (!secret) {
     if (process.env.NODE_ENV === 'development') {
-      return new TextEncoder().encode('agents-dev-auth-secret-not-for-production')
+      // Must match packages/auth mintRealtimeToken fallback.
+      return new TextEncoder().encode('bevel-dev-auth-secret-not-for-production')
     }
     return null
   }

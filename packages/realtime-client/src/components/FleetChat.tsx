@@ -1,6 +1,6 @@
 'use client'
 
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Client, getStateCallbacks, type Room } from '@colyseus/sdk'
 import { Bars3Icon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
@@ -18,8 +18,19 @@ import {
   type SchemaMessage,
 } from '../lib/colyseus-messages'
 import { ChatMessageBody } from '../lib/chat-markdown'
+import {
+  applyMention,
+  filterMentionCandidates,
+  mentionDraftAt,
+  mentionedAgentIds,
+} from '../lib/mentions'
 import { formatSpeaker } from '../lib/system-voice'
 import { readRoomSnapshot, writeRoomSnapshot } from '../lib/room-state-cache'
+import {
+  formatFleetError,
+  formatRoomErrorEvent,
+  sanitizeErrorText,
+} from '../lib/format-error'
 import { cn } from '../lib/utils'
 import {
   BEVEL_COPY,
@@ -35,6 +46,27 @@ import { BevelPoweredBy } from './BevelPoweredBy'
 const SEAT_RETRY_MAX = 2
 const SEAT_RETRY_DELAY_MS = 700
 
+/** Never surface Colyseus "error undefined" placeholders in the UI. */
+function safeIssue(issue: BevelConnectionIssue): BevelConnectionIssue {
+  const title = sanitizeErrorText(issue.title)
+  if (
+    !title ||
+    title === 'undefined' ||
+    /^error\s+undefined$/i.test(title)
+  ) {
+    return {
+      title: BEVEL_COPY.errors.connectionFailed,
+      hint:
+        sanitizeErrorText(issue.hint) ||
+        'Reload the page. If it persists, restart realtime on port 43208.',
+    }
+  }
+  return {
+    title,
+    hint: sanitizeErrorText(issue.hint) || undefined,
+  }
+}
+
 /** Pinned inside the shell so connection issues stay visible above the thread. */
 function ConnectionNotice({
   issue,
@@ -43,14 +75,15 @@ function ConnectionNotice({
   issue: BevelConnectionIssue
   tone?: 'info' | 'warn'
 }) {
+  const safe = safeIssue(issue)
   return (
     <div
       className="fleet-chat-notice"
       data-tone={tone}
       role={tone === 'warn' ? 'alert' : 'status'}
     >
-      <p className="fleet-chat-notice-title">{issue.title}</p>
-      {issue.hint ? <p className="fleet-chat-notice-hint">{issue.hint}</p> : null}
+      <p className="fleet-chat-notice-title">{safe.title}</p>
+      {safe.hint ? <p className="fleet-chat-notice-hint">{safe.hint}</p> : null}
     </div>
   )
 }
@@ -76,14 +109,40 @@ export type FleetChatProps = {
   focusMessageId?: string
   /** Query string for in-thread highlight */
   highlightQuery?: string
+  /**
+   * Optional account control (e.g. Radix avatar dropdown) rendered in the
+   * chat header trailing slot — same surface as 2x4m UserAvatarRadix.
+   */
+  userMenu?: ReactNode
+  /**
+   * Build a direct-message href for an agent (e.g. /brain/chat).
+   * When provided, agent chips expose a Message action on their profile card.
+   */
+  agentMessageHref?: (agentId: string) => string
+  /** Show speaker avatars in the thread (default true). */
+  showAvatars?: boolean
+  /** Name label style from preferences. */
+  nameStyle?: 'full_and_display' | 'display_only'
+  /** Prefer 24-hour timestamps when true. */
+  clock24h?: boolean
+  /**
+   * Fired when an agent program-style message lands (e.g. JOHNNY Caddy heal).
+   * Host app raises PWA / desktop / Flutter notifications.
+   */
+  onProgramMessage?: (event: {
+    id: string
+    agentId?: string
+    speaker: string
+    body: string
+  }) => void
 }
 
 /** Hide legacy join/leave/welcome noise still in live room state. */
 function isEphemeralChannelNoise(body: string): boolean {
   return (
     /joined ♡|stepped out|i'm derozic|your fleet's listening|welcome in/i.test(body) ||
-    /joined #|left #/i.test(body) ||
-    /^#\w+ · (roster:|.* is on the roster)/i.test(body)
+    /joined [#^]|left [#^]/i.test(body) ||
+    /^[#^]\w+ · (roster:|.* is on the roster)/i.test(body)
   )
 }
 
@@ -138,23 +197,47 @@ function HighlightedText({ text, query }: { text: string; query?: string }) {
   }
 }
 
+function formatMessageName(
+  speaker: string,
+  nameStyle: 'full_and_display' | 'display_only',
+  agent?: FleetAgent,
+): string {
+  if (agent) {
+    if (nameStyle === 'full_and_display') {
+      return `${agent.name} · @${agent.id}`
+    }
+    return agent.name
+  }
+  // Humans: speaker is already the display string from the room
+  if (nameStyle === 'display_only') {
+    const first = speaker.trim().split(/\s+/)[0]
+    return first || speaker
+  }
+  return speaker
+}
+
 function MessageRow({
   m,
   agents,
   selfName,
   focused,
   highlightQuery,
+  showAvatars = true,
+  nameStyle = 'full_and_display',
 }: {
   m: ChatMsg
   agents: FleetAgent[]
   selfName: string
   focused?: boolean
   highlightQuery?: string
+  showAvatars?: boolean
+  nameStyle?: 'full_and_display' | 'display_only'
 }) {
   const rowProps = {
     id: `msg-${m.id}`,
     'data-message-id': m.id,
     'data-focused': focused ? 'true' : undefined,
+    'data-avatars': showAvatars ? 'true' : 'false',
   } as const
 
   if (m.speakerType === 'system') {
@@ -173,12 +256,17 @@ function MessageRow({
 
   if (m.speakerType === 'human') {
     const isSelf = m.speaker === selfName
+    const label = formatMessageName(m.speaker, nameStyle)
     return (
       <div className="fleet-chat-msg-row fleet-chat-msg-row--human" {...rowProps}>
-        <HumanAvatar name={m.speaker} avatarUrl={m.speakerAvatar} size="md" />
+        {showAvatars ? (
+          <HumanAvatar name={m.speaker} avatarUrl={m.speakerAvatar} size="md" />
+        ) : (
+          <span className="fleet-chat-avatar-spacer" aria-hidden />
+        )}
         <div className="fleet-chat-bubble fleet-chat-bubble--human">
           {!isSelf ? (
-            <p className="fleet-chat-msg-label">{m.speaker}</p>
+            <p className="fleet-chat-msg-label">{label}</p>
           ) : null}
           <div className="fleet-chat-msg-body">
             {highlightQuery?.trim() ? (
@@ -196,32 +284,39 @@ function MessageRow({
 
   const agent = agents.find((a) => a.id === m.agentId)
   const accent = accentStripeColor(agent?.accent) ?? agent?.accent
+  const agentLabel = formatMessageName(
+    m.speaker,
+    nameStyle,
+    agent,
+  )
 
   return (
     <div className="fleet-chat-msg-row fleet-chat-msg-row--agent" {...rowProps}>
-      {agent?.avatar ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={agent.avatar} alt="" className="fleet-chat-avatar" />
+      {showAvatars ? (
+        agent?.avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={agent.avatar} alt="" className="fleet-chat-avatar" />
+        ) : (
+          <span
+            className="fleet-chat-avatar-fallback"
+            data-agent="true"
+            style={
+              accent
+                ? ({ '--msg-accent': accent, backgroundColor: accent } as CSSProperties)
+                : { backgroundColor: '#7c3aed' }
+            }
+          >
+            {(m.speaker || 'A').charAt(0)}
+          </span>
+        )
       ) : (
-        <span
-          className="fleet-chat-avatar-fallback"
-          data-agent="true"
-          style={
-            accent
-              ? ({ '--msg-accent': accent, backgroundColor: accent } as CSSProperties)
-              : { backgroundColor: '#7c3aed' }
-          }
-        >
-          {(m.speaker || 'A').charAt(0)}
-        </span>
+        <span className="fleet-chat-avatar-spacer" aria-hidden />
       )}
       <div
         className="fleet-chat-bubble fleet-chat-bubble--agent"
         style={accent ? ({ '--msg-accent': accent } as CSSProperties) : undefined}
       >
-        <p className="fleet-chat-msg-label">
-          {formatSpeaker(m.speaker, m.speakerType)}
-        </p>
+        <p className="fleet-chat-msg-label">{agentLabel}</p>
         <div className="fleet-chat-msg-body">
           {highlightQuery?.trim() ? (
             <p className="whitespace-pre-wrap">
@@ -245,6 +340,12 @@ export function FleetChat({
   onChannelToggle,
   focusMessageId,
   highlightQuery,
+  userMenu,
+  agentMessageHref,
+  showAvatars = true,
+  nameStyle = 'full_and_display',
+  clock24h = false,
+  onProgramMessage,
 }: FleetChatProps) {
   const fleet = useFleet()
   const displayName = fleet.displayName
@@ -272,10 +373,14 @@ export function FleetChat({
   const [connected, setConnected] = useState(false)
   const [uiLive, setUiLive] = useState(bootHasThread)
   const [messages, setMessages] = useState<ChatMsg[]>(() => bootSnapshot?.messages ?? [])
+  const notifiedProgramIds = useRef<Set<string>>(new Set())
   const [participants, setParticipants] = useState<HumanParticipant[]>(
     () => bootSnapshot?.participants ?? []
   )
   const [input, setInput] = useState('')
+  const [caret, setCaret] = useState(0)
+  const [mentionHighlight, setMentionHighlight] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
   const [agentIds, setAgentIds] = useState<string[]>(() =>
     bootSnapshot?.agentIds?.length ? bootSnapshot.agentIds : initialAgents
   )
@@ -308,10 +413,23 @@ export function FleetChat({
   const connectGenRef = useRef(0)
   const threadRef = useRef<HTMLDivElement>(null)
   const tokenReady = Boolean(realtimeToken)
-  const presenceRoster = useMemo(
-    () => dedupeHumanParticipantsByUser(participants),
-    [participants]
-  )
+  // People currently in the room. When a userMenu (account avatar) is mounted,
+  // drop the current user from presence so we do not show two identical faces —
+  // the account control is the single self avatar and is the one that opens.
+  const presenceRoster = useMemo(() => {
+    const all = dedupeHumanParticipantsByUser(participants)
+    if (!userMenu) return all
+    const selfId = fleet.userId?.trim()
+    const selfName = fleet.displayName?.trim().toLowerCase()
+    const selfAvatar = fleet.avatarUrl?.trim()
+    return all.filter((p) => {
+      if (selfId && p.userId?.trim() === selfId) return false
+      if (selfAvatar && p.avatar?.trim() === selfAvatar) return false
+      // Fallback when presence userId is empty but name matches the operator
+      if (selfName && p.name?.trim().toLowerCase() === selfName) return false
+      return true
+    })
+  }, [participants, userMenu, fleet.userId, fleet.displayName, fleet.avatarUrl])
   const threadMessages = useMemo(() => dedupeMessagesById(messages), [messages])
 
   const initialAgentsKey = initialAgents.join(',')
@@ -362,6 +480,11 @@ export function FleetChat({
       if (node) {
         node.scrollIntoView({ block: 'center', behavior: 'smooth' })
         node.setAttribute('data-focused', 'true')
+        // Prefer in-message mark if highlight query present
+        const mark = node.querySelector('mark.fleet-chat-mark') as HTMLElement | null
+        if (mark) {
+          mark.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        }
         window.setTimeout(() => node.setAttribute('data-focused', 'settled'), 2200)
         return
       }
@@ -372,7 +495,29 @@ export function FleetChat({
     return () => {
       if (timer) clearTimeout(timer)
     }
-  }, [focusMessageId, messages.length])
+  }, [focusMessageId, highlightQuery, messages.length])
+
+  // Publish loaded messages to the host tab for free local search (no network)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(
+      new CustomEvent('bevel:room-messages', {
+        detail: {
+          roomKey,
+          channelSlug,
+          isChannel,
+          sessionId: isChannel ? channelSlug : resumeSessionId || roomKey,
+          messages: messages.map((m) => ({
+            id: m.id,
+            speaker: m.speaker,
+            body: m.body,
+            ts: m.ts,
+            speakerType: m.speakerType,
+          })),
+        },
+      }),
+    )
+  }, [messages, roomKey, channelSlug, isChannel, resumeSessionId])
 
   useEffect(() => {
     if (connected) {
@@ -418,8 +563,17 @@ export function FleetChat({
     setIssue(null)
 
     const realtimeUrl = fleet.realtimeUrl
-    const client = new Client(realtimeUrl)
-    client.auth.token = tokenRef.current ?? realtimeToken!
+    const authToken = tokenRef.current ?? realtimeToken!
+    // credentials:omit avoids cookie CORS traps (auth cookie domain .lvh.me is
+    // sent to realtime.* with credentials:include). Auth is Bearer JWT only.
+    const client = new Client(realtimeUrl, {
+      fetchFn: (input, init) =>
+        fetch(input, {
+          ...init,
+          credentials: 'omit',
+        }),
+    })
+    client.auth.token = authToken
 
     const roomName = isChannel ? 'fleet_channel' : 'agent_session'
     const joinRoster = joinRosterRef.current
@@ -434,12 +588,18 @@ export function FleetChat({
     }
 
     const joinOptions = isChannel
-      ? { channelSlug, agentIds: joinRoster, displayName: joinDisplayName }
+      ? {
+          channelSlug,
+          agentIds: joinRoster,
+          displayName: joinDisplayName,
+          authToken,
+        }
       : {
           ...(resumeSessionId ? { sessionId: resumeSessionId } : {}),
           agentIds: joinRoster,
           displayName: joinDisplayName,
           title: joinTitle,
+          authToken,
         }
 
     const connectTimeout = window.setTimeout(() => {
@@ -568,7 +728,9 @@ export function FleetChat({
 
           room.onError((code, message) => {
             if (cancelled) return
-            const raw = message || BEVEL_COPY.errors.roomError(`error ${code}`)
+            // Colyseus often fires onError(undefined, undefined) when the WS
+            // ErrorEvent has no code/reason — never surface "error undefined".
+            const raw = formatRoomErrorEvent(code, message)
             if (isSeatReservationExpired(raw) && connectionAttempt < SEAT_RETRY_MAX) {
               setIssue({ title: BEVEL_COPY.errors.seatReservationRetry })
               setConnected(false)
@@ -591,7 +753,7 @@ export function FleetChat({
         } catch (e) {
           setIssue({
             title: BEVEL_COPY.errors.bindFailed,
-            hint: e instanceof Error ? e.message : undefined,
+            hint: formatFleetError(e) || undefined,
           })
           setConnected(false)
         }
@@ -599,7 +761,8 @@ export function FleetChat({
       .catch((e) => {
         window.clearTimeout(connectTimeout)
         if (cancelled) return
-        const msg = e instanceof Error ? e.message : BEVEL_COPY.errors.connectionFailed
+        const msg =
+          formatFleetError(e) || BEVEL_COPY.errors.connectionFailed
         if (isSeatReservationExpired(msg) && connectionAttempt < SEAT_RETRY_MAX) {
           setIssue({ title: BEVEL_COPY.errors.seatReservationRetry })
           scheduleSeatRetry(() => cancelled, () => setConnectionAttempt((n) => n + 1))
@@ -628,14 +791,73 @@ export function FleetChat({
     })
   }, [roomKey, messages, participants, sessionTitle, sessionId, agentIds])
 
-  function mentionedAgents(text: string): string[] {
-    const found = new Set<string>()
-    for (const m of text.matchAll(/@([a-z0-9_-]+)\b/gi)) {
-      const id = m[1].toLowerCase()
-      if (catalog.some((a) => a.id === id)) found.add(id)
+  // Surface agent program runs (JOHNNY, etc.) to host notification bridges
+  useEffect(() => {
+    if (!onProgramMessage) return
+    for (const m of messages) {
+      if (m.speakerType !== 'agent' && m.speakerType !== 'system') continue
+      if (m.status === 'pending') continue
+      if (notifiedProgramIds.current.has(m.id)) continue
+      const isProgram =
+        m.agentId === 'johnny' ||
+        /\[program:|^JOHNNY\b|program:/i.test(m.body)
+      if (!isProgram) continue
+      notifiedProgramIds.current.add(m.id)
+      onProgramMessage({
+        id: m.id,
+        agentId: m.agentId,
+        speaker: m.speaker,
+        body: m.body,
+      })
     }
-    if (found.size > 0) return [...found]
+  }, [messages, onProgramMessage])
+
+  function mentionedAgents(text: string): string[] {
+    const found = mentionedAgentIds(text, catalog)
+    if (found.length > 0) return found
     return agentIds.length > 0 ? agentIds : catalog.map((a) => a.id).slice(0, 1)
+  }
+
+  const liveMentions = useMemo(
+    () => mentionedAgentIds(input, catalog),
+    [input, catalog],
+  )
+  const mentionDraft = useMemo(
+    () => mentionDraftAt(input, caret),
+    [input, caret],
+  )
+  const mentionCandidates = useMemo(() => {
+    if (!mentionDraft) return []
+    return filterMentionCandidates(catalog, mentionDraft.query)
+  }, [catalog, mentionDraft])
+
+  // When @agent resolves, light them up on the roster and auto-include
+  useEffect(() => {
+    if (liveMentions.length === 0) return
+    setAgentIds((prev) => {
+      const next = [...prev]
+      let changed = false
+      for (const id of liveMentions) {
+        if (!next.some((x) => x.toLowerCase() === id)) {
+          next.push(id)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [liveMentions])
+
+  function insertMention(agentId: string) {
+    if (!mentionDraft) return
+    const { text, caret: nextCaret } = applyMention(input, mentionDraft, agentId)
+    setInput(text)
+    setCaret(nextCaret)
+    requestAnimationFrame(() => {
+      const el = inputRef.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(nextCaret, nextCaret)
+    })
   }
 
   async function send() {
@@ -690,7 +912,7 @@ export function FleetChat({
 
   const sessionsPath = fleet.sessionsPath
   const headerLabel = isChannel
-    ? `#${channelSlug}`
+    ? `^${channelSlug}`
     : sessionTitle ?? (sessionId ? `Session ${sessionId.slice(0, 8)}…` : BEVEL_COPY.connectingSession)
 
   const visible = visibleMessages(messages)
@@ -764,26 +986,91 @@ export function FleetChat({
                   />
                 ))}
               </div>
-            ) : (
+            ) : userMenu ? null : (
               <span className="fleet-chat-presence-placeholder" aria-hidden />
             )}
           </div>
+          {userMenu ? (
+            <div className="fleet-chat-user-menu" data-account-menu>
+              {userMenu}
+            </div>
+          ) : null}
         </div>
 
         <div className="fleet-chat-agents" role="group" aria-label="Agents in channel">
-          {catalog.map((a) => (
-            <AgentChip
-              key={a.id}
-              agent={a}
-              active={agentIds.includes(a.id)}
-              onToggle={() => {
-                setAgentIds((prev) =>
-                  prev.includes(a.id) ? prev.filter((x) => x !== a.id) : [...prev, a.id]
-                )
-              }}
-            />
-          ))}
+          {catalog.map((a) => {
+            const isMentioned = liveMentions.includes(a.id.toLowerCase())
+            return (
+              <AgentChip
+                key={a.id}
+                agent={a}
+                active={agentIds.some((id) => id.toLowerCase() === a.id.toLowerCase())}
+                mentioned={isMentioned}
+                messageHref={agentMessageHref?.(a.id)}
+                role={a.category}
+                onToggle={() => {
+                  setAgentIds((prev) =>
+                    prev.some((id) => id.toLowerCase() === a.id.toLowerCase())
+                      ? prev.filter((x) => x.toLowerCase() !== a.id.toLowerCase())
+                      : [...prev, a.id],
+                  )
+                }}
+              />
+            )
+          })}
         </div>
+
+        {/* Live @mentions — avatars brought forward so you know the agent resolved */}
+        {liveMentions.length > 0 ? (
+          <div
+            className="fleet-chat-mention-strip"
+            role="status"
+            aria-live="polite"
+            aria-label="Mentioned agents"
+          >
+            {liveMentions.map((id) => {
+              const agent = catalog.find((a) => a.id.toLowerCase() === id)
+              if (!agent) return null
+              const stripe = accentStripeColor(agent.accent)
+              return (
+                <div
+                  key={id}
+                  className="fleet-chat-mention-pill"
+                  data-mentioned="true"
+                  style={
+                    stripe
+                      ? ({ '--chip-accent': stripe } as CSSProperties)
+                      : undefined
+                  }
+                >
+                  {agent.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={agent.avatar}
+                      alt=""
+                      className="fleet-chat-mention-pill-avatar"
+                    />
+                  ) : (
+                    <span
+                      className="fleet-chat-mention-pill-avatar fleet-chat-mention-pill-avatar--fallback"
+                      aria-hidden
+                    >
+                      {agent.name.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="fleet-chat-mention-pill-copy">
+                    <span className="fleet-chat-mention-pill-at">@{agent.id}</span>
+                    <span className="fleet-chat-mention-pill-name">
+                      {agent.name}
+                      {agent.tagline ? ` · ${agent.tagline}` : ''}
+                    </span>
+                  </span>
+                  <span className="fleet-chat-mention-pill-badge">Found</span>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
 
         <div className="fleet-chat-notice-slot" aria-live="polite">
           {issue ? (
@@ -817,6 +1104,8 @@ export function FleetChat({
               selfName={displayName}
               focused={focusMessageId === m.id}
               highlightQuery={highlightQuery}
+              showAvatars={showAvatars}
+              nameStyle={nameStyle}
             />
           ))}
         </div>
@@ -852,7 +1141,10 @@ export function FleetChat({
           </div>
         ) : null}
 
-        <div className="fleet-chat-composer">
+        <div
+          className="fleet-chat-composer"
+          data-mentioning={liveMentions.length > 0 ? 'true' : 'false'}
+        >
           {fleet.canPutOnWork ? (
             <>
               <button
@@ -881,23 +1173,126 @@ export function FleetChat({
             </>
           ) : null}
           <HumanAvatar name={displayName} avatarUrl={fleet.avatarUrl} size="sm" />
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-            placeholder={
-              workMode && fleet.canPutOnWork
-                ? isChannel
-                  ? BEVEL_COPY.placeholderWork(channelSlug, sampleAgent)
-                  : BEVEL_COPY.placeholderWork('session', sampleAgent)
-                : isChannel
-                  ? BEVEL_COPY.placeholderChannel(channelSlug, sampleAgent)
-                  : sessionPlaceholder
-            }
-            disabled={!connected || ticketBusy}
-            className="fleet-chat-input"
-            aria-label="Message"
-          />
+          <div className="fleet-chat-composer-field">
+            {mentionDraft && mentionCandidates.length > 0 ? (
+              <ul
+                className="fleet-chat-mention-menu"
+                role="listbox"
+                aria-label="Mention agent"
+              >
+                {mentionCandidates.map((a, i) => {
+                  const active = i === mentionHighlight
+                  return (
+                    <li key={a.id} role="option" aria-selected={active}>
+                      <button
+                        type="button"
+                        className="fleet-chat-mention-option"
+                        data-active={active ? 'true' : 'false'}
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          insertMention(a.id)
+                        }}
+                        onMouseEnter={() => setMentionHighlight(i)}
+                      >
+                        {a.avatar ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={a.avatar}
+                            alt=""
+                            className="fleet-chat-mention-option-avatar"
+                          />
+                        ) : (
+                          <span
+                            className="fleet-chat-mention-option-avatar fleet-chat-mention-option-avatar--fallback"
+                            aria-hidden
+                          >
+                            {a.name.slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                        <span className="fleet-chat-mention-option-text">
+                          <span className="fleet-chat-mention-option-name">
+                            {a.name}
+                          </span>
+                          <span className="fleet-chat-mention-option-id">
+                            @{a.id}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : null}
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value)
+                setCaret(e.target.selectionStart ?? e.target.value.length)
+                setMentionHighlight(0)
+              }}
+              onSelect={(e) => {
+                const t = e.currentTarget
+                setCaret(t.selectionStart ?? t.value.length)
+              }}
+              onClick={(e) => {
+                const t = e.currentTarget
+                setCaret(t.selectionStart ?? t.value.length)
+              }}
+              onKeyDown={(e) => {
+                if (mentionDraft && mentionCandidates.length > 0) {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    setMentionHighlight(
+                      (h) => (h + 1) % mentionCandidates.length,
+                    )
+                    return
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    setMentionHighlight(
+                      (h) =>
+                        (h - 1 + mentionCandidates.length) %
+                        mentionCandidates.length,
+                    )
+                    return
+                  }
+                  if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                    e.preventDefault()
+                    const pick =
+                      mentionCandidates[mentionHighlight] ?? mentionCandidates[0]
+                    if (pick) insertMention(pick.id)
+                    return
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    setCaret(input.length)
+                    // break draft by moving caret conceptually — append space if needed
+                    setInput((v) => (v.endsWith('@') ? v.slice(0, -1) : v))
+                    return
+                  }
+                }
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  void send()
+                }
+              }}
+              placeholder={
+                workMode && fleet.canPutOnWork
+                  ? isChannel
+                    ? BEVEL_COPY.placeholderWork(channelSlug, sampleAgent)
+                    : BEVEL_COPY.placeholderWork('session', sampleAgent)
+                  : isChannel
+                    ? BEVEL_COPY.placeholderChannel(channelSlug, sampleAgent)
+                    : sessionPlaceholder
+              }
+              disabled={!connected || ticketBusy}
+              className="fleet-chat-input"
+              aria-label="Message"
+              aria-autocomplete="list"
+              aria-expanded={Boolean(mentionDraft && mentionCandidates.length)}
+            />
+          </div>
           <button
             type="button"
             onClick={() => void send()}
