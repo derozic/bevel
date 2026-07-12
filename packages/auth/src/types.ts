@@ -24,6 +24,10 @@ declare module 'next-auth/jwt' {
     tenantHost?: string
     realtimeNamespace?: string
     githubLogin?: string
+    /** User OAuth access token for GitHub API (work mode / issues). Never expose to client session. */
+    githubAccessToken?: string
+    /** True when GitHub was linked with repo-capable scopes. */
+    repoWrite?: boolean
     picture?: string | null
     needsWorkspacePick?: boolean
     workspaceCandidates?: string

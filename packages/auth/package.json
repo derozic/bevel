@@ -10,7 +10,8 @@
     ".": "./src/index.ts",
     "./tokens": "./src/tokens.ts",
     "./client": "./src/client.tsx",
-    "./config": "./src/config.ts"
+    "./config": "./src/config.ts",
+    "./otp": "./src/otp.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

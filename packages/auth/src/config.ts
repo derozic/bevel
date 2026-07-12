@@ -1,6 +1,7 @@
 import './types'
 import Google from 'next-auth/providers/google'
 import GitHub from 'next-auth/providers/github'
+import Credentials from 'next-auth/providers/credentials'
 import type { NextAuthConfig } from 'next-auth'
 import type { Tenant } from '@bevel/schema'
 import {
@@ -12,6 +13,12 @@ import {
   resolveWorkspacesForEmail,
 } from '@bevel/tenant-config'
 import { mintRealtimeToken, resolveAuthSecret } from './tokens'
+import {
+  isPhoneSyntheticEmail,
+  phoneToSyntheticEmail,
+  verifyOtpCode,
+  type OtpChannel,
+} from './otp'
 
 export interface CreateTenantAuthConfigOptions {
   /** Tenant resolved from Host (shell / org surface). */
@@ -63,6 +70,65 @@ function cookieDomain(): string | undefined {
   return process.env.AUTH_COOKIE_DOMAIN || process.env.NEXTAUTH_COOKIE_DOMAIN || undefined
 }
 
+/**
+ * Auth.js cookies for multi-host OAuth.
+ *
+ * Local multi-tenant flow pins OAuth callbacks to AUTH_URL (platform host) while
+ * users often start sign-in on an org host (e.g. bevel.2x4m.lvh.me).
+ *
+ * Split strategy (important):
+ * - **CSRF is host-only** (`__Host-` when secure). Auth.js only validates CSRF on
+ *   the sign-in POST (same host as the form). Putting Domain=.lvh.me on CSRF caused
+ *   MissingCSRF in browsers (cookie not paired with the form body) and showed up as
+ *   a generic "Sign-in failed" on /login?error=MissingCSRF.
+ * - **PKCE / state / session / callback-url share AUTH_COOKIE_DOMAIN** so the Google
+ *   callback on the platform host can complete the dance started on an org host, and
+ *   the session can hop to the org host after /welcome.
+ */
+function buildAuthCookies(secure: boolean, domain?: string): NextAuthConfig['cookies'] {
+  const hostOnly = {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    path: '/',
+    secure,
+  }
+  const shared = {
+    ...hostOnly,
+    ...(domain ? { domain } : {}),
+  }
+  const shortLived = { ...shared, maxAge: 60 * 15 }
+  const securePrefix = secure ? '__Secure-' : ''
+  // CSRF stays host-only — use Auth.js default __Host- name when secure.
+  const csrfName = `${secure ? '__Host-' : ''}authjs.csrf-token`
+
+  return {
+    sessionToken: {
+      name: `${securePrefix}authjs.session-token`,
+      options: shared,
+    },
+    callbackUrl: {
+      name: `${securePrefix}authjs.callback-url`,
+      options: shared,
+    },
+    csrfToken: {
+      name: csrfName,
+      options: hostOnly,
+    },
+    pkceCodeVerifier: {
+      name: `${securePrefix}authjs.pkce.code_verifier`,
+      options: shortLived,
+    },
+    state: {
+      name: `${securePrefix}authjs.state`,
+      options: shortLived,
+    },
+    nonce: {
+      name: `${securePrefix}authjs.nonce`,
+      options: shared,
+    },
+  }
+}
+
 export function isGoogleAuthConfigured(): boolean {
   const id = process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID
   const secret = process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET
@@ -73,6 +139,13 @@ export function isGitHubAuthConfigured(): boolean {
   const id = process.env.AUTH_GITHUB_ID || process.env.GITHUB_CLIENT_ID
   const secret = process.env.AUTH_GITHUB_SECRET || process.env.GITHUB_CLIENT_SECRET
   return Boolean(id && secret)
+}
+
+/** OTP (email + SMS) is always available; delivery needs SMTP and/or Twilio. */
+export function isOtpAuthEnabled(): boolean {
+  const flag = process.env.AUTH_OTP_ENABLED
+  if (flag === '0' || flag === 'false') return false
+  return true
 }
 
 export function createTenantAuthConfig(
@@ -119,28 +192,90 @@ export function createTenantAuthConfig(
     )
   }
 
-  if (tenant.auth.providers.includes('github') && isGitHubAuthConfigured()) {
+  // GitHub is available for primary sign-in (mode=github) OR account linking
+  // for work mode (require_github_for_work) even when primary auth is Google.
+  if (isGitHubAuthConfigured()) {
     const clientId =
       process.env.AUTH_GITHUB_ID || process.env.GITHUB_CLIENT_ID || ''
     const clientSecret =
       process.env.AUTH_GITHUB_SECRET || process.env.GITHUB_CLIENT_SECRET || ''
+    // repo scope: collaborator checks, issues, work-mode write access
+    const scope =
+      process.env.AUTH_GITHUB_SCOPES || 'read:user user:email repo'
     providers.push(
       GitHub({
         clientId,
         clientSecret,
+        allowDangerousEmailAccountLinking: true,
         authorization: {
-          params: { scope: 'read:user user:email' },
+          params: { scope },
         },
       }),
     )
   }
 
-  const cookieOptions = {
-    httpOnly: true,
-    sameSite: 'lax' as const,
-    path: '/',
-    secure,
-    ...(domain ? { domain } : {}),
+  // Email + SMS OTP (Credentials). Codes issued via /api/auth/otp/send.
+  if (isOtpAuthEnabled()) {
+    providers.push(
+      Credentials({
+        id: 'otp',
+        name: 'OTP',
+        credentials: {
+          email: { label: 'Email', type: 'email' },
+          phone: { label: 'Phone', type: 'tel' },
+          otp: { label: 'Code', type: 'text' },
+          channel: { label: 'Channel', type: 'text' },
+        },
+        authorize: async (credentials) => {
+          const channelRaw =
+            typeof credentials?.channel === 'string'
+              ? credentials.channel
+              : credentials?.phone
+                ? 'sms'
+                : 'email'
+          const channel = (
+            channelRaw === 'sms' ? 'sms' : 'email'
+          ) as OtpChannel
+          const email =
+            typeof credentials?.email === 'string'
+              ? credentials.email.trim().toLowerCase()
+              : undefined
+          const phone =
+            typeof credentials?.phone === 'string'
+              ? credentials.phone.trim()
+              : undefined
+          const otp =
+            typeof credentials?.otp === 'string' ? credentials.otp.trim() : ''
+          const destination = channel === 'sms' ? phone : email
+          if (!otp || !destination) return null
+
+          const result = verifyOtpCode(channel, destination, otp)
+          if (!result.ok) return null
+
+          if (channel === 'email') {
+            const resolved = result.destination
+            if (platformEntry) {
+              if (!emailAllowedOnPlatform(resolved)) return null
+            } else if (!emailAllowedOnTenant(resolved, tenant)) {
+              return null
+            }
+            return {
+              id: resolved,
+              email: resolved,
+              name: resolved.split('@')[0] || resolved,
+            }
+          }
+
+          // SMS: possession of the number is the proof
+          const synthetic = phoneToSyntheticEmail(result.destination)
+          return {
+            id: synthetic,
+            email: synthetic,
+            name: result.destination,
+          }
+        },
+      }),
+    )
   }
 
   return {
@@ -154,17 +289,17 @@ export function createTenantAuthConfig(
       strategy: 'jwt',
       maxAge: 30 * 24 * 60 * 60,
     },
-    cookies: {
-      sessionToken: {
-        name: secure
-          ? '__Secure-authjs.session-token'
-          : 'authjs.session-token',
-        options: cookieOptions,
-      },
-    },
+    cookies: buildAuthCookies(secure, domain),
     callbacks: {
-      async signIn({ user }) {
+      async signIn({ user, account }) {
         if (!user.email) return false
+        // Phone OTP synthetic emails are allowed (number possession is the auth factor).
+        if (
+          account?.provider === 'otp' &&
+          isPhoneSyntheticEmail(user.email)
+        ) {
+          return true
+        }
         if (platformEntry) return emailAllowedOnPlatform(user.email)
         return emailAllowedOnTenant(user.email, tenant)
       },
@@ -175,9 +310,22 @@ export function createTenantAuthConfig(
           if (user?.name) token.name = user.name
           if (user?.image) token.picture = user.image
 
-          // Slack-like: resolve organization from Workspace email on platform entry
-          // (and re-resolve when session updates).
-          if (platformEntry || trigger === 'signIn' || !token.tenantSlug) {
+          // Phone OTP → bind to the host tenant (no email domain map).
+          if (isPhoneSyntheticEmail(email)) {
+            if (platformEntry || trigger === 'signIn' || !token.tenantSlug) {
+              token.tenantId = tenant.id
+              token.tenantSlug = tenant.slug
+              token.tenantHost = tenant.host
+              token.realtimeNamespace = tenant.realtime.namespace
+              token.needsWorkspacePick = false
+            }
+          } else if (
+            platformEntry ||
+            trigger === 'signIn' ||
+            !token.tenantSlug
+          ) {
+            // Resolve organization from Workspace email on platform entry
+            // (and re-resolve when session updates).
             const home = resolveHomeTenantForEmail(email)
             const { tenants } = resolveWorkspacesForEmail(email)
             if (home) {
@@ -217,8 +365,18 @@ export function createTenantAuthConfig(
           delete token.workspaceSwitchSlug
         }
 
-        if (account?.provider === 'github' && profile && 'login' in profile) {
-          token.githubLogin = String(profile.login)
+        // Link or sign-in with GitHub → work mode credentials on the JWT
+        if (account?.provider === 'github') {
+          if (profile && 'login' in profile) {
+            token.githubLogin = String(
+              (profile as { login?: string }).login || '',
+            )
+          }
+          if (account.access_token) {
+            token.githubAccessToken = String(account.access_token)
+          }
+          // Linked with repo scope → eligible for work mode (repo checks refine later)
+          token.repoWrite = true
         }
         return token
       },
@@ -247,6 +405,15 @@ export function createTenantAuthConfig(
             session.githubLogin = String(token.githubLogin)
           }
 
+          // Work mode: GitHub linked + tenant work_mode feature
+          const githubLinked = Boolean(token.githubLogin && token.repoWrite)
+          const workModeOn = active.features.workMode !== false
+          const requireGh = active.auth.requireGitHubForWork
+          session.canPutOnWork =
+            workModeOn &&
+            (requireGh ? githubLinked : githubLinked || !requireGh) &&
+            Boolean(token.repoWrite)
+
           const sub = token.sub ?? session.user.email
           if (sub && session.user.email) {
             // History + channels are namespaced by org tenant — not the entry host.
@@ -262,6 +429,7 @@ export function createTenantAuthConfig(
               githubLogin: token.githubLogin
                 ? String(token.githubLogin)
                 : undefined,
+              repoWrite: Boolean(session.canPutOnWork),
             })
           }
         }
