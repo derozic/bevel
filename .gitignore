@@ -56,3 +56,5 @@ services/api/.venv/
 
 # Release artifacts
 dist/
+
+/build/
