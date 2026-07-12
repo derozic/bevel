@@ -120,7 +120,9 @@ export default function DownloadPage() {
               <code className="rounded bg-surface px-1 py-0.5 text-[11px]">
                 dist/native/&lt;version&gt;/
               </code>
-              . Store / TestFlight links attach here when distribution is
+              . Deep native APIs (HealthKit / Health Connect, share sheets,
+              notifications, Icon Composer marks) ship in apps/mobile.
+              Store / TestFlight links attach when distribution is
               enabled for your org.
             </p>
           </div>

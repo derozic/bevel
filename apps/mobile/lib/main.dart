@@ -3,6 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'config.dart';
+import 'native/deep_links.dart';
+import 'native/health_service.dart';
+import 'native/native_capabilities.dart';
+import 'native/notification_service.dart';
+import 'native/sharing_service.dart';
+import 'ui/native_hub_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,7 +62,53 @@ class BevelHomePage extends StatefulWidget {
 }
 
 class _BevelHomePageState extends State<BevelHomePage> {
+  final _sharing = const SharingService();
+  final _health = HealthService();
+  final _notifications = NotificationService();
+  final _deepLinks = DeepLinkService();
+
+  NativeCapabilities? _caps;
   String? _status;
+  String? _lastDeepLink;
+
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    try {
+      final caps = await NativeCapabilities.probe();
+      if (caps.supportsNotifications) {
+        await _notifications.initialize();
+      }
+      if (caps.supportsHealth) {
+        await _health.configure();
+      }
+      if (caps.supportsDeepLinks) {
+        await _deepLinks.listen((uri) {
+          if (!mounted) return;
+          setState(() {
+            _lastDeepLink = uri.toString();
+            _status = 'Deep link: ${DeepLinkService.routeFor(uri) ?? uri}';
+          });
+        });
+      }
+      if (!mounted) return;
+      setState(() => _caps = caps);
+    } catch (e) {
+      // Tests and incomplete platform channels must not blank the shell.
+      if (!mounted) return;
+      setState(() => _status = 'Native probe limited: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _deepLinks.dispose();
+    super.dispose();
+  }
 
   Future<void> _open(Uri uri) async {
     setState(() => _status = 'Opening ${uri.host}${uri.path}…');
@@ -72,25 +124,41 @@ class _BevelHomePageState extends State<BevelHomePage> {
     }
   }
 
+  void _openNativeHub() {
+    final caps = _caps;
+    if (caps == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NativeHubPage(
+          capabilities: caps,
+          sharing: _sharing,
+          health: _health,
+          notifications: _notifications,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final caps = _caps;
     final platforms = <_PlatformCard>[
       _PlatformCard(
         title: 'iOS',
-        subtitle: 'iPhone and iPad · TestFlight / App Store',
+        subtitle: 'HealthKit · Share · APNs · Icon Composer',
         icon: Icons.phone_iphone_rounded,
         onOpen: () => _open(BevelConfig.workspaceUri()),
       ),
       _PlatformCard(
         title: 'Android',
-        subtitle: 'Phone and tablet · Play Store / APK',
+        subtitle: 'Health Connect · Share · FCM · Adaptive icon',
         icon: Icons.phone_android_rounded,
         onOpen: () => _open(BevelConfig.workspaceUri()),
       ),
       _PlatformCard(
         title: 'Mac Silicon',
-        subtitle: 'arm64 Flutter desktop · M-series only',
+        subtitle: 'arm64 desktop · notifications · share',
         icon: Icons.desktop_mac_rounded,
         onOpen: () => _open(BevelConfig.workspaceUri()),
       ),
@@ -123,6 +191,11 @@ class _BevelHomePageState extends State<BevelHomePage> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Native integrations',
+            onPressed: caps == null ? null : _openNativeHub,
+            icon: const Icon(Icons.hub_outlined),
+          ),
+          IconButton(
             tooltip: 'Copy workspace URL',
             onPressed: () async {
               await Clipboard.setData(
@@ -152,8 +225,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'One Flutter codebase ships to iOS, Android, and Apple Silicon '
-                  'Mac. Open your workspace to join channels with humans and agents.',
+                  'Native-first on iOS and Android: HealthKit / Health Connect, '
+                  'system share, notifications, deep links, and award-tier '
+                  'iconography — one Flutter codebase including Apple Silicon Mac.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFF9AA8B5),
                         height: 1.45,
@@ -170,6 +244,12 @@ class _BevelHomePageState extends State<BevelHomePage> {
                       vertical: 14,
                     ),
                   ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: caps == null ? null : _openNativeHub,
+                  icon: const Icon(Icons.health_and_safety_outlined),
+                  label: const Text('Native integrations'),
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
@@ -204,7 +284,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 const SizedBox(height: 16),
                 Text(
                   'Workspace: ${BevelConfig.baseUrl}\n'
-                  'Client v${BevelConfig.versionLabel}',
+                  'Client v${BevelConfig.versionLabel}'
+                  '${caps != null ? ' · ${caps.platformLabel}' : ''}'
+                  '${_lastDeepLink != null ? '\nLast link: $_lastDeepLink' : ''}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: const Color(0xFF6B7A88),
                         height: 1.5,
