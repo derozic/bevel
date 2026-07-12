@@ -1,0 +1,97 @@
+name: Native release bundles
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: BEVEL_BASE_URL for the client
+        required: false
+        default: https://app.bevel.com
+      target:
+        description: all | macos | android | ios
+        required: false
+        default: all
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-android:
+    name: Flutter macOS + Android
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter test
+        run: flutter test
+
+      - name: Build release bundles
+        env:
+          BEVEL_BASE_URL: ${{ inputs.base_url || 'https://app.bevel.com' }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          chmod +x scripts/mobile/release.sh
+          TARGET="${{ inputs.target || 'all' }}"
+          # Prefer macos+android on CI; ios often needs certs
+          if [[ "$TARGET" == "all" ]]; then
+            ./scripts/mobile/release.sh macos || true
+            ./scripts/mobile/release.sh android || true
+          else
+            ./scripts/mobile/release.sh "$TARGET" || true
+          fi
+
+      - name: Upload native artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bevel-native-${{ github.ref_name }}
+          path: dist/native/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  build-ios:
+    name: Flutter iOS (unsigned)
+    runs-on: macos-latest
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: iOS release (no codesign)
+        env:
+          BEVEL_BASE_URL: ${{ inputs.base_url || 'https://app.bevel.com' }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          chmod +x scripts/mobile/release.sh
+          ./scripts/mobile/release.sh ios || true
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bevel-ios-${{ github.ref_name }}
+          path: dist/native/**
+          if-no-files-found: warn
+          retention-days: 14

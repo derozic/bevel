@@ -12,6 +12,7 @@ bevel/
   apps/
     web/             # Next.js tenant app (Host → tenant)
     admin/           # Operator console
+    mobile/          # Flutter — iOS, Android, macOS Silicon
     docs/            # Developer documentation
   services/
     realtime/        # WebSocket — live bidirectional (isolated)
@@ -163,3 +164,14 @@ pnpm mcp                 # run stdio MCP server
 ## License
 
 MIT
+## Native clients (iOS · Android · macOS Silicon)
+
+Flutter app: `apps/mobile`. Release bundles:
+
+```bash
+./scripts/mobile/release.sh macos     # Apple Silicon .app + zip
+./scripts/mobile/release.sh android   # APK + AAB
+./scripts/mobile/release.sh ios       # iOS release (signing required for store)
+```
+
+See [docs/NATIVE_RELEASE.md](docs/NATIVE_RELEASE.md) and the in-app download page at `/download`.

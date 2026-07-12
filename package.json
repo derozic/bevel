@@ -2,7 +2,7 @@
   "name": "bevel",
   "version": "0.1.0",
   "private": true,
-  "description": "BEVEL — multi-tenant workspace channels for humans and agents",
+  "description": "BEVEL \u2014 multi-tenant workspace channels for humans and agents",
   "packageManager": "pnpm@10.15.1",
   "scripts": {
     "dev": "nx run-many -t dev --projects=web,admin,realtime --parallel=3",
@@ -21,7 +21,14 @@
     "typecheck": "nx run-many -t typecheck --all",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
     "bevel": "pnpm exec tsx packages/cli/src/index.ts",
-    "doctor": "pnpm bevel doctor"
+    "doctor": "pnpm bevel doctor",
+    "mobile:get": "cd apps/mobile && flutter pub get",
+    "mobile:test": "cd apps/mobile && flutter test",
+    "mobile:run:macos": "cd apps/mobile && flutter run -d macos --dart-define=BEVEL_BASE_URL=https://2x4m.bevel.lvh.me",
+    "mobile:release": "bash scripts/mobile/release.sh",
+    "mobile:release:macos": "bash scripts/mobile/release.sh macos",
+    "mobile:release:android": "bash scripts/mobile/release.sh android",
+    "mobile:release:ios": "bash scripts/mobile/release.sh ios"
   },
   "devDependencies": {
     "@bevel/cli": "workspace:*",

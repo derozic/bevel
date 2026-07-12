@@ -53,3 +53,6 @@ __pycache__/
 *.py[cod]
 .venv/
 services/api/.venv/
+
+# Release artifacts
+dist/

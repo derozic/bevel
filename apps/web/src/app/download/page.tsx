@@ -108,9 +108,20 @@ export default function DownloadPage() {
               </li>
             </ul>
             <p className="text-xs">
-              Store links and build artifacts will attach here as release
-              pipelines land. For now, open the workspace on the web and ask an
-              operator for the latest Flutter package.
+              Native builds ship from{' '}
+              <code className="rounded bg-surface px-1 py-0.5 text-[11px]">
+                apps/mobile
+              </code>{' '}
+              via{' '}
+              <code className="rounded bg-surface px-1 py-0.5 text-[11px]">
+                ./scripts/mobile/release.sh
+              </code>{' '}
+              (iOS, Android, macOS arm64). Artifacts land in{' '}
+              <code className="rounded bg-surface px-1 py-0.5 text-[11px]">
+                dist/native/&lt;version&gt;/
+              </code>
+              . Store / TestFlight links attach here when distribution is
+              enabled for your org.
             </p>
           </div>
         </div>
