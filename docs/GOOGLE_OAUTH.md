@@ -10,10 +10,18 @@ Type: **Web application**
 ```
 https://bevel.lvh.me
 https://demo.bevel.lvh.me
+https://bevel.2x4m.lvh.me
 ```
 
-(OAuth callback stays on the platform entry host. After login we hop to the org host
-with a shared cookie domain — `.lvh.me` locally.)
+OAuth **callback** stays on the platform entry host (`AUTH_URL` / `NEXTAUTH_URL` =
+`https://bevel.lvh.me`). Users may click “Sign in” on an org host
+(`bevel.2x4m.lvh.me`); Auth.js still sends `redirect_uri` to the platform host.
+
+That only works when **all** Auth.js cookies (session, CSRF, PKCE, state) share
+`AUTH_COOKIE_DOMAIN=.lvh.me`. Host-only `__Host-` CSRF cookies break the hop and
+surface as Auth.js `Configuration` (“Google OAuth credentials may be missing”).
+
+After login, `/welcome` hops to the org host with the shared session cookie.
 
 ## 2. Authorized redirect URIs
 
@@ -22,6 +30,9 @@ https://bevel.lvh.me/api/auth/callback/google
 https://demo.bevel.lvh.me/api/auth/callback/google
 ```
 
+(Org hosts do **not** need their own Google redirect URI while `AUTH_URL` pins
+callbacks to the platform. Optional: add org-host callbacks only if you drop the
+`AUTH_URL` pin and run same-host OAuth.)
 ## 3. Scopes (Data access / OAuth consent)
 
 Non-sensitive scopes used by Auth.js:
@@ -58,6 +69,8 @@ AUTH_GOOGLE_HD=derozic.com
 AUTH_TRUST_HOST=true
 AUTH_URL=https://bevel.lvh.me
 NEXTAUTH_URL=https://bevel.lvh.me
+# Required for org-host → platform OAuth hop (PKCE/session shared across *.lvh.me)
+AUTH_COOKIE_DOMAIN=.lvh.me
 ```
 
 Then restart web:
