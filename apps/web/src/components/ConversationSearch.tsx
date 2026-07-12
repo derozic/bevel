@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import type { SearchHitDto } from '@/app/api/search/route'
+import { localMessageIndex } from '@/lib/local-message-index'
 
 function formatWhen(ts: number): string {
   if (!ts) return ''
@@ -21,7 +22,7 @@ function formatWhen(ts: number): string {
 }
 
 function roomLabel(hit: SearchHitDto): string {
-  if (hit.kind === 'channel') return `#${hit.channelSlug ?? hit.sessionId}`
+  if (hit.kind === 'channel') return `^${hit.channelSlug ?? hit.sessionId}`
   return hit.sessionId.startsWith('dm-') ? 'Direct' : `Session ${hit.sessionId.slice(0, 8)}…`
 }
 
@@ -54,23 +55,52 @@ export function ConversationSearch({ className }: { className?: string }) {
       setLoading(false)
       return
     }
-    setLoading(true)
     setError(null)
+    // 1) Instant: in-tab inverted index of messages already loaded (free, to the metal)
+    const local = localMessageIndex.search(query, 20).map(
+      (h): SearchHitDto => ({
+        key: h.key,
+        messageId: h.messageId,
+        sessionId: h.sessionId,
+        kind: h.kind,
+        channelSlug: h.channelSlug,
+        speaker: h.speaker,
+        speakerType: 'unknown',
+        body: h.body,
+        ts: h.ts,
+        score: h.score + 50, // prefer open-room hits
+        snippet: h.snippet,
+        href: h.href,
+      }),
+    )
+    setHits(local)
+    setActive(0)
+
+    // 2) Full history: realtime process index (still local machine, no SaaS)
+    setLoading(true)
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=20`, {
         credentials: 'include',
       })
       if (!res.ok) {
-        setError('Search is unavailable right now')
-        setHits([])
+        if (local.length === 0) setError('Search is unavailable right now')
         return
       }
       const data = (await res.json()) as { hits?: SearchHitDto[] }
-      setHits(data.hits ?? [])
+      const remote = data.hits ?? []
+      // Merge: local first, then remote by key
+      const seen = new Set(local.map((h) => h.key ?? `${h.sessionId}:${h.messageId}`))
+      const merged = [...local]
+      for (const hit of remote) {
+        const k = hit.key ?? `${hit.sessionId}:${hit.messageId}`
+        if (seen.has(k)) continue
+        seen.add(k)
+        merged.push(hit)
+      }
+      setHits(merged.slice(0, 30))
       setActive(0)
     } catch {
-      setError('Search failed')
-      setHits([])
+      if (local.length === 0) setError('Search failed')
     } finally {
       setLoading(false)
     }
@@ -100,9 +130,10 @@ export function ConversationSearch({ className }: { className?: string }) {
   useEffect(() => {
     if (!open) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    // Local index is instant; keep a short debounce only for remote merge
     debounceRef.current = setTimeout(() => {
       void runSearch(q)
-    }, 120)
+    }, 40)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
@@ -121,17 +152,12 @@ export function ConversationSearch({ className }: { className?: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={cn(
-          'flex w-full items-center gap-2 rounded-lg border border-border bg-background/40 px-2.5 py-1.5 text-left text-xs text-muted transition hover:border-accent/40 hover:text-foreground',
-          className,
-        )}
+        className={cn('bevel-rail-search', className)}
         aria-label="Search conversations"
       >
-        <MagnifyingGlassIcon className="size-3.5 shrink-0" aria-hidden />
-        <span className="flex-1 truncate">Search conversations…</span>
-        <kbd className="rounded border border-border px-1 py-0.5 font-mono text-[10px] text-muted">
-          ⌘K
-        </kbd>
+        <MagnifyingGlassIcon className="bevel-rail-search__icon" aria-hidden />
+        <span className="bevel-rail-search__label">Search conversations</span>
+        <kbd className="bevel-rail-search__kbd">⌘K</kbd>
       </button>
     )
   }

@@ -1,0 +1,33 @@
+{
+  "name": "BEVEL",
+  "short_name": "BEVEL",
+  "description": "Open channels for humans and agents. Agent programs notify you across web, desktop, and mobile.",
+  "start_url": "/^general",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c0c0e",
+  "theme_color": "#7c5cff",
+  "lang": "en",
+  "categories": ["productivity", "business", "social"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/2x4m/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

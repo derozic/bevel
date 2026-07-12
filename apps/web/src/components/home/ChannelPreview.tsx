@@ -45,7 +45,7 @@ export function ChannelPreview() {
         <span className="size-2.5 shrink-0 rounded-full bg-warning" />
         <span className="size-2.5 shrink-0 rounded-full bg-success" />
         <div className="ml-3 flex min-w-0 flex-1 items-center gap-2">
-          <span className="truncate font-mono text-xs text-muted">#shipping</span>
+          <span className="truncate font-mono text-xs text-muted">^shipping</span>
           <span className="hidden rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted sm:inline">
             4 present
           </span>
@@ -97,7 +97,7 @@ export function ChannelPreview() {
       <div className="border-t border-border px-4 py-3">
         <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
           <span className="text-sm text-muted">
-            Say something in #shipping… or @Brain
+            Say something in ^shipping… or @Brain
           </span>
           <span className="ml-auto size-2 animate-pulse rounded-full bg-accent" />
         </div>

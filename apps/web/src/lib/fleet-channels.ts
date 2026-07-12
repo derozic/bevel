@@ -12,4 +12,14 @@ export const DEFAULT_CHANNELS: FleetChannelSummary[] = [
     name: 'General',
     tags: ['bevel', 'general'],
   },
+  {
+    slug: 'product',
+    name: 'product',
+    tags: ['bevel', 'product', 'github', 'accountability'],
+  },
+  {
+    slug: 'ops',
+    name: 'ops',
+    tags: ['bevel', 'ops', 'programs'],
+  },
 ]

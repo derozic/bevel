@@ -9,7 +9,7 @@ import {
 import { auth } from '@/auth'
 
 /**
- * Post-login router (Slack-like).
+ * Post-login router.
  * Platform entry (bevel.lvh.me) → org host / workspace picker based on Google Workspace email.
  * Org host → straight into /bevel (tenant realtime namespace = historical chats).
  */
@@ -37,8 +37,9 @@ export default async function WelcomePage() {
     redirect('/workspaces')
   }
 
+  // No org yet — claim a namespace instead of a dead-end AccessDenied.
   if (!home && tenants.length === 0) {
-    redirect('/login?error=AccessDenied')
+    redirect('/claim')
   }
 
   const target = home ?? tenants[0]!
@@ -46,9 +47,9 @@ export default async function WelcomePage() {
 
   // Hop to the organization's BEVEL host so channels/history bind to that namespace.
   if (onPlatform && target.host !== host) {
-    redirect(publicTenantUrl(target, '/bevel'))
+    redirect(publicTenantUrl(target, '/^general'))
   }
 
   // Already on the org host (or soft multi-tenant on same host)
-  redirect('/bevel')
+  redirect('/^general')
 }

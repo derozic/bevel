@@ -13,7 +13,8 @@ const nextConfig: NextConfig = {
     'demo.bevel.lvh.me',
     'bevel.acme.lvh.me',
     'acme.bevel.lvh.me',
-    'bevel.agents.2x4m.lvh.me',
+    'bevel.2x4m.lvh.me',
+    'bevel.agents.2x4m.lvh.me', // legacy redirect target still hits Next briefly
     'bevel.2ndbrain.lvh.me',
     'bevel.preso.lvh.me',
   ],

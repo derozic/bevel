@@ -4,7 +4,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { signIn, useSession } from 'next-auth/react'
 import { FleetChat, FleetProvider, type FleetWorkRepo } from '@bevel/realtime-client'
 import { agents } from '@/lib/agent-catalog'
-import { BEVEL_ARCHIVE_PATH, BEVEL_COPY } from '@/lib/bevel'
+import { BEVEL_ARCHIVE_PATH, BEVEL_COPY, bevelTalkPath } from '@/lib/bevel'
+import { UserMenu } from '@/components/UserMenu'
+import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
+import {
+  ensureNotificationPermission,
+  showBevelNotification,
+} from '@/lib/bevel-notify'
 
 const WORK_REPO_STORAGE_KEY = 'bevel.workRepo'
 
@@ -54,11 +60,22 @@ export function ChannelChatShell({
   highlightQuery?: string
 }) {
   const { data: session, status } = useSession()
+  const prefs = usePreferencesOptional()
   const [workRepos, setWorkRepos] = useState<FleetWorkRepo[]>([])
   const [defaultRepo, setDefaultRepo] = useState('derozic/2x4m')
   const [selectedWorkRepo, setSelectedWorkRepo] = useState<string | null>(null)
-  const [canPutOnWork, setCanPutOnWork] = useState(false)
-  const [workMeta, setWorkMeta] = useState<WorkAccessMeta | null>(null)
+  const [canPutOnWork, setCanPutOnWork] = useState(
+    () => Boolean(session?.canPutOnWork),
+  )
+  const [workMeta, setWorkMeta] = useState<WorkAccessMeta | null>(() =>
+    session?.githubLogin
+      ? {
+          githubEnabled: true,
+          linked: true,
+          login: session.githubLogin,
+        }
+      : null,
+  )
 
   useEffect(() => {
     if (status !== 'authenticated') {
@@ -67,6 +84,16 @@ export function ChannelChatShell({
       setWorkMeta(null)
       return
     }
+
+    // Optimistic from session while APIs load
+    if (session?.githubLogin) {
+      setWorkMeta({
+        githubEnabled: true,
+        linked: true,
+        login: session.githubLogin,
+      })
+    }
+    if (session?.canPutOnWork) setCanPutOnWork(true)
 
     let cancelled = false
     Promise.all([
@@ -123,7 +150,8 @@ export function ChannelChatShell({
         accent: a.accent,
         category: a.category,
         avatar: a.avatarUrl,
-        summary: a.bio,
+        tagline: a.tagline,
+        summary: a.bio || a.summary,
         capabilities: a.skills.slice(0, 4),
       })),
     []
@@ -140,8 +168,14 @@ export function ChannelChatShell({
     }
   }
 
+  const realtimeUrl =
+    process.env.NEXT_PUBLIC_REALTIME_URL ??
+    process.env.REALTIME_URL ??
+    'https://realtime.bevel.lvh.me'
+
   return (
     <FleetProvider
+      realtimeUrl={realtimeUrl}
       realtimeToken={session?.realtimeToken}
       displayName={displayNameFromSession(session)}
       userId={session?.user?.id}
@@ -163,7 +197,9 @@ export function ChannelChatShell({
       githubLinked={workMeta?.linked ?? Boolean(session?.githubLogin)}
       githubLogin={workMeta?.login ?? session?.githubLogin ?? null}
       onLinkGitHub={() =>
-        signIn('github', { callbackUrl: `/bevel/${channelSlug}` })
+        signIn('github', {
+          callbackUrl: `/^product?github=linked&from=${encodeURIComponent(channelSlug)}`,
+        })
       }
       authError={
         status !== 'loading' && !session?.realtimeToken
@@ -180,6 +216,28 @@ export function ChannelChatShell({
         focusMessageId={focusMessageId}
         highlightQuery={highlightQuery}
         onChannelToggle={onChannelToggle}
+        userMenu={<UserMenu size="sm" align="end" />}
+        agentMessageHref={(agentId) => bevelTalkPath(agentId)}
+        showAvatars={prefs?.prefs.messages.showAvatars !== false}
+        nameStyle={prefs?.prefs.messages.nameStyle ?? 'full_and_display'}
+        clock24h={prefs?.prefs.messages.clock24h ?? false}
+        onProgramMessage={(event) => {
+          // Prefer desktop notifications when enabled in prefs
+          if (prefs?.prefs.notifications.desktopEnabled === false) return
+          const title = event.speaker || event.agentId || 'Agent'
+          const body = event.body.slice(0, 240)
+          void (async () => {
+            await ensureNotificationPermission()
+            await showBevelNotification({
+              title,
+              body,
+              agentId: event.agentId,
+              tag: `msg-${event.id}`,
+              url: `/^${channelSlug}`,
+              icon: '/icons/icon-192.png',
+            })
+          })()
+        }}
       />
     </FleetProvider>
   )

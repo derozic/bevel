@@ -6,8 +6,7 @@ import { BEVEL_COPY, bevelChannelHref, bevelTalkPath } from '@/lib/bevel'
 import { parseChatAgentsParam } from '@/lib/chat-agents'
 
 /**
- * Resolves /bevel and /bevel#channel — hash is client-only, so we normalize
- * to the canonical path /bevel/:slug on first paint.
+ * Resolves workspace entry + #channel hash → canonical `/^slug` on first paint.
  */
 export function BevelEntry() {
   const router = useRouter()

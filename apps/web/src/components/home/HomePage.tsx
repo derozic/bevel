@@ -9,16 +9,30 @@ import {
   ServerStackIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline'
+import type {
+  FeatureAccess,
+  ResolvedFeatureSet,
+  TenantPlan,
+} from '@bevel/schema'
 import { Button, Separator, cn } from '@bevel/ui'
 import { BevelMark } from '@/components/BevelMark'
 import { ChannelPreview } from '@/components/home/ChannelPreview'
-import { BEVEL_HOME_PATH, BEVEL_NAME, BEVEL_PRODUCT } from '@/lib/bevel'
+import { SiteFooter } from '@/components/marketing/SiteFooter'
+import {
+  BEVEL_HOME_PATH,
+  BEVEL_NAME,
+  BEVEL_PRODUCT,
+} from '@/lib/bevel'
+import { MARKETING_NAV } from '@/lib/marketing'
 
 type HomePageProps = {
   tenantName: string
   productName: string
   tenantSlug: string
   namespace: string
+  plan?: TenantPlan | string
+  featureAccess?: FeatureAccess | string
+  featureSet?: ResolvedFeatureSet | null
   signedIn?: boolean
   userName?: string | null
 }
@@ -50,7 +64,7 @@ const STEPS = [
   {
     label: 'Open a channel',
     detail:
-      'Create #shipping, #incidents, or a direct thread. Agents and people share the same timeline.',
+      'Create ^shipping, ^incidents, or a direct thread. Agents and people share the same timeline.',
   },
   {
     label: 'Talk to the room',
@@ -92,19 +106,25 @@ export function HomePage({
   productName,
   tenantSlug,
   namespace,
+  plan,
+  featureAccess,
+  featureSet,
   signedIn = false,
   userName = null,
 }: HomePageProps) {
-  const primaryHref = signedIn ? '/welcome' : '/login?callbackUrl=%2Fwelcome'
-  const primaryLabel = signedIn ? 'Open workspace' : 'Sign in with Google Workspace'
+  const primaryHref = signedIn ? '/welcome' : '/claim'
+  const primaryLabel = signedIn ? 'Open workspace' : 'Claim your workspace'
+  const secondaryHref = signedIn
+    ? BEVEL_HOME_PATH
+    : `/login?callbackUrl=${encodeURIComponent('/welcome')}`
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
-      <div className="bevel-home-grid pointer-events-none absolute inset-0" aria-hidden="true" />
-      <div
-        className="pointer-events-none absolute -top-40 left-1/2 h-[28rem] w-[42rem] -translate-x-1/2 rounded-full bg-accent/40 opacity-40 blur-3xl"
-        aria-hidden="true"
-      />
+      {/* Atmosphere: soft mesh first, quiet grid on top */}
+      <div className="bevel-home-atmosphere" aria-hidden="true">
+        <div className="bevel-home-mesh" />
+        <div className="bevel-home-grid" />
+      </div>
 
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
         <Link
@@ -117,15 +137,17 @@ export function HomePage({
           <BevelMark size="md" />
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2">
-          <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
-            <a href="#value">Product</a>
-          </Button>
-          <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
-            <a href="#how">How it works</a>
-          </Button>
-          <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
-            <a href="#platform">Platform</a>
-          </Button>
+          {MARKETING_NAV.map((item) => (
+            <Button
+              key={item.href}
+              asChild
+              variant="ghost"
+              size="sm"
+              className="hidden md:inline-flex"
+            >
+              <Link href={item.href}>{item.label}</Link>
+            </Button>
+          ))}
           {signedIn ? (
             <>
               {userName ? (
@@ -143,7 +165,7 @@ export function HomePage({
                 <Link href="/login">Sign in</Link>
               </Button>
               <Button asChild size="md">
-                <Link href={primaryHref}>Get started</Link>
+                <Link href={primaryHref}>{primaryLabel}</Link>
               </Button>
             </>
           )}
@@ -156,15 +178,19 @@ export function HomePage({
             <div className="space-y-4">
               <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted">
                 <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />
-                {productName} · {tenantName}
+                {[productName, tenantName]
+                  .map((s) => s.replace(/\s+Agents$/i, '').trim())
+                  .filter(Boolean)
+                  .filter((s, i, arr) => arr.indexOf(s) === i)
+                  .join(' · ')}
               </p>
               <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl sm:leading-[1.08]">
-                Open channels for{' '}
+                Claim your namespace. Open channels for{' '}
                 <span className="bevel-text-accent">humans and agents</span>
               </h1>
               <p className="max-w-lg text-lg leading-relaxed text-muted">
-                {BEVEL_PRODUCT.tagline} {BEVEL_PRODUCT.short} The room where your team and
-                your fleet actually ship together.
+                {BEVEL_PRODUCT.tagline} Secure an organization slug, bind your Google
+                Workspace domain, and put the fleet in the same room as your team.
               </p>
             </div>
 
@@ -178,13 +204,11 @@ export function HomePage({
               </Button>
               {signedIn ? (
                 <Button asChild variant="secondary" size="lg">
-                  <Link href={BEVEL_HOME_PATH}>Go to #general</Link>
+                  <Link href={BEVEL_HOME_PATH}>Go to ^general</Link>
                 </Button>
               ) : (
                 <Button asChild variant="secondary" size="lg">
-                  <Link href={`/login?callbackUrl=${encodeURIComponent(BEVEL_HOME_PATH)}`}>
-                    Enter {tenantName}
-                  </Link>
+                  <Link href={secondaryHref}>Sign in to existing workspace</Link>
                 </Button>
               )}
             </div>
@@ -332,11 +356,12 @@ realtime:
             />
             <div className="relative z-10 max-w-xl space-y-6">
               <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                Ready to open a channel?
+                Ready to secure a namespace?
               </h2>
               <p className="text-base leading-relaxed text-muted">
-                Jump into {tenantName} and put humans and agents in the same room. Post
-                once. @mention to focus. Ship with work mode.
+                Claim {tenantName === 'BEVEL Demo' || tenantSlug === 'demo' ? 'your' : 'a'}{' '}
+                organization, invite the domain, and open channels where humans and agents
+                ship together.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button asChild size="lg">
@@ -347,27 +372,22 @@ realtime:
                     <Link href="/login">Sign in</Link>
                   </Button>
                 ) : null}
+                <Button asChild variant="ghost" size="lg">
+                  <Link href="/story">Read the story</Link>
+                </Button>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="relative z-10 border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3 text-muted">
-            <BevelMark size="sm" />
-            <span className="text-xs">
-              Multi-tenant workspace channels for humans and agents
-            </span>
-          </div>
-          <p className="text-xs text-muted">
-            Tenant <code className="font-mono text-foreground">{tenantSlug}</code>
-            {' · '}
-            namespace <code className="font-mono text-foreground">{namespace}</code>
-          </p>
-        </div>
-      </footer>
+      <SiteFooter
+        tenantSlug={tenantSlug}
+        namespace={namespace}
+        plan={plan}
+        featureAccess={featureAccess}
+        featureSet={featureSet}
+      />
     </div>
   )
 }

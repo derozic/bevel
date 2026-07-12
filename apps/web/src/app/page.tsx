@@ -16,10 +16,13 @@ export default async function Page() {
 
   return (
     <HomePage
-      tenantName={tenant.name}
-      productName={tenant.theme.productName ?? BEVEL_PRODUCT.name}
+      tenantName={tenant.theme.productName ?? tenant.name}
+      productName={tenant.theme.productName ?? tenant.name}
       tenantSlug={tenant.slug}
       namespace={tenant.realtime.namespace}
+      plan={tenant.plan}
+      featureAccess={tenant.featureAccess}
+      featureSet={tenant.featureSet}
       signedIn={Boolean(session?.user)}
       userName={session?.user?.name ?? session?.user?.email ?? null}
     />

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { requireTenantFromRequest } from '@bevel/tenant-config'
 import { auth } from '@/auth'
 import { BevelChatPane } from '@/components/BevelChatPane'
 import {
@@ -19,8 +20,10 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>
 }): Promise<Metadata> {
   const { slug } = await params
+  const tenant = await requireTenantFromRequest().catch(() => null)
+  const workspace = tenant?.theme.productName ?? tenant?.name
   return {
-    title: bevelPageTitle(normalizeBevelChannelSlug(slug)),
+    title: bevelPageTitle(normalizeBevelChannelSlug(slug), workspace),
     description: BEVEL_TAGLINE,
   }
 }
