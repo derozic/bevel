@@ -47,3 +47,9 @@ apps/mobile/android/app/profile/
 apps/mobile/android/app/release/
 *.iml
 .idea/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+services/api/.venv/
