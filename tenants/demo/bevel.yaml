@@ -8,12 +8,16 @@ brand:
   theme: ./theme.json
   product_name: BEVEL
 
+# Demo stays free — no SMS / paid flags unless plan is raised
+plan: free
+
 features:
   async_streams: true
   live_sessions: true
   analytics: true
   agent_dispatch: true
-  work_mode: true
+  # work_mode requires pro+; leave off on free demo
+  work_mode: false
 
 auth:
   mode: google
