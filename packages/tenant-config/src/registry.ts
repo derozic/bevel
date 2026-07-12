@@ -61,7 +61,11 @@ let cache: {
 } | null = null
 
 function registry() {
-  if (!cache) cache = buildRegistry()
+  // Dev: always rebuild so bevel.yaml brand renames (e.g. product_name) show in UI.
+  // Production: keep process-level cache until explicit refreshTenantRegistry().
+  if (!cache || process.env.NODE_ENV !== 'production') {
+    cache = buildRegistry()
+  }
   return cache
 }
 

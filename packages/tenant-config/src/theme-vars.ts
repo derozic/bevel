@@ -12,7 +12,13 @@ export function tenantThemeCssVars(tenant: Tenant | null): CssVarMap {
   const surface = t.surface ?? (t.mode === 'light' ? '#ffffff' : '#141418')
   const text = t.text ?? (t.mode === 'light' ? '#1a1410' : '#f4f4f5')
   const textMuted = t.textMuted ?? (t.mode === 'light' ? '#5c534c' : '#a1a1aa')
-  const border = t.border ?? text
+  // Theme JSON sometimes sets border = full ink (too heavy for chrome).
+  // Prefer a soft hairline unless an explicit light border is provided.
+  const rawBorder = t.border ?? text
+  const border =
+    t.mode === 'light' && rawBorder.toLowerCase() === text.toLowerCase()
+      ? `color-mix(in srgb, ${text} 14%, transparent)`
+      : rawBorder
 
   return {
     '--tenant-accent': accent,
@@ -30,7 +36,7 @@ export function tenantThemeCssVars(tenant: Tenant | null): CssVarMap {
     '--surface': surface,
     '--border': border,
     '--sticker-muted': textMuted,
-    '--sticker-subtle': textMuted,
+    '--sticker-subtle': `color-mix(in srgb, ${textMuted} 88%, ${text})`,
     '--command-accent': accent,
   }
 }

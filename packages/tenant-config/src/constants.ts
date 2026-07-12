@@ -4,7 +4,7 @@ export const TENANT_HEADER = 'x-bevel-tenant'
 export const TENANT_HOST_HEADER = 'x-bevel-host'
 
 /**
- * Platform entry hosts — Slack-like "find your workspace" surface.
+ * Platform entry hosts — "find your workspace" surface.
  * Users sign in here with Google Workspace; email domain routes them to
  * their organization's BEVEL (host + realtime namespace + history).
  */
