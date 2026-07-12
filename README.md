@@ -105,9 +105,38 @@ cp .env.example .env
 pnpm bevel list
 pnpm bevel doctor demo --offline
 
-./scripts/dev.sh
-caddy run --config caddy/Caddyfile   # optional HTTPS
+# Preferred: service scripts (or decli)
+bash scripts/services.sh start
+# or
+decli bevel start
+decli bevel monitor
 ```
+
+Use the **one** machine-wide Caddy (`~/dev/Caddyfile.global`). Reload, don't kill:
+```bash
+caddy reload --config ~/dev/Caddyfile.global --adapter caddyfile
+```
+
+### Start / stop / monitor
+
+| Action | Shell | decli | pnpm |
+|--------|-------|-------|------|
+| Start all | `bash scripts/services.sh start` | `decli bevel start` | `pnpm services:start` |
+| Stop all | `bash scripts/services.sh stop` | `decli bevel stop` | `pnpm services:stop` |
+| Status | `bash scripts/services.sh status` | `decli bevel status` | `pnpm services:status` |
+| Live monitor | `bash scripts/services.sh monitor` | `decli bevel monitor` | `pnpm services:monitor` |
+| URLs | `bash scripts/services.sh urls` | `decli bevel urls` | `pnpm services:urls` |
+
+One process per terminal (iTerm tabs):
+
+```bash
+bash scripts/iterm-tabs/00-api.sh       # :43203 control plane
+bash scripts/iterm-tabs/01-web.sh       # :43200 web
+bash scripts/iterm-tabs/02-realtime.sh  # :43208 realtime
+bash scripts/iterm-tabs/03-admin.sh     # :43201 admin
+```
+
+### Control plane API + MCP
 
 | Surface | Dev URL |
 |---------|---------|
@@ -115,6 +144,15 @@ caddy run --config caddy/Caddyfile   # optional HTTPS
 | Tenant (acme) | https://bevel.acme.lvh.me |
 | Admin | https://admin.bevel.lvh.me |
 | Realtime | https://realtime.bevel.lvh.me |
+| **API** | https://api.bevel.lvh.me |
+| API docs | https://api.bevel.lvh.me/docs |
+| GraphQL | https://api.bevel.lvh.me/graphql |
+
+```bash
+# MCP (tools call REST — not shell)
+decli bevel mcp          # print client config
+pnpm mcp                 # run stdio MCP server
+```
 
 ## Tooling
 

@@ -1,0 +1,47 @@
+# Notify BEVEL ^product of CI completion (agent accountability trail).
+# Secrets: BEVEL_PRODUCT_URL, FLEET_INTERNAL_API_KEY (optional in local).
+
+name: BEVEL product trail
+
+on:
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      title:
+        description: 'Message title for ^product'
+        required: false
+        default: 'Manual product trail ping'
+
+jobs:
+  notify-bevel:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion != '' }}
+    steps:
+      - name: Post agent activity to BEVEL ^product
+        env:
+          BEVEL_PRODUCT_URL: ${{ secrets.BEVEL_PRODUCT_URL }}
+          FLEET_INTERNAL_API_KEY: ${{ secrets.FLEET_INTERNAL_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BEVEL_PRODUCT_URL:-}" ]; then
+            echo "BEVEL_PRODUCT_URL not set — skip"
+            exit 0
+          fi
+          TITLE="${{ github.event.inputs.title }}"
+          if [ -z "$TITLE" ]; then
+            TITLE="CI ${{ github.event.workflow_run.name || github.workflow }}: ${{ github.event.workflow_run.conclusion || 'dispatched' }}"
+          fi
+          URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id || github.run_id }}"
+          HEADERS=(-H "Content-Type: application/json")
+          if [ -n "${FLEET_INTERNAL_API_KEY:-}" ]; then
+            HEADERS+=(-H "X-Fleet-Internal-Key: ${FLEET_INTERNAL_API_KEY}")
+          fi
+          curl -sS -X POST "${BEVEL_PRODUCT_URL}/api/github/agent-activity" \
+            "${HEADERS[@]}" \
+            -d "$(jq -n \
+              --arg title "$TITLE" \
+              --arg repo "${{ github.repository }}" \
+              --arg url "$URL" \
+              '{kind:"ci_run",agentId:"forge",title:$title,repo:$repo,url:$url}')"
