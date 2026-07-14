@@ -26,4 +26,30 @@ class BevelConfig {
     final base = Uri.parse(baseUrl);
     return base.replace(path: path.startsWith('/') ? path : '/$path');
   }
+
+  /// Hosts that may load inside the in-app WebView (workspace + local multi-tenant).
+  /// Everything else (OAuth IdPs, arbitrary HTTPS) opens in the system browser.
+  static bool isAllowedInAppHost(String host) {
+    final h = host.toLowerCase();
+    if (h.isEmpty) return false;
+
+    final baseHost = Uri.parse(baseUrl).host.toLowerCase();
+    if (h == baseHost) return true;
+
+    // Local multi-tenant surfaces (Caddy .lvh.me)
+    if (h.endsWith('.lvh.me') || h == 'lvh.me') return true;
+
+    // Same registrable domain as configured workspace (e.g. app.bevel.com → *.bevel.com)
+    final parts = baseHost.split('.');
+    if (parts.length >= 2) {
+      final suffix = parts.sublist(parts.length - 2).join('.');
+      if (h == suffix || h.endsWith('.$suffix')) return true;
+    }
+    return false;
+  }
+
+  static bool isAllowedInAppUri(Uri uri) {
+    if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+    return isAllowedInAppHost(uri.host);
+  }
 }

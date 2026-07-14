@@ -71,9 +71,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           },
           onNavigationRequest: (request) {
             final uri = Uri.tryParse(request.url);
-            if (uri == null) return NavigationDecision.navigate;
-            // Keep workspace hosts in-app; open external schemes outside.
-            if (uri.scheme == 'http' || uri.scheme == 'https') {
+            if (uri == null) return NavigationDecision.prevent;
+            // Workspace hosts stay in-app; OAuth IdPs and other origins open outside.
+            if (BevelConfig.isAllowedInAppUri(uri)) {
               return NavigationDecision.navigate;
             }
             launchUrl(uri, mode: LaunchMode.externalApplication);
