@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from bevel_api.lib import announcements as store
+from bevel_api.lib.internal_auth import enforce_internal, require_internal
 
 router = APIRouter(prefix="/v1", tags=["Announcements"])
+
+InternalAuth = Annotated[None, Depends(require_internal)]
 
 
 class GradientStopIn(BaseModel):
@@ -76,17 +79,27 @@ class AnnouncementUpdateIn(BaseModel):
 
 @router.get("/announcements")
 def list_announcements(
+    request: Request,
     active: bool = Query(default=False),
     tenant: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    """List announcements. Use active=true for member-facing bars."""
+    """List announcements.
+
+    - active=true → public member-facing bars (no auth)
+    - active=false → full operator list (requires internal key / loopback)
+    """
     if active:
         return {"announcements": store.list_active(tenant_slug=tenant)}
+    enforce_internal(request)
     return {"announcements": store.list_all()}
 
 
 @router.get("/announcements/{announcement_id}")
-def get_announcement(announcement_id: str) -> dict[str, Any]:
+def get_announcement(
+    announcement_id: str,
+    request: Request,
+) -> dict[str, Any]:
+    enforce_internal(request)
     item = store.get_one(announcement_id)
     if not item:
         raise HTTPException(404, "Announcement not found")
@@ -94,7 +107,10 @@ def get_announcement(announcement_id: str) -> dict[str, Any]:
 
 
 @router.post("/announcements", status_code=201)
-def create_announcement(body: AnnouncementCreateIn) -> dict[str, Any]:
+def create_announcement(
+    body: AnnouncementCreateIn,
+    _auth: InternalAuth,
+) -> dict[str, Any]:
     payload = body.model_dump(exclude_none=True)
     if payload.get("style"):
         payload["style"] = body.style.model_dump() if body.style else None
@@ -105,6 +121,7 @@ def create_announcement(body: AnnouncementCreateIn) -> dict[str, Any]:
 def update_announcement(
     announcement_id: str,
     body: AnnouncementUpdateIn,
+    _auth: InternalAuth,
 ) -> dict[str, Any]:
     payload = body.model_dump(exclude_unset=True)
     if "style" in payload and body.style is not None:
@@ -116,7 +133,10 @@ def update_announcement(
 
 
 @router.delete("/announcements/{announcement_id}")
-def delete_announcement(announcement_id: str) -> dict[str, str]:
+def delete_announcement(
+    announcement_id: str,
+    _auth: InternalAuth,
+) -> dict[str, str]:
     ok = store.delete(announcement_id)
     if not ok:
         raise HTTPException(404, "Announcement not found")
