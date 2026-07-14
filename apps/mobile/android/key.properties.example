@@ -1,0 +1,9 @@
+# Copy to android/key.properties (gitignored) and fill from 1Password.
+# Never commit real store passwords or keystore files.
+#
+# 1Password item suggestion: "BEVEL Android Play Upload Keystore"
+
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=bevel
+storeFile=/absolute/path/to/bevel-upload.jks

@@ -44,6 +44,10 @@ class DeepLinkService {
             : uri.pathSegments.skip(1).firstOrNull;
         return id == null ? '/bevel' : '/bevel/$id';
       }
+      // After system-browser OAuth — reopen workspace shell at home.
+      if (host == 'auth' || path.startsWith('/auth')) {
+        return '/';
+      }
       if (host == 'login' || path == '/login') return '/login';
       return '/';
     }

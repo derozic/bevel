@@ -52,4 +52,53 @@ class BevelConfig {
     if (uri.scheme != 'http' && uri.scheme != 'https') return false;
     return isAllowedInAppHost(uri.host);
   }
+
+  /// Control-plane API for push token registration (override in release builds).
+  static const String apiBaseUrl = String.fromEnvironment(
+    'BEVEL_API_URL',
+    defaultValue: 'https://api.bevel.lvh.me',
+  );
+
+  /// OAuth IdP hosts and Auth.js sign-in paths that must leave the WebView.
+  /// Google blocks embedded WebViews; system browser / ASWebAuthenticationSession
+  /// is required for reliable Google and GitHub sign-in.
+  static bool isOAuthNavigation(Uri uri) {
+    final host = uri.host.toLowerCase();
+    final path = uri.path.toLowerCase();
+
+    const idpHosts = <String>{
+      'accounts.google.com',
+      'oauth2.googleapis.com',
+      'github.com',
+      'api.github.com',
+      'login.microsoftonline.com',
+      'appleid.apple.com',
+    };
+    if (idpHosts.contains(host) ||
+        (host.endsWith('.google.com') &&
+            (path.contains('oauth') ||
+                path.contains('signin') ||
+                path.contains('ServiceLogin')))) {
+      return true;
+    }
+
+    // Auth.js provider start + callback — complete outside WKWebView
+    if (path.contains('/api/auth/signin') ||
+        path.contains('/api/auth/callback') ||
+        path.contains('/api/auth/signout')) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Prefer system browser for the whole login surface (cookie + OAuth hop).
+  static Uri systemBrowserLoginUri() {
+    return workspaceUri(loginPath).replace(
+      queryParameters: {
+        ...workspaceUri(loginPath).queryParameters,
+        'native': '1',
+        'return': 'bevel://auth/complete',
+      },
+    );
+  }
 }

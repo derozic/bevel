@@ -8,6 +8,7 @@ import 'native/deep_links.dart';
 import 'native/health_service.dart';
 import 'native/native_capabilities.dart';
 import 'native/notification_service.dart';
+import 'native/oauth_browser.dart';
 import 'native/sharing_service.dart';
 import 'ui/native_hub_page.dart';
 import 'ui/workspace_shell.dart';
@@ -69,6 +70,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
   final _health = HealthService();
   final _notifications = NotificationService();
   final _deepLinks = DeepLinkService();
+  final _oauth = const OAuthBrowser();
 
   NativeCapabilities? _caps;
   String? _status;
@@ -267,9 +269,15 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: () => _openWorkspace(path: BevelConfig.loginPath),
+                  onPressed: () async {
+                    // Google OAuth is fragile inside WKWebView — system browser.
+                    final ok = await _oauth.openSystemLogin();
+                    if (!ok && mounted) {
+                      _openWorkspace(path: BevelConfig.loginPath);
+                    }
+                  },
                   icon: const Icon(Icons.login_rounded),
-                  label: const Text('Sign in'),
+                  label: const Text('Sign in (system browser)'),
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
