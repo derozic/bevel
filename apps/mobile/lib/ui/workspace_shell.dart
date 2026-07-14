@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../config.dart';
+import '../native/oauth_browser.dart';
 import '../native/sharing_service.dart';
 
 /// In-app workspace browser (WKWebView on macOS / iOS, WebView on Android).
@@ -25,6 +26,7 @@ class WorkspaceShellPage extends StatefulWidget {
 class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   late final WebViewController _controller;
   final _sharing = const SharingService();
+  final _oauth = const OAuthBrowser();
   var _loading = true;
   var _progress = 0;
   String? _title;
@@ -72,7 +74,12 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           onNavigationRequest: (request) {
             final uri = Uri.tryParse(request.url);
             if (uri == null) return NavigationDecision.prevent;
-            // Workspace hosts stay in-app; OAuth IdPs and other origins open outside.
+            // Google/GitHub/Auth.js must leave the WebView (IdP policy + reliability).
+            if (BevelConfig.isOAuthNavigation(uri)) {
+              _oauth.open(uri);
+              return NavigationDecision.prevent;
+            }
+            // Workspace hosts stay in-app; other origins open outside.
             if (BevelConfig.isAllowedInAppUri(uri)) {
               return NavigationDecision.navigate;
             }
@@ -127,6 +134,11 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Sign in (system browser)',
+            onPressed: () => _oauth.openSystemLogin(),
+            icon: const Icon(Icons.login_rounded),
+          ),
           IconButton(
             tooltip: 'Home',
             onPressed: _goHome,

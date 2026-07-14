@@ -39,33 +39,44 @@ jobs:
       - name: Flutter test
         run: flutter test
 
+      - name: Flutter analyze
+        run: flutter analyze lib
+
       - name: Build release bundles
         env:
           BEVEL_BASE_URL: ${{ inputs.base_url || 'https://app.bevel.com' }}
         working-directory: ${{ github.workspace }}
         run: |
+          set -euo pipefail
           chmod +x scripts/mobile/release.sh
           TARGET="${{ inputs.target || 'all' }}"
-          # Prefer macos+android on CI; ios often needs certs
+          # Prefer macos+android on CI; ios is a separate job (certs)
           if [[ "$TARGET" == "all" ]]; then
-            ./scripts/mobile/release.sh macos || true
-            ./scripts/mobile/release.sh android || true
+            ./scripts/mobile/release.sh macos
+            ./scripts/mobile/release.sh android
+          elif [[ "$TARGET" == "ios" ]]; then
+            echo "iOS builds run in the build-ios job"
+            exit 0
           else
-            ./scripts/mobile/release.sh "$TARGET" || true
+            ./scripts/mobile/release.sh "$TARGET"
           fi
 
       - name: Upload native artifacts
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: bevel-native-${{ github.ref_name }}
           path: dist/native/**
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
 
   build-ios:
     name: Flutter iOS (unsigned)
     runs-on: macos-latest
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+        (inputs.target == 'all' || inputs.target == 'ios' || inputs.target == '')) ||
+      startsWith(github.ref, 'refs/tags/v')
     defaults:
       run:
         working-directory: apps/mobile
@@ -85,13 +96,15 @@ jobs:
           BEVEL_BASE_URL: ${{ inputs.base_url || 'https://app.bevel.com' }}
         working-directory: ${{ github.workspace }}
         run: |
+          set -euo pipefail
           chmod +x scripts/mobile/release.sh
-          ./scripts/mobile/release.sh ios || true
+          ./scripts/mobile/release.sh ios
 
       - name: Upload iOS artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: bevel-ios-${{ github.ref_name }}
           path: dist/native/**
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14

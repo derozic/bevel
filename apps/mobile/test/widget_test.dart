@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:bevel_app/config.dart';
 import 'package:bevel_app/main.dart';
 import 'package:bevel_app/native/deep_links.dart';
 
@@ -32,6 +33,31 @@ void main() {
     expect(
       DeepLinkService.routeFor(Uri.parse('bevel://login')),
       '/login',
+    );
+    expect(
+      DeepLinkService.routeFor(Uri.parse('bevel://auth/complete')),
+      '/',
+    );
+  });
+
+  test('OAuth hosts are detected for system browser', () {
+    expect(
+      BevelConfig.isOAuthNavigation(
+        Uri.parse('https://accounts.google.com/o/oauth2/v2/auth'),
+      ),
+      isTrue,
+    );
+    expect(
+      BevelConfig.isOAuthNavigation(
+        Uri.parse('https://2x4m.bevel.lvh.me/api/auth/signin/google'),
+      ),
+      isTrue,
+    );
+    expect(
+      BevelConfig.isOAuthNavigation(
+        Uri.parse('https://2x4m.bevel.lvh.me/bevel'),
+      ),
+      isFalse,
     );
   });
 }

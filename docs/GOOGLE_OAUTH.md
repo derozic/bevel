@@ -80,6 +80,23 @@ Then restart web:
 cd apps/web && pnpm dev
 ```
 
+## 7. Native client (Flutter / macOS / iOS)
+
+Do **not** complete Google OAuth inside the in-app WKWebView. Google rejects many
+embedded WebView user agents, and session cookies may not hop correctly.
+
+Native path:
+
+1. User taps **Sign in (system browser)** → opens  
+   `{BEVEL_BASE_URL}/login?native=1&return=bevel://auth/complete`
+2. Or the WebView intercepts `/api/auth/signin/*` and IdP hosts and opens the
+   system browser (`OAuthBrowser`)
+3. After Auth.js finishes on the platform host, deep link back with  
+   `bevel://auth/complete` so the shell reloads the workspace
+
+Optional: add `bevel://auth/complete` as a post-login redirect from `/welcome`
+when `native=1` is present (query flag already set by the client).
+
 Verify:
 
 ```bash

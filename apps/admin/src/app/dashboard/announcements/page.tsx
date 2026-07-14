@@ -21,9 +21,8 @@ import {
   EyeOff,
 } from 'lucide-react'
 
-const API =
-  process.env.NEXT_PUBLIC_BEVEL_API_URL?.replace(/\/$/, '') ||
-  'https://api.bevel.lvh.me'
+/** Same-origin proxy — injects FLEET_INTERNAL_API_KEY server-side. */
+const API = '/api/announcements'
 
 const APP_LINK_OPTIONS = [
   { value: '/download', label: 'Download Flutter app' },
@@ -130,7 +129,7 @@ export default function AnnouncementsAdminPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`${API}/api/v1/announcements`, {
+      const res = await fetch(API, {
         cache: 'no-store',
       })
       if (!res.ok) throw new Error(`Failed to load (${res.status})`)
@@ -207,9 +206,7 @@ export default function AnnouncementsAdminPage() {
     }
     try {
       const res = await fetch(
-        draft.id
-          ? `${API}/api/v1/announcements/${draft.id}`
-          : `${API}/api/v1/announcements`,
+        draft.id ? `${API}/${draft.id}` : API,
         {
           method: draft.id ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -236,7 +233,7 @@ export default function AnnouncementsAdminPage() {
     if (!window.confirm('Delete this announcement?')) return
     setSaving(true)
     try {
-      const res = await fetch(`${API}/api/v1/announcements/${draft.id}`, {
+      const res = await fetch(`${API}/${draft.id}`, {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error('Delete failed')
@@ -251,7 +248,7 @@ export default function AnnouncementsAdminPage() {
   }
 
   const toggleEnabled = async (a: Announcement) => {
-    await fetch(`${API}/api/v1/announcements/${a.id}`, {
+    await fetch(`${API}/${a.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled: !a.enabled }),

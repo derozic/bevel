@@ -2,56 +2,25 @@
 
 from __future__ import annotations
 
-import os
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from bevel_api.lib import fleet_messages
+from bevel_api.lib.internal_auth import require_internal
 
 router = APIRouter(prefix="/v1/fleet", tags=["Fleet"])
 
-
-def _internal_ok(request: Request, x_fleet_internal_key: str | None) -> bool:
-    key = os.getenv("FLEET_INTERNAL_API_KEY")
-    if key and x_fleet_internal_key == key:
-        return True
-    # Local agent programs (JOHNNY) and realtime on loopback in development
-    if os.getenv("NODE_ENV", "development") != "production":
-        client = request.client.host if request.client else ""
-        if client in {"127.0.0.1", "::1", "localhost"}:
-            return True
-    # If no key is configured, allow loopback only
-    if not key:
-        client = request.client.host if request.client else ""
-        return client in {"127.0.0.1", "::1", "localhost"}
-    return False
-
-
-def _require_internal(
-    request: Request,
-    x_fleet_internal_key: str | None,
-) -> None:
-    if not _internal_ok(request, x_fleet_internal_key):
-        raise HTTPException(401, "Unauthorized")
+InternalAuth = Annotated[None, Depends(require_internal)]
 
 
 @router.get("/channels")
-def list_channels(
-    request: Request,
-    x_fleet_internal_key: str | None = Header(default=None, alias="X-Fleet-Internal-Key"),
-) -> dict[str, Any]:
-    _require_internal(request, x_fleet_internal_key)
+def list_channels(_auth: InternalAuth) -> dict[str, Any]:
     return {"channels": fleet_messages.list_channels()}
 
 
 @router.get("/channels/{slug}")
-def get_channel(
-    slug: str,
-    request: Request,
-    x_fleet_internal_key: str | None = Header(default=None, alias="X-Fleet-Internal-Key"),
-) -> dict[str, Any]:
-    _require_internal(request, x_fleet_internal_key)
+def get_channel(slug: str, _auth: InternalAuth) -> dict[str, Any]:
     ch = fleet_messages.get_channel(slug)
     if not ch:
         raise HTTPException(404, "Channel not found")
@@ -61,11 +30,9 @@ def get_channel(
 @router.get("/channels/{slug}/messages")
 def get_messages(
     slug: str,
-    request: Request,
+    _auth: InternalAuth,
     limit: int = Query(default=100, ge=1, le=500),
-    x_fleet_internal_key: str | None = Header(default=None, alias="X-Fleet-Internal-Key"),
 ) -> dict[str, Any]:
-    _require_internal(request, x_fleet_internal_key)
     return {"messages": fleet_messages.read_messages(slug, limit=limit)}
 
 
@@ -73,9 +40,8 @@ def get_messages(
 async def post_message(
     slug: str,
     request: Request,
-    x_fleet_internal_key: str | None = Header(default=None, alias="X-Fleet-Internal-Key"),
+    _auth: InternalAuth,
 ) -> dict[str, Any]:
-    _require_internal(request, x_fleet_internal_key)
     try:
         body = await request.json()
     except Exception as exc:

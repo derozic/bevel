@@ -13,6 +13,7 @@ from bevel_api.config import settings
 from bevel_api.graphql.schema import schema
 from bevel_api.lib import realtime_proxy
 from bevel_api.routers import announcements as announcements_router
+from bevel_api.routers import devices as devices_router
 from bevel_api.routers import fleet as fleet_router
 from bevel_api.routers import services as services_router
 from bevel_api.routers import tenants as tenants_router
@@ -36,11 +37,14 @@ app.add_middleware(
         "https://api.bevel.lvh.me",
         "https://admin.bevel.lvh.me",
         "https://bevel.2x4m.lvh.me",
+        "https://2x4m.bevel.lvh.me",
         "http://127.0.0.1:43200",
         "http://localhost:43200",
         "http://127.0.0.1:43201",
         "http://localhost:43201",
     ],
+    # Native clients may call from file:// or custom origins during dev
+    allow_origin_regex=r"https://.*\.bevel\.(lvh\.me|com|cc)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,6 +55,7 @@ app.include_router(graphql_app)
 app.include_router(services_router.router, prefix="/api")
 app.include_router(tenants_router.router, prefix="/api")
 app.include_router(announcements_router.router, prefix="/api")
+app.include_router(devices_router.router, prefix="/api")
 app.include_router(fleet_router.router, prefix="/api")
 
 

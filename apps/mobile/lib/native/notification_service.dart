@@ -6,16 +6,21 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'push_registration.dart';
+
 /// Local notifications + permission bootstrap.
 ///
-/// Push (APNs / FCM) hooks live here as extension points — wire device tokens
-/// to the BEVEL API when backend push is provisioned.
+/// Push (APNs / FCM): after permission grant, [syncPushToken] POSTs the device
+/// token to `POST /api/v1/devices/push-tokens` when a platform token is available.
 class NotificationService {
   NotificationService({
     FlutterLocalNotificationsPlugin? plugin,
-  }) : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+    PushRegistrationService? pushRegistration,
+  })  : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
+        _push = pushRegistration ?? PushRegistrationService();
 
   final FlutterLocalNotificationsPlugin _plugin;
+  final PushRegistrationService _push;
   bool _ready = false;
 
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
@@ -101,6 +106,18 @@ class NotificationService {
     }
 
     return false;
+  }
+
+  /// Attempt to obtain an APNs/FCM token and register it with the control plane.
+  /// No-ops until platform push plugins are configured (returns false).
+  Future<bool> syncPushToken({String? userId, String? tenantSlug}) async {
+    final token = await _push.fetchPlatformDeviceToken();
+    if (token == null || token.isEmpty) return false;
+    return _push.registerToken(
+      token: token,
+      userId: userId,
+      tenantSlug: tenantSlug,
+    );
   }
 
   Future<void> showWorkspaceAlert({

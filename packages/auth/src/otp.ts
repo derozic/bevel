@@ -1,6 +1,11 @@
 /**
  * OTP codes for email + SMS sign-in (server-only).
  * Codes are hashed at rest; plaintext is only returned to the sender path.
+ *
+ * Abuse controls:
+ * - per-destination cooldown between issues
+ * - per-IP sliding window on send attempts
+ * - max verify attempts per code (existing)
  */
 
 import { createHash, randomInt } from 'node:crypto'
@@ -17,12 +22,27 @@ export type OtpRecord = {
   expiresAt: string
   attempts: number
   createdAt: string
+  /** Last successful issue time (ISO) for cooldown */
+  lastIssuedAt?: string
 }
 
 type Store = Record<string, OtpRecord>
 
+type RateBucket = {
+  hits: number[]
+}
+
+type RateStore = Record<string, RateBucket>
+
 const MAX_ATTEMPTS = 5
 const TTL_MS = 10 * 60 * 1000
+
+/** Minimum ms between OTP issues for the same destination. */
+const DEST_COOLDOWN_MS = Number(process.env.OTP_DEST_COOLDOWN_MS || 60_000)
+/** Max OTP send attempts per IP in the sliding window. */
+const IP_MAX_HITS = Number(process.env.OTP_IP_MAX_HITS || 10)
+/** Sliding window for per-IP sends (ms). */
+const IP_WINDOW_MS = Number(process.env.OTP_IP_WINDOW_MS || 60 * 60 * 1000)
 
 function dataDir(): string {
   if (process.env.BEVEL_DATA_ROOT) {
@@ -36,6 +56,10 @@ function dataDir(): string {
 
 function storePath(): string {
   return join(dataDir(), 'codes.json')
+}
+
+function ratePath(): string {
+  return join(dataDir(), 'rate.json')
 }
 
 function load(): Store {
@@ -52,6 +76,22 @@ function save(store: Store) {
   const dir = dataDir()
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   writeFileSync(storePath(), JSON.stringify(store, null, 2), 'utf8')
+}
+
+function loadRate(): RateStore {
+  const path = ratePath()
+  if (!existsSync(path)) return {}
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as RateStore
+  } catch {
+    return {}
+  }
+}
+
+function saveRate(store: RateStore) {
+  const dir = dataDir()
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  writeFileSync(ratePath(), JSON.stringify(store, null, 2), 'utf8')
 }
 
 function normalizeDestination(channel: OtpChannel, raw: string): string {
@@ -77,6 +117,70 @@ export function generateOtpCode(): string {
   return String(randomInt(100000, 999999))
 }
 
+export type OtpRateLimitResult =
+  | { ok: true }
+  | {
+      ok: false
+      reason: 'destination_cooldown' | 'ip_rate_limited'
+      retryAfterSec: number
+    }
+
+/**
+ * Check (and record) send-rate limits for destination + optional client IP.
+ * Call before issueOtp. On failure, do not issue a code.
+ */
+export function checkOtpSendRateLimit(opts: {
+  channel: OtpChannel
+  destination: string
+  clientIp?: string | null
+}): OtpRateLimitResult {
+  const dest = normalizeDestination(opts.channel, opts.destination)
+  const now = Date.now()
+  const key = storeKey(opts.channel, dest)
+  const store = load()
+  const existing = store[key]
+  if (existing?.lastIssuedAt || existing?.createdAt) {
+    const last = new Date(
+      existing.lastIssuedAt || existing.createdAt,
+    ).getTime()
+    const elapsed = now - last
+    if (elapsed < DEST_COOLDOWN_MS) {
+      return {
+        ok: false,
+        reason: 'destination_cooldown',
+        retryAfterSec: Math.ceil((DEST_COOLDOWN_MS - elapsed) / 1000),
+      }
+    }
+  }
+
+  const ip = (opts.clientIp || '').trim()
+  if (ip && ip !== 'unknown') {
+    const rates = loadRate()
+    const bucketKey = `ip:${ip}`
+    const bucket = rates[bucketKey] ?? { hits: [] }
+    const windowStart = now - IP_WINDOW_MS
+    bucket.hits = bucket.hits.filter((t) => t >= windowStart)
+    if (bucket.hits.length >= IP_MAX_HITS) {
+      const oldest = bucket.hits[0] ?? now
+      return {
+        ok: false,
+        reason: 'ip_rate_limited',
+        retryAfterSec: Math.ceil((oldest + IP_WINDOW_MS - now) / 1000),
+      }
+    }
+    bucket.hits.push(now)
+    rates[bucketKey] = bucket
+    // prune other idle buckets
+    for (const [k, b] of Object.entries(rates)) {
+      b.hits = b.hits.filter((t) => t >= windowStart)
+      if (b.hits.length === 0) delete rates[k]
+    }
+    saveRate(rates)
+  }
+
+  return { ok: true }
+}
+
 /** Create / replace OTP for destination. Returns plaintext code for delivery. */
 export function issueOtp(
   channel: OtpChannel,
@@ -98,13 +202,15 @@ export function issueOtp(
     if (new Date(v.expiresAt).getTime() < now) delete store[k]
   }
   const expiresAt = new Date(now + TTL_MS).toISOString()
+  const issuedAt = new Date(now).toISOString()
   store[storeKey(channel, dest)] = {
     channel,
     destination: dest,
     hash: hashCode(code),
     expiresAt,
     attempts: 0,
-    createdAt: new Date(now).toISOString(),
+    createdAt: issuedAt,
+    lastIssuedAt: issuedAt,
   }
   save(store)
   return { code, expiresAt, destination: dest }
