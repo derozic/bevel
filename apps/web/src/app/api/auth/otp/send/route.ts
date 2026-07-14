@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import {
+  checkOtpSendRateLimit,
   issueOtp,
   phoneOtpAllowedOnTenant,
   type OtpChannel,
@@ -96,6 +97,35 @@ export async function POST(request: Request) {
         { status: 403 },
       )
     }
+  }
+
+  const clientIp =
+    headerStore.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    headerStore.get('x-real-ip')?.trim() ||
+    'unknown'
+
+  const rate = checkOtpSendRateLimit({
+    channel,
+    destination,
+    clientIp,
+  })
+  if (!rate.ok) {
+    return NextResponse.json(
+      {
+        error:
+          rate.reason === 'destination_cooldown'
+            ? 'Please wait before requesting another code.'
+            : 'Too many sign-in attempts from this network. Try again later.',
+        reason: rate.reason,
+        retryAfterSec: rate.retryAfterSec,
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rate.retryAfterSec),
+        },
+      },
+    )
   }
 
   let issued: { code: string; expiresAt: string; destination: string }
