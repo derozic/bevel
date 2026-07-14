@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   Globe,
   LayoutDashboard,
+  Megaphone,
   Radio,
   Settings,
   Users,
@@ -15,6 +16,7 @@ const nav = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Tenants', href: '/dashboard/tenants', icon: Users },
   { name: 'Domains', href: '/dashboard/domains', icon: Globe },
+  { name: 'Announcements', href: '/dashboard/announcements', icon: Megaphone },
   { name: 'Realtime', href: '/dashboard/realtime', icon: Radio },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]

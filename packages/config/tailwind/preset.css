@@ -1,21 +1,26 @@
 @import "tailwindcss";
 
+/* Shared BEVEL Tailwind v4 theme — import or mirror in app globals.css */
 @theme {
   --color-background: #0c0c0e;
   --color-surface: #141418;
   --color-surface-raised: #1c1c22;
   --color-border: #2a2a32;
-  --color-text: #f4f4f5;
-  --color-text-muted: #a1a1aa;
+  --color-foreground: #f4f4f5;
+  --color-muted: #a1a1aa;
   --color-accent: #7c5cff;
   --color-accent-muted: #5b45c4;
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
 }

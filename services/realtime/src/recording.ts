@@ -49,6 +49,14 @@ function sessionPath(sessionId: string): string {
 
 export function recordEvent(event: SessionEvent): void {
   void getRecorder().record(event)
+  // Live search index — keep bookmark jump targets fresh without waiting for rebuild.
+  if (event.type === 'message' || event.type === 'agent_reply') {
+    // Lazy import avoids circular init with search-index → recording
+    void import('./search-index.js').then(({ conversationSearchIndex }) => {
+      conversationSearchIndex.indexEvent(event)
+      conversationSearchIndex.markReady()
+    })
+  }
 }
 
 export function listRecordings(): string[] {

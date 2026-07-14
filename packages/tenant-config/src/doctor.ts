@@ -223,7 +223,7 @@ export async function runDoctor(
   ) {
     authIssues.push('magic-link requires allowed_domains or allowed_emails')
   }
-  if (declarative.features.work_mode && declarative.auth.mode !== 'github') {
+  if (declarative.features.work_mode === true && declarative.auth.mode !== 'github') {
     authIssues.push('work_mode enabled — recommend github auth')
   }
   checks.push(

@@ -4,9 +4,11 @@ import {
   type SessionSummary,
 } from './realtime'
 
-/** Server-side fetches bypass Caddy TLS — hit Colyseus directly. */
-function serverRealtimeUrl(): string {
-  return process.env.REALTIME_SERVER_URL ?? 'http://127.0.0.1:41008'
+/** Server-side fetches bypass Caddy TLS — hit Colyseus directly on REALTIME_PORT. */
+export function serverRealtimeUrl(): string {
+  if (process.env.REALTIME_SERVER_URL) return process.env.REALTIME_SERVER_URL
+  const port = process.env.REALTIME_PORT ?? '43208'
+  return `http://127.0.0.1:${port}`
 }
 
 async function authHeaders(): Promise<HeadersInit> {

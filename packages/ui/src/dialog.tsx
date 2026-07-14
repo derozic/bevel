@@ -24,25 +24,43 @@ export const DialogOverlay = forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+export type DialogContentSize = 'sm' | 'md' | 'lg' | 'xl' | 'prefs'
+
+const sizeClass: Record<DialogContentSize, string> = {
+  sm: 'max-w-sm p-5',
+  md: 'max-w-md p-6',
+  lg: 'max-w-2xl p-6',
+  xl: 'max-w-4xl p-0',
+  /** Preferences panel shell */
+  prefs:
+    'max-w-5xl h-[min(40rem,88vh)] max-h-[88vh] overflow-hidden p-0 sm:w-[calc(100%-2rem)]',
+}
+
 export const DialogContent = forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    size?: DialogContentSize
+    hideClose?: boolean
+  }
+>(({ className, children, size = 'md', hideClose = false, ...props }, ref) => (
   <DialogPrimitive.Portal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[var(--bevel-border)] bg-[var(--bevel-surface)] p-6 shadow-2xl outline-none',
+        'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-surface shadow-2xl outline-none',
+        sizeClass[size],
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1 text-[var(--bevel-text-muted)] hover:bg-white/5 hover:text-[var(--bevel-text)]">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
+      {hideClose ? null : (
+        <DialogPrimitive.Close className="absolute right-4 top-4 z-10 rounded-lg p-1 text-muted hover:bg-white/5 hover:text-foreground">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      )}
     </DialogPrimitive.Content>
   </DialogPrimitive.Portal>
 ))
@@ -61,7 +79,7 @@ export function DialogTitle({
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
-      className={cn('text-lg font-semibold text-[var(--bevel-text)]', className)}
+      className={cn('text-lg font-semibold text-foreground', className)}
       {...props}
     />
   )
@@ -73,7 +91,7 @@ export function DialogDescription({
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
-      className={cn('text-sm text-[var(--bevel-text-muted)]', className)}
+      className={cn('text-sm text-muted', className)}
       {...props}
     />
   )

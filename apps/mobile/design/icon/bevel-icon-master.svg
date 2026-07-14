@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BEVEL mark — master vector for Icon Composer + store assets.
+  Layers are ordered back → front for Apple Icon Composer import.
+  Accent: #22C55E  ·  Ink: #0A0E12  ·  Face: #F4F7F5
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="BEVEL">
+  <!-- Layer: background -->
+  <rect id="layer-background" width="1024" height="1024" rx="224" fill="#0A0E12"/>
+  <!-- Layer: soft glow -->
+  <circle id="layer-glow" cx="512" cy="480" r="280" fill="#22C55E" opacity="0.12"/>
+  <!-- Layer: bevel plane left -->
+  <path id="layer-plane-left" d="M300 260 L480 260 L480 764 L300 700 Z" fill="#1A2330"/>
+  <!-- Layer: bevel plane right -->
+  <path id="layer-plane-right" d="M480 260 L700 300 L700 724 L480 764 Z" fill="#243040"/>
+  <!-- Layer: accent edge -->
+  <path id="layer-accent-edge" d="M470 250 L494 250 L494 774 L470 774 Z" fill="#22C55E"/>
+  <!-- Layer: face highlight -->
+  <path id="layer-highlight" d="M320 300 L460 300 L460 420 L340 400 Z" fill="#F4F7F5" opacity="0.14"/>
+  <!-- Layer: monogram B silhouette (composition guide) -->
+  <path id="layer-mark"
+        d="M360 300 h140 c70 0 120 40 120 100 0 42-24 76-64 92 52 14 86 54 86 112 0 74-58 120-140 120 H360 V300 Z
+           m70 60 v120 h70 c34 0 56-18 56-50s-22-50-56-50 H430 Z
+           m0 180 v140 h80 c40 0 66-22 66-60s-26-60-66-60 H430 Z"
+        fill="none" stroke="#22C55E" stroke-width="6" opacity="0.35"/>
+</svg>

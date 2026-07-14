@@ -1,0 +1,65 @@
+{
+  "$schema": "https://bevel.dev/schemas/icon-composer-brief.json",
+  "name": "BEVEL",
+  "version": "0.1.0",
+  "tool": "Apple Icon Composer (Xcode / Icon Composer)",
+  "canvas": { "size": 1024, "cornerRadiusHint": 224 },
+  "palette": {
+    "background": "#0A0E12",
+    "surface": "#141A21",
+    "accent": "#22C55E",
+    "face": "#F4F7F5",
+    "muted": "#9AA8B5"
+  },
+  "layers": [
+    {
+      "id": "background",
+      "file": "bevel-icon-master.svg#layer-background",
+      "role": "fill",
+      "notes": "Deep ink plate; keep flat for Liquid Glass lighting"
+    },
+    {
+      "id": "glow",
+      "file": "bevel-icon-master.svg#layer-glow",
+      "role": "atmosphere",
+      "notes": "Soft accent bloom behind the mark"
+    },
+    {
+      "id": "plane-left",
+      "file": "bevel-icon-master.svg#layer-plane-left",
+      "role": "structure"
+    },
+    {
+      "id": "plane-right",
+      "file": "bevel-icon-master.svg#layer-plane-right",
+      "role": "structure"
+    },
+    {
+      "id": "accent-edge",
+      "file": "bevel-icon-master.svg#layer-accent-edge",
+      "role": "specular",
+      "notes": "Signature bevel edge — must remain legible at 29pt"
+    },
+    {
+      "id": "highlight",
+      "file": "bevel-icon-master.svg#layer-highlight",
+      "role": "specular"
+    }
+  ],
+  "exports": {
+    "ios": "Runner/Assets.xcassets/AppIcon.appiconset",
+    "android_adaptive": {
+      "background": "#0A0E12",
+      "foreground": "bevel-icon-fg-1024.png",
+      "monochrome": "bevel-icon-mono-1024.png"
+    },
+    "macos": "macos/Runner/Assets.xcassets/AppIcon.appiconset",
+    "marketing_1024": "bevel-icon-1024.png"
+  },
+  "quality_bar": [
+    "Recognizable as a B at 16px (macOS menu) and 29pt (iOS settings)",
+    "Accent edge survives circular Android mask",
+    "No emoji, no photographic texture, no tiny type",
+    "Dark-first; works on light springboard with contrast"
+  ]
+}

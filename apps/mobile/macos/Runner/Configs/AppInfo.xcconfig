@@ -1,0 +1,10 @@
+// Application-level settings for the Runner target.
+
+// Window / dock name
+PRODUCT_NAME = BEVEL
+
+// Bundle identifier
+PRODUCT_BUNDLE_IDENTIFIER = com.derozic.bevel.bevelApp
+
+// Copyright
+PRODUCT_COPYRIGHT = Copyright © 2026 deˆrozic. All rights reserved.

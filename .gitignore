@@ -9,4 +9,52 @@ dist
 *.log
 .DS_Store
 coverage
-.vercel
+.verceltmp/
+tmp/
+
+# Fleet message JSONL store
+services/api/data/
+
+# Workspace secrets (Twilio, etc.) — never commit
+data/secrets/
+data/sms/
+data/otp/
+
+# TypeScript incremental build caches
+*.tsbuildinfo
+
+# Runtime data stores (never commit)
+data/sessions/
+data/announcements.json
+data/
+
+# Flutter / native build outputs
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.packages
+apps/mobile/build/
+apps/mobile/**/Pods/
+apps/mobile/**/Generated.xcconfig
+apps/mobile/**/Flutter/ephemeral/
+apps/mobile/**/Flutter/flutter_export_environment.sh
+apps/mobile/ios/Flutter/Flutter.podspec
+apps/mobile/macos/Flutter/ephemeral/
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
+apps/mobile/android/app/debug/
+apps/mobile/android/app/profile/
+apps/mobile/android/app/release/
+*.iml
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+services/api/.venv/
+
+# Release artifacts
+dist/
+
+/build/

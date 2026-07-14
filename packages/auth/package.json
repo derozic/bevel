@@ -10,13 +10,15 @@
     ".": "./src/index.ts",
     "./tokens": "./src/tokens.ts",
     "./client": "./src/client.tsx",
-    "./config": "./src/config.ts"
+    "./config": "./src/config.ts",
+    "./otp": "./src/otp.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@bevel/schema": "workspace:*",
+    "@bevel/tenant-config": "workspace:*",
     "jose": "^6.2.3"
   },
   "peerDependencies": {

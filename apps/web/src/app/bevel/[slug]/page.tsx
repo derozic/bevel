@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { requireTenantFromRequest } from '@bevel/tenant-config'
 import { auth } from '@/auth'
 import { BevelChatPane } from '@/components/BevelChatPane'
 import {
@@ -19,8 +20,10 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>
 }): Promise<Metadata> {
   const { slug } = await params
+  const tenant = await requireTenantFromRequest().catch(() => null)
+  const workspace = tenant?.theme.productName ?? tenant?.name
   return {
-    title: bevelPageTitle(normalizeBevelChannelSlug(slug)),
+    title: bevelPageTitle(normalizeBevelChannelSlug(slug), workspace),
     description: BEVEL_TAGLINE,
   }
 }
@@ -30,11 +33,11 @@ export default async function BevelChannelPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>
-  searchParams: Promise<{ agents?: string }>
+  searchParams: Promise<{ agents?: string; msg?: string; q?: string }>
 }) {
   const session = await auth()
   const { slug } = await params
-  const { agents: agentsParam } = await searchParams
+  const { agents: agentsParam, msg, q } = await searchParams
 
   if (slug === 'talk') {
     redirect(BEVEL_TALK_PATH)
@@ -48,11 +51,16 @@ export default async function BevelChannelPage({
 
   if (!session?.user) {
     redirect(
-      `/auth/signin?callbackUrl=${encodeURIComponent(bevelChannelPath(channelSlug))}`
+      `/login?callbackUrl=${encodeURIComponent(bevelChannelPath(channelSlug))}`
     )
   }
 
   return (
-    <BevelChatPane channelSlug={channelSlug} initialAgents={initialAgents} />
+    <BevelChatPane
+      channelSlug={channelSlug}
+      initialAgents={initialAgents}
+      focusMessageId={msg}
+      highlightQuery={q}
+    />
   )
 }

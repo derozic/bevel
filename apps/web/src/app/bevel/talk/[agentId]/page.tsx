@@ -1,6 +1,11 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { agentChatPath } from '@/lib/agent-bevel-session'
+import { requireTenantFromRequest } from '@bevel/tenant-config'
+import { auth } from '@/auth'
+import {
+  AgentBevelSessionView,
+  agentChatPath,
+} from '@/lib/agent-bevel-session'
 import { getAgentById } from '@/lib/agent-catalog'
 import { BEVEL_TAGLINE, bevelPageTitle } from '@/lib/bevel'
 
@@ -12,21 +17,36 @@ export async function generateMetadata({
   const { agentId } = await params
   const agent = getAgentById(agentId)
   const name = agent?.name ?? agentId
+  const tenant = await requireTenantFromRequest().catch(() => null)
+  const workspace = tenant?.theme.productName ?? tenant?.name
   return {
-    title: bevelPageTitle(name),
-    description: BEVEL_TAGLINE,
+    title: bevelPageTitle(name, workspace),
+    description: agent?.bio ?? BEVEL_TAGLINE,
   }
 }
 
-/** Legacy path — canonical direct chat is /:agent/chat */
-export default async function BevelTalkRedirectPage({
+/**
+ * Direct agent thread — /bevel/talk/brain (and multi via ?agents=).
+ * Canonical under /bevel so tenant layout + auth resolve cleanly.
+ */
+export default async function BevelTalkAgentPage({
   params,
   searchParams,
 }: {
   params: Promise<{ agentId: string }>
-  searchParams: Promise<{ agents?: string }>
+  searchParams: Promise<{ agents?: string; invite?: string }>
 }) {
+  const session = await auth()
   const { agentId } = await params
   const { agents: agentsParam } = await searchParams
-  redirect(agentChatPath(agentId, agentsParam))
+  const callbackPath = agentChatPath(agentId, agentsParam)
+
+  return (
+    <AgentBevelSessionView
+      session={session}
+      agentId={agentId}
+      agentsParam={agentsParam}
+      callbackPath={callbackPath}
+    />
+  )
 }

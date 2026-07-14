@@ -1,39 +1,10 @@
-# Local multi-tenant routing for BEVEL dev.
-# Requires: caddy trust (for lvh.me HTTPS)
+# Deprecated local runner — do NOT `caddy run` this file.
+# BEVEL sites live under caddy/sites/*.conf and are imported by the machine-wide
+# ~/dev/Caddyfile.global. Reload that instance instead of starting a second Caddy.
+#
+#   caddy validate --config ~/dev/Caddyfile.global --adapter caddyfile
+#   caddy reload  --config ~/dev/Caddyfile.global --adapter caddyfile
+#
+# See ~/dev/CADDY_ORCHESTRATION.md
 
-{
-  auto_https disable_redirects
-}
-
-demo.bevel.lvh.me {
-  reverse_proxy 127.0.0.1:43200
-}
-
-acme.bevel.lvh.me {
-  reverse_proxy 127.0.0.1:43200
-}
-
-admin.bevel.lvh.me {
-  reverse_proxy 127.0.0.1:43201
-}
-
-realtime.bevel.lvh.me {
-  reverse_proxy 127.0.0.1:43208
-}
-
-docs.bevel.lvh.me {
-  reverse_proxy 127.0.0.1:43202
-}
-
-# Product clients (Host → tenant via middleware)
-bevel.agents.2x4m.lvh.me {
-  reverse_proxy 127.0.0.1:43200
-}
-
-bevel.2ndbrain.lvh.me {
-  reverse_proxy 127.0.0.1:43200
-}
-
-bevel.preso.lvh.me {
-  reverse_proxy 127.0.0.1:43200
-}
+import sites/*.conf

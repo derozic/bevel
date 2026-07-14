@@ -1,17 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeftIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import type {
+  FeatureAccess,
+  ResolvedFeatureSet,
+  TenantPlan,
+} from '@bevel/schema'
 import { cn } from '@/lib/utils'
 import { agents } from '@/lib/agent-catalog'
 import {
   BEVEL_COPY,
+  BEVEL_TRADEMARK_NOTICE,
   bevelChannelPath,
   bevelConversationPath,
+  bevelTalkPath,
 } from '@/lib/bevel'
+import { FeatureFlagsBar } from '@/components/FeatureFlagsBar'
 import {
   filterVisibleSessions,
   readConversationCache,
@@ -26,14 +34,56 @@ import {
 import { DEFAULT_CHANNELS, type FleetChannelSummary } from '@/lib/fleet-channels'
 import type { SessionSummary } from '@/lib/realtime'
 import { BevelMark } from './BevelMark'
+import { WorkspaceBrand } from './WorkspaceBrand'
+import { ConversationRoster } from './ConversationRoster'
+import { ConversationSearch } from './ConversationSearch'
 import { CreateChannelModal } from './CreateChannelModal'
+import { DaypartControl } from './DaypartControl'
+import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 
-function BevelRailFooter() {
+function BevelRailFooter({
+  plan,
+  featureAccess,
+  featureSet,
+}: {
+  plan?: TenantPlan | string
+  featureAccess?: FeatureAccess | string
+  featureSet?: ResolvedFeatureSet | null
+}) {
+  const prefs = usePreferencesOptional()
   return (
-    <Link href="/" className="bevel-rail-footer-link">
-      <ArrowLeftIcon className="h-3.5 w-3.5" />
-      Agent catalog
-    </Link>
+    <div className="flex flex-col gap-1.5">
+      <DaypartControl />
+      <button
+        type="button"
+        className="bevel-rail-footer-link w-full text-left"
+        onClick={() => prefs?.openSection('appearance')}
+      >
+        <Cog6ToothIcon className="h-3.5 w-3.5" />
+        Appearance
+      </button>
+      <button
+        type="button"
+        className="bevel-rail-footer-link w-full text-left"
+        onClick={() => prefs?.openSection('ai')}
+      >
+        <Cog6ToothIcon className="h-3.5 w-3.5" />
+        Preferences
+      </button>
+      <Link href="/" className="bevel-rail-footer-link">
+        <ArrowLeftIcon className="h-3.5 w-3.5" />
+        Home
+      </Link>
+      {plan || featureAccess || featureSet ? (
+        <FeatureFlagsBar
+          compact
+          plan={plan}
+          featureAccess={featureAccess}
+          featureSet={featureSet}
+          className="mt-1 border-t border-border/60 pt-2"
+        />
+      ) : null}
+    </div>
   )
 }
 
@@ -47,17 +97,29 @@ function conversationLabel(summary: SessionSummary): string {
 }
 
 export function BevelRail({
+  productName,
+  platformHomeHref,
+  platformHomeLabel,
   activeSlug,
   activeSessionId,
   initialChannels,
   initialSessions,
+  plan,
+  featureAccess,
+  featureSet,
   onNavigate,
   headerAction,
 }: {
+  productName?: string
+  platformHomeHref?: string
+  platformHomeLabel?: string
   activeSlug?: string
   activeSessionId?: string
   initialChannels?: FleetChannelSummary[]
   initialSessions?: SessionSummary[]
+  plan?: TenantPlan | string
+  featureAccess?: FeatureAccess | string
+  featureSet?: ResolvedFeatureSet | null
   onNavigate?: () => void
   headerAction?: ReactNode
 }) {
@@ -193,27 +255,41 @@ export function BevelRail({
   return (
     <div className="bevel-rail">
       <div className="bevel-rail-header">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-0.5">
-            <BevelMark size="sm" />
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">
-              {BEVEL_COPY.channelsLabel}
-            </p>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <WorkspaceBrand productName={productName} />
+            {platformHomeHref ? (
+              <a
+                href={platformHomeHref}
+                className="bevel-rail-platform-back"
+                title={`Back to ${platformHomeLabel || productName || 'home'}`}
+              >
+                ← {platformHomeLabel || productName || 'home'}
+              </a>
+            ) : null}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => {
                 setCreatedSlug(null)
                 setShowCreate(true)
               }}
-              className="rounded-full border border-ink-200 bg-surface px-2.5 py-0.5 text-xs font-medium text-ink-900 transition-colors hover:border-ink-900"
+              className="bevel-rail-new-channel"
             >
               {BEVEL_COPY.newChannel}
             </button>
             {headerAction}
           </div>
         </div>
+        <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+          {BEVEL_COPY.channelsLabel}
+        </p>
+        {status === 'authenticated' ? (
+          <div className="mt-2">
+            <ConversationSearch />
+          </div>
+        ) : null}
       </div>
 
       <div className="bevel-rail-nav">
@@ -227,7 +303,7 @@ export function BevelRail({
               className="bevel-rail-channel"
               aria-busy={loading ? true : undefined}
             >
-              <span className="bevel-rail-channel-slug">#{ch.slug}</span>
+              <span className="bevel-rail-channel-slug">^{ch.slug}</span>
               <span className="bevel-rail-channel-name">{ch.name || '\u00a0'}</span>
             </Link>
           ))}
@@ -237,27 +313,57 @@ export function BevelRail({
           <div className="bevel-rail-section-header">
             <p className="bevel-rail-section-label">{BEVEL_COPY.conversationsLabel}</p>
           </div>
+          <div className="mb-2 px-1">
+            <ConversationRoster onStarted={onNavigate} />
+          </div>
           <nav aria-label={BEVEL_COPY.conversationsLabel}>
-            {visibleConversations.length === 0 ? (
-              <div className="bevel-rail-empty-block" aria-busy={conversationsLoading}>
-                <p className="bevel-rail-empty">
-                  {conversationsLoading
-                    ? BEVEL_COPY.loadingConversations
-                    : BEVEL_COPY.conversationsEmpty}
-                </p>
-                {!conversationsLoading ? (
-                  <p className="bevel-rail-empty bevel-rail-empty--subtle">
-                    {BEVEL_COPY.humanDmsSoon}
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              visibleConversations.map((conv) => (
+            {/* Always list fleet agents so a DM is one click away */}
+            {agents.map((agent) => {
+              const href = bevelTalkPath(agent.id)
+              const live = visibleConversations.find(
+                (c) =>
+                  c.agentIds.length === 1 &&
+                  c.agentIds[0]?.toLowerCase() === agent.id.toLowerCase(),
+              )
+              const active =
+                activeSessionId != null &&
+                (activeSessionId === live?.sessionId ||
+                  activeSessionId === `talk:${agent.id}` ||
+                  activeSessionId.endsWith(`-${agent.id}`) ||
+                  activeSessionId.includes(`-${agent.id}`) ||
+                  activeSessionId.endsWith(`-${agent.id.toLowerCase()}`))
+              return (
+                <Link
+                  key={agent.id}
+                  href={href}
+                  onClick={onNavigate}
+                  data-active={active ? 'true' : 'false'}
+                  className="bevel-rail-conversation"
+                  title={`Message ${agent.name}`}
+                >
+                  <span className="bevel-rail-conversation-title">
+                    {agent.name}
+                  </span>
+                  <span className="bevel-rail-conversation-preview">
+                    {live?.preview?.trim() ||
+                      agent.tagline ||
+                      agent.role ||
+                      'Direct thread'}
+                  </span>
+                </Link>
+              )
+            })}
+            {/* Multi-agent or historical sessions not covered by single-agent rows */}
+            {visibleConversations
+              .filter((c) => c.agentIds.length !== 1)
+              .map((conv) => (
                 <Link
                   key={conv.sessionId}
                   href={bevelConversationPath(conv)}
                   onClick={onNavigate}
-                  data-active={activeSessionId === conv.sessionId ? 'true' : 'false'}
+                  data-active={
+                    activeSessionId === conv.sessionId ? 'true' : 'false'
+                  }
                   className="bevel-rail-conversation"
                 >
                   <span className="bevel-rail-conversation-title">
@@ -267,13 +373,20 @@ export function BevelRail({
                     {conv.preview ??
                       (conv.agentIds.length > 0
                         ? conv.agentIds
-                            .map((id) => agents.find((a) => a.id === id)?.name ?? id)
+                            .map(
+                              (id) =>
+                                agents.find((a) => a.id === id)?.name ?? id,
+                            )
                             .join(' · ')
                         : '\u00a0')}
                   </span>
                 </Link>
-              ))
-            )}
+              ))}
+            {conversationsLoading && visibleConversations.length === 0 ? (
+              <p className="bevel-rail-empty" aria-busy>
+                {BEVEL_COPY.loadingConversations}
+              </p>
+            ) : null}
           </nav>
           {conversationsError ? (
             <button
@@ -297,7 +410,7 @@ export function BevelRail({
                 onClick={onNavigate}
                 className="font-semibold underline"
               >
-                #{createdSlug}
+                ^{createdSlug}
               </Link>
               — open when you are ready.
             </p>
@@ -319,7 +432,11 @@ export function BevelRail({
       </div>
 
       <div className="bevel-rail-footer">
-        <BevelRailFooter />
+        <BevelRailFooter
+          plan={plan}
+          featureAccess={featureAccess}
+          featureSet={featureSet}
+        />
       </div>
 
       <CreateChannelModal

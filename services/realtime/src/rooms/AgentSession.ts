@@ -234,6 +234,7 @@ export class AgentSession extends Room {
       speaker,
       speakerType: 'human',
       body: text,
+      meta: { messageId: human.id },
     })
 
     const targets = this.resolveTargetAgents(text, payload.targetAgent)
@@ -285,7 +286,7 @@ export class AgentSession extends Room {
       speakerType: 'agent',
       agentId: target,
       body: output,
-      meta,
+      meta: { ...meta, messageId: reply.id },
     })
   }
 

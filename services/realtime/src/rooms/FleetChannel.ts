@@ -3,8 +3,10 @@ import { verifyAuthToken } from '../auth-verify.js'
 import { dispatchAgentChat, dispatchAgentWork } from '../agent-dispatch.js'
 import { canDispatchWork, normalizeWorkRepo } from '../work-repos.js'
 import { appendChannelMessage, fetchChannel, fetchChannelMessages } from '../fleet-channel-api.js'
+import { logAgentWorkToProduct } from '../product-log.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { recordEvent } from '../recording.js'
+import { conversationSearchIndex } from '../search-index.js'
 import { loadMergedRegistry } from '../registry-merge.js'
 import {
   AgentPresence,
@@ -59,9 +61,10 @@ function uid(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
+/** Parse in-message tags. Prefer `^tag`; still accept legacy `#tag`. */
 function parseMessageTags(text: string): string[] {
   const tags = new Set<string>()
-  for (const m of text.matchAll(/#([a-z0-9][a-z0-9_-]*)\b/gi)) {
+  for (const m of text.matchAll(/[#^]([a-z0-9][a-z0-9_-]*)\b/gi)) {
     tags.add(m[1].toLowerCase())
   }
   return [...tags]
@@ -97,7 +100,7 @@ export class FleetChannel extends Room {
         : channel?.defaultAgentIds ?? ['hermes', 'johnny']
     ).map((id) => id.toLowerCase())
 
-    this.state.title = channel?.name ?? `#${this.channelSlug}`
+    this.state.title = channel?.name ?? `^${this.channelSlug}`
     for (const tag of channel?.tags ?? []) {
       this.state.tags.push(tag)
     }
@@ -128,6 +131,22 @@ export class FleetChannel extends Room {
       msg.status = row.status
       msg.ts = new Date(row.createdAt).getTime() || Date.now()
       this.pushMessage(msg)
+      // Seed search index only (do not re-append history into JSONL)
+      if (row.speakerType !== 'system' && row.body?.trim()) {
+        conversationSearchIndex.indexDocument({
+          key: `${this.channelSlug}::${row.id}`,
+          messageId: row.id,
+          sessionId: this.channelSlug,
+          kind: 'channel',
+          channelSlug: this.channelSlug,
+          speaker: row.speakerName,
+          speakerType: row.speakerType,
+          agentId: row.agentId,
+          body: row.body,
+          ts: msg.ts,
+        })
+        conversationSearchIndex.markReady()
+      }
     }
 
     // Channel copy lives in the client empty state — avoid welcome/join/leave chat noise.
@@ -238,6 +257,16 @@ export class FleetChannel extends Room {
     human.ts = Date.now()
     this.pushMessage(human)
 
+    recordEvent({
+      ts: human.ts,
+      sessionId: this.channelSlug,
+      type: 'message',
+      speaker: human.speaker,
+      speakerType: 'human',
+      body: text,
+      meta: { messageId: human.id, channelSlug: this.channelSlug, tags },
+    })
+
     void appendChannelMessage(this.channelSlug, {
       id: human.id,
       speakerId: human.speakerId,
@@ -279,7 +308,12 @@ export class FleetChannel extends Room {
       }))
   }
 
-  private pushAgentReply(target: string, agentName: string, output: string) {
+  private pushAgentReply(
+    target: string,
+    agentName: string,
+    output: string,
+    opts: { work?: boolean; workRepo?: string } = {},
+  ) {
     const reply = new ChatMessage()
     reply.id = uid()
     reply.sessionId = this.channelSlug
@@ -291,6 +325,22 @@ export class FleetChannel extends Room {
     reply.ts = Date.now()
     this.pushMessage(reply)
 
+    recordEvent({
+      ts: reply.ts,
+      sessionId: this.channelSlug,
+      type: 'agent_reply',
+      speaker: agentName,
+      speakerType: 'agent',
+      agentId: target,
+      body: output,
+      meta: {
+        messageId: reply.id,
+        channelSlug: this.channelSlug,
+        work: opts.work === true,
+        workRepo: opts.workRepo,
+      },
+    })
+
     void appendChannelMessage(this.channelSlug, {
       id: reply.id,
       speakerId: target,
@@ -299,7 +349,99 @@ export class FleetChannel extends Room {
       agentId: target,
       body: output,
       status: 'final',
+      tags: opts.work ? ['work', 'github'] : undefined,
     })
+
+    // Accountability: every work-mode agent move lands in ^product with repo context
+    if (opts.work) {
+      const ghMatch = output.match(
+        /https:\/\/github\.com\/[^\s)]+/i,
+      )
+      void logAgentWorkToProduct({
+        agentId: target,
+        agentName,
+        title: `Work complete on ${opts.workRepo || 'repo'}`,
+        body: output.slice(0, 500),
+        repo: opts.workRepo,
+        url: ghMatch?.[0],
+      })
+    }
+  }
+
+  /**
+   * Inject an agent program run (JOHNNY Caddy heal, etc.) into the live room.
+   * Called via matchMaker.remoteRoomCall from POST /api/program-events.
+   */
+  injectProgramEvent(payload: {
+    id?: string
+    agentId?: string
+    speakerName?: string
+    body: string
+    tags?: string[]
+    persist?: boolean
+  }): { id: string; channelSlug: string } {
+    const agentId = (payload.agentId || 'johnny').toLowerCase()
+    const speakerName =
+      payload.speakerName ||
+      this.state.agents.find((a) => a.id === agentId)?.name ||
+      agentId.toUpperCase()
+    const msg = new ChatMessage()
+    msg.id = payload.id || uid()
+    msg.sessionId = this.channelSlug
+    msg.speaker = speakerName
+    msg.speakerId = `agent:${agentId}`
+    msg.speakerType = 'agent'
+    msg.agentId = agentId
+    msg.body = payload.body
+    msg.status = 'final'
+    msg.ts = Date.now()
+    this.pushMessage(msg)
+
+    recordEvent({
+      ts: msg.ts,
+      sessionId: this.channelSlug,
+      type: 'program_event',
+      speaker: speakerName,
+      speakerType: 'agent',
+      agentId,
+      body: payload.body,
+      meta: {
+        messageId: msg.id,
+        channelSlug: this.channelSlug,
+        tags: payload.tags ?? ['program'],
+      },
+    })
+
+    if (payload.persist !== false) {
+      void appendChannelMessage(this.channelSlug, {
+        id: msg.id,
+        speakerId: msg.speakerId,
+        speakerName,
+        speakerType: 'agent',
+        agentId,
+        body: payload.body,
+        status: 'final',
+        tags: payload.tags ?? ['program'],
+      })
+    }
+
+    if (payload.body?.trim()) {
+      conversationSearchIndex.indexDocument({
+        key: `${this.channelSlug}::${msg.id}`,
+        messageId: msg.id,
+        sessionId: this.channelSlug,
+        kind: 'channel',
+        channelSlug: this.channelSlug,
+        speaker: speakerName,
+        speakerType: 'agent',
+        agentId,
+        body: payload.body,
+        ts: msg.ts,
+      })
+      conversationSearchIndex.markReady()
+    }
+
+    return { id: msg.id, channelSlug: this.channelSlug }
   }
 
   private async dispatchToAgents(
@@ -345,8 +487,14 @@ export class FleetChannel extends Room {
       if (agentRow) agentRow.status = 'idle'
 
       const result = results[i]
+      const workMeta = { work: opts.work === true, workRepo }
       if (result.status === 'fulfilled') {
-        this.pushAgentReply(target, result.value.agentName, result.value.res.output)
+        this.pushAgentReply(
+          target,
+          result.value.agentName,
+          result.value.res.output,
+          workMeta,
+        )
       } else {
         const agentName = agentRow?.name ?? target
         const reason = result.reason
@@ -356,7 +504,12 @@ export class FleetChannel extends Room {
         this.pushAgentReply(
           target,
           agentName,
-          is429 ? fleetRateLimited(agentName) : reason instanceof Error ? reason.message : 'Agent failed'
+          is429
+            ? fleetRateLimited(agentName)
+            : reason instanceof Error
+              ? reason.message
+              : 'Agent failed',
+          workMeta,
         )
       }
     }

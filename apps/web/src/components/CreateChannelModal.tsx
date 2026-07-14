@@ -48,7 +48,7 @@ export function CreateChannelModal({
           name: name.trim() || undefined,
           tags: tags
             .split(',')
-            .map((t) => t.trim().replace(/^#/, ''))
+            .map((t) => t.trim().replace(/^[#^]/, ''))
             .filter(Boolean),
           defaultAgentIds: ['hermes', 'johnny'],
         }),
@@ -64,7 +64,7 @@ export function CreateChannelModal({
         .toLowerCase()
       const tagList = tags
         .split(',')
-        .map((t) => t.trim().replace(/^#/, ''))
+        .map((t) => t.trim().replace(/^[#^]/, ''))
         .filter(Boolean)
       onCreated({
         slug: createdSlug,

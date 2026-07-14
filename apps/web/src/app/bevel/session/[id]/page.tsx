@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { requireTenantFromRequest } from '@bevel/tenant-config'
 import { auth } from '@/auth'
 import { BevelChatPane } from '@/components/BevelChatPane'
 import { getAgentById } from '@/lib/agent-catalog'
@@ -16,23 +17,28 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
+  const tenant = await requireTenantFromRequest().catch(() => null)
+  const workspace = tenant?.theme.productName ?? tenant?.name
   return {
-    title: bevelPageTitle(id.slice(0, 12)),
+    title: bevelPageTitle(id.slice(0, 12), workspace),
     description: BEVEL_TAGLINE,
   }
 }
 
 export default async function BevelResumeSessionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ msg?: string; q?: string }>
 }) {
   const session = await auth()
   const { id: sessionId } = await params
+  const { msg, q } = await searchParams
 
   if (!session?.user) {
     redirect(
-      `/auth/signin?callbackUrl=${encodeURIComponent(bevelSessionPath(sessionId))}`
+      `/login?callbackUrl=${encodeURIComponent(bevelSessionPath(sessionId))}`
     )
   }
 
@@ -51,6 +57,8 @@ export default async function BevelResumeSessionPage({
         const agent = getAgentById(id)
         return agent?.id ?? id
       })}
+      focusMessageId={msg}
+      highlightQuery={q}
     />
   )
 }

@@ -1,17 +1,23 @@
 tenant: demo
 name: BEVEL Demo
-domain: demo.bevel.lvh.me
+domain: bevel.lvh.me
+hosts:
+  - demo.bevel.lvh.me
 
 brand:
   theme: ./theme.json
   product_name: BEVEL
+
+# Demo stays free — no SMS / paid flags unless plan is raised
+plan: free
 
 features:
   async_streams: true
   live_sessions: true
   analytics: true
   agent_dispatch: true
-  work_mode: true
+  # work_mode requires pro+; leave off on free demo
+  work_mode: false
 
 auth:
   mode: google
@@ -32,7 +38,7 @@ transports:
     protocol: websocket
 
 deployment:
-  preview_url: https://demo.bevel.lvh.me
+  preview_url: https://bevel.lvh.me
   target: vercel
 
 work_repos:

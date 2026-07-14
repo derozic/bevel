@@ -10,6 +10,11 @@ import {
 } from 'react'
 import { usePathname } from 'next/navigation'
 import { XMarkIcon } from '@heroicons/react/24/outline'
+import type {
+  FeatureAccess,
+  ResolvedFeatureSet,
+  TenantPlan,
+} from '@bevel/schema'
 import { BevelRail, type FleetChannelSummary } from '@/components/BevelRail'
 import type { SessionSummary } from '@/lib/realtime'
 
@@ -31,11 +36,24 @@ function activeRouteFromPath(pathname: string): {
   activeSlug?: string
   activeSessionId?: string
 } {
-  const sessionMatch = pathname.match(/\/bevel\/session\/([^/]+)/)
+  // Public short paths + legacy /bevel/*
+  const sessionMatch = pathname.match(
+    /(?:^\/session\/|^\/bevel\/session\/)([^/]+)/,
+  )
   if (sessionMatch) {
     return { activeSessionId: decodeURIComponent(sessionMatch[1]!) }
   }
-  const channelMatch = pathname.match(/\/bevel\/([^/]+)/)
+  const talkMatch = pathname.match(/(?:^\/talk\/|^\/bevel\/talk\/)([^/]+)/)
+  if (talkMatch) {
+    const agentId = decodeURIComponent(talkMatch[1]!).toLowerCase()
+    return { activeSessionId: `talk:${agentId}` }
+  }
+  // /^general or /%5Egeneral or /bevel/general
+  const caretMatch = pathname.match(/^\/(?:\^|%5[eE])([a-z0-9][a-z0-9-]*)/i)
+  if (caretMatch) {
+    return { activeSlug: caretMatch[1]!.toLowerCase() }
+  }
+  const channelMatch = pathname.match(/^\/bevel\/([^/]+)/)
   if (channelMatch) {
     const slug = decodeURIComponent(channelMatch[1]!)
     if (slug !== 'session' && slug !== 'talk' && slug !== 'c') {
@@ -47,12 +65,26 @@ function activeRouteFromPath(pathname: string): {
 
 export function BevelShell({
   children,
+  productName,
+  platformHomeHref,
+  platformHomeLabel,
   initialChannels,
   initialSessions,
+  plan,
+  featureAccess,
+  featureSet,
 }: {
   children: ReactNode
+  /** Workspace brand label (rail) — e.g. "2x4m" not "2x4m Agents" */
+  productName?: string
+  /** Compact "← product" link (no second logo row) */
+  platformHomeHref?: string
+  platformHomeLabel?: string
   initialChannels?: FleetChannelSummary[]
   initialSessions?: SessionSummary[]
+  plan?: TenantPlan | string
+  featureAccess?: FeatureAccess | string
+  featureSet?: ResolvedFeatureSet | null
 }) {
   const pathname = usePathname()
   const { activeSlug, activeSessionId } = activeRouteFromPath(pathname ?? '')
@@ -90,10 +122,16 @@ export function BevelShell({
         aria-label="Channels"
       >
         <BevelRail
+          productName={productName}
+          platformHomeHref={platformHomeHref}
+          platformHomeLabel={platformHomeLabel}
           activeSlug={activeSlug}
           activeSessionId={activeSessionId}
           initialChannels={initialChannels}
           initialSessions={initialSessions}
+          plan={plan}
+          featureAccess={featureAccess}
+          featureSet={featureSet}
           onNavigate={closeSidebar}
           headerAction={
             <button

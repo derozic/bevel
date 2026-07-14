@@ -1,37 +1,52 @@
 import {
   BEVEL_COPY,
+  BEVEL_WORD,
+  BEVEL_TM,
   BEVEL_NAME,
   BEVEL_POWERED_BY_LABEL,
+  BEVEL_TRADEMARK_NOTICE,
   BEVEL_PRODUCT,
+  CHANNEL_TAG_PREFIX,
+  channelTag,
   type BevelProduct,
 } from '@bevel/realtime-client'
 
 export {
   BEVEL_COPY,
+  BEVEL_WORD,
+  BEVEL_TM,
   BEVEL_NAME,
   BEVEL_POWERED_BY_LABEL,
+  BEVEL_TRADEMARK_NOTICE,
   BEVEL_PRODUCT,
+  CHANNEL_TAG_PREFIX,
+  channelTag,
   type BevelProduct,
 }
 
 export const BEVEL_TAGLINE = BEVEL_PRODUCT.tagline
 export const BEVEL_SHORT = BEVEL_PRODUCT.short
 
-export const BEVEL_HOME_PATH = '/bevel'
+/** Workspace home → default channel (public URL, no /bevel/ prefix). */
+export const BEVEL_HOME_PATH = '/^general'
 export const BEVEL_DEFAULT_CHANNEL = 'general'
 export const BEVEL_ARCHIVE_PATH = '/sessions'
-export const BEVEL_TALK_PATH = '/bevel/talk'
-export const BEVEL_SESSION_PATH = '/bevel/session'
+/** Direct agent threads: /talk/brain */
+export const BEVEL_TALK_PATH = '/talk'
+export const BEVEL_SESSION_PATH = '/session'
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/
 
-/** Canonical channel URL: /bevel/general (no /c/ — that was legacy Slack mimicry). */
+/**
+ * Canonical channel URL: `/^general` (browsers may show %5E; both work).
+ * Internal Next routes remain under /bevel/* via middleware rewrite.
+ */
 export function bevelChannelPath(slug: string): string {
-  const normalized = slug.trim().toLowerCase()
-  return `/bevel/${normalized}`
+  const normalized = slug.trim().toLowerCase().replace(/^[\^#]+/, '')
+  return `/^${normalized || BEVEL_DEFAULT_CHANNEL}`
 }
 
-/** Legacy /bevel/c/:slug and /chat/c/:slug — still accepted via redirects. */
+/** Legacy /bevel/c/:slug — still accepted via redirects. */
 export function bevelLegacyChannelPath(slug: string): string {
   return `/bevel/c/${slug.trim().toLowerCase()}`
 }
@@ -41,7 +56,11 @@ export function chatLegacyChannelPath(slug: string): string {
 }
 
 export function normalizeBevelChannelSlug(slug: string): string {
-  const normalized = slug.trim().toLowerCase()
+  const normalized = slug
+    .trim()
+    .toLowerCase()
+    .replace(/^%5e/i, '')
+    .replace(/^[\^#]+/, '')
   if (!SLUG_RE.test(normalized)) {
     return BEVEL_DEFAULT_CHANNEL
   }
@@ -54,14 +73,23 @@ export function bevelChannelHref(slug: string, agents?: string): string {
   return `${base}?agents=${encodeURIComponent(agents)}`
 }
 
-export function bevelPageTitle(channelSlug?: string): string {
-  if (channelSlug) return `${BEVEL_NAME} · #${channelSlug} · 2x4m Agents`
-  return `${BEVEL_NAME} · 2x4m Agents`
+/**
+ * Browser / tab title for workspace surfaces.
+ * Prefer the org brand (e.g. "2x4m") over generic BEVEL when known.
+ */
+export function bevelPageTitle(
+  channelSlug?: string,
+  workspaceLabel?: string | null,
+): string {
+  const brand = (workspaceLabel || '').trim() || BEVEL_NAME
+  const clean = brand.replace(/\s+Agents$/i, '').trim() || brand
+  if (channelSlug) return `${clean} · ^${channelSlug}`
+  return clean
 }
 
 export function bevelTalkPath(agentId: string, agents?: string): string {
   const id = agentId.trim().toLowerCase()
-  const base = `/${encodeURIComponent(id)}/chat`
+  const base = `${BEVEL_TALK_PATH}/${encodeURIComponent(id)}`
   if (!agents?.trim()) return base
   return `${base}?agents=${encodeURIComponent(agents)}`
 }
@@ -84,7 +112,9 @@ export function bevelConversationPath(summary: {
 /** Stable session id so a user resumes the same thread with the same agent roster. */
 export function bevelDirectSessionId(userId: string, agentIds: string[]): string {
   const safeUser = userId.replace(/[^a-zA-Z0-9_-]/g, '_')
-  const roster = [...new Set(agentIds.map((id) => id.trim().toLowerCase()))].sort().join('+')
+  const roster = [...new Set(agentIds.map((id) => id.trim().toLowerCase()))]
+    .sort()
+    .join('+')
   return `dm-${safeUser}-${roster}`
 }
 
@@ -93,4 +123,23 @@ export function bevelConversationTitle(agentNames: string[]): string {
   if (agentNames.length === 1) return agentNames[0]!
   if (agentNames.length === 2) return `${agentNames[0]} & ${agentNames[1]}`
   return `${agentNames[0]} +${agentNames.length - 1}`
+}
+
+/** Deep-link into a message with highlight query. */
+export function bevelMessageHref(opts: {
+  kind: 'channel' | 'session'
+  channelSlug?: string
+  sessionId?: string
+  messageId: string
+  query?: string
+}): string {
+  const msg = encodeURIComponent(opts.messageId)
+  const q = opts.query?.trim()
+    ? `&q=${encodeURIComponent(opts.query.trim())}`
+    : ''
+  if (opts.kind === 'channel') {
+    const slug = opts.channelSlug || opts.sessionId || BEVEL_DEFAULT_CHANNEL
+    return `${bevelChannelPath(slug)}?msg=${msg}${q}`
+  }
+  return `${bevelSessionPath(opts.sessionId || 'unknown')}?msg=${msg}${q}`
 }

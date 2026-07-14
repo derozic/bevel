@@ -1,12 +1,26 @@
 tenant: 2x4m
-name: 2x4m Agents
-domain: bevel.agents.2x4m.lvh.me
+name: 2x4m
+domain: bevel.2x4m.lvh.me
 hosts:
-  - agents.2x4m.lvh.me
+  # Legacy hosts redirect via Caddy; primary is bevel.2x4m.lvh.me / bevel.2x4m.cc
+  - 2x4m.lvh.me
+
+# Plan + release access drive feature set (docs/FEATURE_SETS.md)
+# plan: free | trial | pro | team | enterprise
+# feature_access: stable | beta | upcoming
+plan: pro
+feature_access: beta
 
 brand:
   theme: ./theme.json
-  product_name: 2x4m Agents
+  product_name: 2x4m
+  logo: ./logo.svg
+  # Four unique day-part marks (rail, left of product name)
+  logos:
+    morning: ./logos/logo-morning.svg
+    midday: ./logos/logo-midday.svg
+    afternoon: ./logos/logo-afternoon.svg
+    night: ./logos/logo-night.svg
 
 features:
   async_streams: true
@@ -17,11 +31,18 @@ features:
   agent_dispatch: true
   work_mode: true
   custom_branding: true
+  sms: true
 
 auth:
   mode: google
   allowed_domains:
     - derozic.com
+    - 2x4m.com
+  # Platform login (bevel.lvh.me): Workspace users on these domains land in 2x4m
+  # with that org's channels + history (home workspace).
+  default_for_domains:
+    - derozic.com
+    - 2x4m.com
   require_github_for_work: true
 
 realtime:
@@ -38,8 +59,8 @@ transports:
     protocol: websocket
 
 deployment:
-  preview_url: https://bevel.agents.2x4m.lvh.me
-  production_url: https://bevel.agents.2x4m.cc
+  preview_url: https://bevel.2x4m.lvh.me
+  production_url: https://bevel.2x4m.cc
   target: vercel
 
 work_repos:

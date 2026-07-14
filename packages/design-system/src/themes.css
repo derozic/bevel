@@ -5,3 +5,7 @@
 [data-tenant-theme='acme'] {
   --tenant-accent: #22c55e;
 }
+
+[data-tenant-theme='2x4m'] {
+  color-scheme: light;
+}
