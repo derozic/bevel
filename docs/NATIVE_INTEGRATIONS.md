@@ -57,9 +57,48 @@ Android also registers as a **share target** for `text/plain` (inbound share int
 2. Requests runtime notification permission
 3. Shows local alerts (mentions, agent updates)
 4. Schedules reminders (standups / votes)
-5. **Extension points** for APNs device token + FCM — register with BEVEL API when push backend lands
+5. Calls `syncPushToken()` → `PushRegistrationService` →  
+   `POST /api/v1/devices/push-tokens` on the control plane
 
 Background modes (iOS): `remote-notification`, `fetch`.
+
+### APNs / FCM registration
+
+| Layer | Status |
+|-------|--------|
+| API store | `POST /api/v1/devices/push-tokens` (public register) · list/delete require `X-Fleet-Internal-Key` |
+| Flutter client | `lib/native/push_registration.dart` |
+| Token source | `fetchPlatformDeviceToken()` returns null until `firebase_messaging` / APNs plugin is wired |
+
+When Apple/Google push credentials land in 1Password:
+
+1. Add `firebase_messaging` (Android/iOS) + APNs key upload to Firebase or direct APNs
+2. Implement `PushRegistrationService.fetchPlatformDeviceToken`
+3. Call `NotificationService.syncPushToken` after permission grant
+4. Control-plane worker reads tokens and fans out via APNs/FCM HTTP v1
+
+## OAuth (system browser)
+
+Google blocks or degrades embedded WebViews. The client:
+
+- Detects IdP / Auth.js sign-in URLs via `BevelConfig.isOAuthNavigation`
+- Opens them with `OAuthBrowser` → `LaunchMode.externalApplication` (Safari / Chrome)
+- Exposes **Sign in (system browser)** on home + workspace shell
+- Accepts return deep link `bevel://auth/complete` to reload the workspace
+
+See [GOOGLE_OAUTH.md](./GOOGLE_OAUTH.md) for Cloud Console redirect URIs.
+
+## CallKit / ConnectionService (voice health calls)
+
+Scaffold: `lib/native/call_service.dart` (`StubCallService` until product ships).
+
+| Platform | System API | Next package |
+|----------|------------|--------------|
+| iOS | CallKit + PushKit | `flutter_callkit_incoming` |
+| Android | ConnectionService / Telecom | same / platform channel |
+| Signaling | BEVEL realtime invite → ring → answer | WebRTC (`@bevel/feature-webrtc`) |
+
+Do not request CallKit entitlements until the signaling path is production-ready.
 
 ## Deep links
 

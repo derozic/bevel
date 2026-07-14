@@ -58,35 +58,67 @@ dist/native/<version>/
 ```bash
 cd apps/mobile
 flutter run -d macos \
-  --dart-define=BEVEL_BASE_URL=https://2x4m.bevel.lvh.me
+  --dart-define=BEVEL_BASE_URL=https://2x4m.bevel.lvh.me \
+  --dart-define=BEVEL_API_URL=https://api.bevel.lvh.me
 ```
 
 ## Signing (production)
+
+Store all certs and keystore passwords in **1Password** (item titles like
+`BEVEL Apple Distribution`, `BEVEL Android Play Upload Keystore`). Never commit
+secrets.
 
 ### iOS
 
 1. Open `apps/mobile/ios/Runner.xcworkspace` in Xcode
 2. Set Team, Bundle ID (`com.derozic.bevel.bevelApp` by default)
-3. Archive → Distribute App → App Store Connect / TestFlight
-4. Or: `flutter build ipa --release --dart-define=BEVEL_BASE_URL=…`
+3. Enable capabilities: **HealthKit**, **Push Notifications**, **Associated Domains**
+4. Archive → Distribute App → App Store Connect / TestFlight
+5. Or: `flutter build ipa --release --dart-define=BEVEL_BASE_URL=…`
+
+App Store Connect checklist:
+
+- [ ] Privacy nutrition labels (Health, notifications, identifiers)
+- [ ] Export compliance / encryption answers
+- [ ] Screenshots for iPhone (+ iPad if needed)
+- [ ] Production `BEVEL_BASE_URL` dart-define on the archive
 
 ### Android
 
 1. Create an upload keystore (store in 1Password; never commit)
-2. Configure `android/key.properties` (gitignored) pointing at the keystore
-3. `flutter build appbundle --release`
+
+```bash
+keytool -genkey -v -keystore bevel-upload.jks -keyalg RSA -keysize 2048 \
+  -validity 10000 -alias bevel
+```
+
+2. Copy `apps/mobile/android/key.properties.example` → `android/key.properties`
+   (gitignored) pointing at the keystore
+3. Wire `key.properties` into `android/app/build.gradle.kts` signingConfigs when
+   ready for Play (template lives next to the example)
+4. `flutter build appbundle --release --dart-define=BEVEL_BASE_URL=…`
+
+Play Console checklist:
+
+- [ ] Health Connect declaration if shipping health APIs
+- [ ] Data safety form aligned with privacy strings
+- [ ] Internal testing track before production
 
 ### macOS Silicon
 
 1. Build on arm64 host: `./scripts/mobile/release.sh macos`
-2. Optional: codesign + notarize for Gatekeeper:
+2. Codesign + notarize for Gatekeeper:
 
 ```bash
 codesign --deep --force --options runtime \
   --sign "Developer ID Application: …" \
   dist/native/0.1.0/BEVEL-macos-arm64.app
+ditto -c -k --keepParent \
+  dist/native/0.1.0/BEVEL-macos-arm64.app \
+  dist/native/0.1.0/BEVEL-macos-arm64.zip
 xcrun notarytool submit dist/native/0.1.0/BEVEL-macos-arm64.zip \
   --apple-id … --team-id … --wait
+xcrun stapler staple dist/native/0.1.0/BEVEL-macos-arm64.app
 ```
 
 ## Versioning
@@ -100,9 +132,10 @@ xcrun notarytool submit dist/native/0.1.0/BEVEL-macos-arm64.zip \
 Workflow: `.github/workflows/native-release.yml`
 
 - Runs on `macos-latest` (Apple Silicon runners when available)
-- Builds macOS + Android (if SDK present) on tag `v*`
-- iOS archive step is gated on secrets / optional job
-- Uploads `dist/native/**` as workflow artifacts
+- Builds macOS + Android on tag `v*` and workflow_dispatch
+- **Fails the job when `release.sh` fails** (no `|| true` swallow)
+- iOS unsigned archive is a separate job
+- Uploads `dist/native/**` as workflow artifacts (`if-no-files-found: error`)
 
 ## Download page
 
@@ -113,6 +146,7 @@ When release artifacts are published, update that page’s store / direct-downlo
 ## Roadmap toward “completed” store bundles
 
 1. **Done:** Flutter scaffold, arm64 macOS + Android + iOS build scripts, download UX
-2. **Next:** In-app WebView / deep links for SSO cookies; push notifications
-3. **Next:** Signed TestFlight + Play internal track + notarized macOS zip
-4. **Then:** Store listings, privacy nutrition labels, production `BEVEL_BASE_URL`
+2. **Done:** In-app WebView shell, OAuth via system browser, deep links
+3. **Done:** Push token registration API + client hook (APNs/FCM plugin wiring next)
+4. **Next:** Signed TestFlight + Play internal track + notarized macOS zip
+5. **Then:** Store listings, privacy nutrition labels, production `BEVEL_BASE_URL`
