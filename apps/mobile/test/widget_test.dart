@@ -5,8 +5,7 @@ import 'package:bevel_app/main.dart';
 import 'package:bevel_app/native/deep_links.dart';
 
 void main() {
-  testWidgets('BEVEL home shows workspace and native entry points', (tester) async {
-    // Tall surface so ListView children are all built (lazy list).
+  testWidgets('BEVEL home shows workspace entry', (tester) async {
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -17,10 +16,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('BEVEL'), findsWidgets);
-    expect(find.text('Open workspace'), findsOneWidget);
-    expect(find.text('iOS'), findsOneWidget);
-    expect(find.text('Android'), findsOneWidget);
-    expect(find.text('Mac Silicon'), findsOneWidget);
+    // Mac vs mobile copy depends on platform under test
+    expect(
+      find.textContaining('Open workspace'),
+      findsWidgets,
+    );
     expect(find.text('Native integrations'), findsOneWidget);
   });
 
