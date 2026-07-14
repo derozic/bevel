@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { issueOtp, type OtpChannel } from '@bevel/auth'
+import {
+  issueOtp,
+  phoneOtpAllowedOnTenant,
+  type OtpChannel,
+} from '@bevel/auth'
 import {
   getTenantFromRequest,
   isPlatformEntryHost,
@@ -67,6 +71,33 @@ export async function POST(request: Request) {
     }
   }
 
+  // SMS gates before issueOtp — avoid orphaned codes and closed-org admits
+  if (channel === 'sms') {
+    if (!tenant || !hasFeature(tenant, 'otpSms')) {
+      return NextResponse.json(
+        {
+          error:
+            'Mobile OTP is available on paid BEVEL plans (Trial, Pro, Team, Enterprise). Use email code or Google, or upgrade this workspace.',
+          plan: tenant?.plan ?? 'free',
+          upgradeRequired: true,
+        },
+        { status: 402 },
+      )
+    }
+    // Closed membership (allowed_domains / allowed_emails): phone alone cannot
+    // prove org membership. Prefer Google or email OTP on the allowlist.
+    if (!phoneOtpAllowedOnTenant(tenant)) {
+      return NextResponse.json(
+        {
+          error:
+            'Mobile sign-in is not available for this workspace. Use Google or an allowed email address.',
+          closedMembership: true,
+        },
+        { status: 403 },
+      )
+    }
+  }
+
   let issued: { code: string; expiresAt: string; destination: string }
   try {
     issued = issueOtp(channel, destination)
@@ -91,20 +122,7 @@ export async function POST(request: Request) {
     delivered = result.delivered
     simulated = result.simulated
   } else {
-    // SMS OTP is a paid product feature (trial | pro | team | enterprise)
-    if (!tenant || !hasFeature(tenant, 'otpSms')) {
-      return NextResponse.json(
-        {
-          error:
-            'Mobile OTP is available on paid BEVEL plans (Trial, Pro, Team, Enterprise). Use email code or Google, or upgrade this workspace.',
-          plan: tenant?.plan ?? 'free',
-          upgradeRequired: true,
-        },
-        { status: 402 },
-      )
-    }
-
-    const slug = tenant.slug
+    const slug = tenant!.slug
     const workspace = loadWorkspaceTwilio(slug)
     const cfg =
       toTwilioClientConfig(workspace) ??

@@ -46,6 +46,22 @@ function emailAllowedOnTenant(email: string, tenant: Tenant): boolean {
   return false
 }
 
+/**
+ * Closed membership: tenant declares email/domain allowlists.
+ * Pure phone OTP cannot prove membership on those orgs (no phone allowlist yet).
+ */
+export function tenantHasClosedMembership(tenant: Tenant): boolean {
+  return Boolean(
+    tenant.auth.allowedEmails?.length ||
+      tenant.auth.allowedEmailDomains?.length,
+  )
+}
+
+/** Phone OTP is only for open workspaces (no email/domain allowlist). */
+export function phoneOtpAllowedOnTenant(tenant: Tenant): boolean {
+  return !tenantHasClosedMembership(tenant)
+}
+
 /** Platform login: allow if any org tenant accepts this Workspace email. */
 function emailAllowedOnPlatform(email: string): boolean {
   const { tenants } = resolveWorkspacesForEmail(email)
@@ -266,7 +282,11 @@ export function createTenantAuthConfig(
             }
           }
 
-          // SMS: possession of the number is the proof
+          // SMS: number possession only proves identity on *open* workspaces.
+          // Closed orgs (allowed_domains / allowed_emails) require Google/email.
+          if (tenantHasClosedMembership(tenant)) {
+            return null
+          }
           const synthetic = phoneToSyntheticEmail(result.destination)
           return {
             id: synthetic,
@@ -293,12 +313,12 @@ export function createTenantAuthConfig(
     callbacks: {
       async signIn({ user, account }) {
         if (!user.email) return false
-        // Phone OTP synthetic emails are allowed (number possession is the auth factor).
+        // Phone OTP: open workspaces only (closed orgs use Google/email allowlists).
         if (
           account?.provider === 'otp' &&
           isPhoneSyntheticEmail(user.email)
         ) {
-          return true
+          return phoneOtpAllowedOnTenant(tenant)
         }
         if (platformEntry) return emailAllowedOnPlatform(user.email)
         return emailAllowedOnTenant(user.email, tenant)

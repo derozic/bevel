@@ -4,6 +4,8 @@ export {
   isGoogleAuthConfigured,
   isGitHubAuthConfigured,
   isOtpAuthEnabled,
+  phoneOtpAllowedOnTenant,
+  tenantHasClosedMembership,
   type CreateTenantAuthConfigOptions,
 } from './config'
 export { mintApiToken, mintRealtimeToken, resolveAuthSecret } from './tokens'
