@@ -11,6 +11,11 @@ export const TENANT_HOST_HEADER = 'x-bevel-host'
 export const PLATFORM_ENTRY_HOSTS = new Set([
   'bevel.lvh.me',
   'demo.bevel.lvh.me',
+  // Production apex (Route 53 zone Z01074371LVNN1WNMK9OQ)
+  'bevel.is',
+  'www.bevel.is',
+  'app.bevel.is',
+  // Legacy / alternate branding (if still used)
   'bevel.com',
   'www.bevel.com',
   'app.bevel.com',
@@ -18,6 +23,13 @@ export const PLATFORM_ENTRY_HOSTS = new Set([
 
 /** Hosts that are not customer tenants (admin, marketing apex, local tools). */
 export const PLATFORM_HOSTS = new Set([
+  'bevel.is',
+  'www.bevel.is',
+  'admin.bevel.is',
+  'api.bevel.is',
+  'realtime.bevel.is',
+  'docs.bevel.is',
+  'cname.bevel.is',
   'bevel.com',
   'www.bevel.com',
   'admin.bevel.com',
