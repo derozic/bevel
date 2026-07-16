@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button, cn } from '@bevel/ui'
-import { BevelMark } from '@/components/BevelMark'
+import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { BEVEL_NAME } from '@/lib/bevel'
 
@@ -127,23 +127,11 @@ export default function ClaimPage() {
         <div className="bevel-home-grid" />
       </div>
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <Link href="/" className="flex items-center gap-3">
-          <BevelMark size="md" />
-        </Link>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/story">Story</Link>
-          </Button>
-          {status === 'authenticated' ? (
-            <span className="hidden text-sm text-muted sm:inline">{email}</span>
-          ) : (
-            <Button asChild variant="outline" size="sm">
-              <Link href="/login?callbackUrl=%2Fclaim">Sign in</Link>
-            </Button>
-          )}
-        </div>
-      </header>
+      <MarketingSiteHeader
+        actions="claim"
+        signedIn={status === 'authenticated'}
+        userLabel={email || null}
+      />
 
       <main className="relative z-10 mx-auto max-w-xl px-6 pb-24 pt-8">
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-accent">
