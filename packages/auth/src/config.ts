@@ -86,6 +86,69 @@ function cookieDomain(): string | undefined {
   return process.env.AUTH_COOKIE_DOMAIN || process.env.NEXTAUTH_COOKIE_DOMAIN || undefined
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  return (
+    h === 'localhost' ||
+    h === '127.0.0.1' ||
+    h === '0.0.0.0' ||
+    h === '::1' ||
+    h.endsWith('.localhost')
+  )
+}
+
+/**
+ * Auth.js baseUrl is sometimes the *bind* address (e.g. http://localhost:41009)
+ * when AUTH_URL is unset and the process listens on 127.0.0.1. Never send
+ * browsers there after OAuth — prefer public env / request host / tenant host.
+ */
+function resolvePublicBaseUrl(
+  baseUrl: string,
+  tenant: Tenant,
+  requestHost?: string,
+): string {
+  const candidates = [
+    process.env.AUTH_URL,
+    process.env.NEXTAUTH_URL,
+    process.env.BEVEL_PUBLIC_URL,
+    requestHost && !isLoopbackHostname(requestHost.split(':')[0]!)
+      ? `https://${requestHost.split(':')[0]}`
+      : null,
+    `https://${tenant.host}`,
+    baseUrl,
+  ]
+
+  for (const raw of candidates) {
+    if (!raw) continue
+    try {
+      const u = new URL(raw)
+      if (isLoopbackHostname(u.hostname)) continue
+      return u.origin
+    } catch {
+      /* try next */
+    }
+  }
+  return `https://${tenant.host}`
+}
+
+/** Absolute post-login redirects allowed across BEVEL / 2x4m production hosts. */
+function isAllowedCrossHostRedirect(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  if (isLoopbackHostname(h)) return false
+  return (
+    h.endsWith('.lvh.me') ||
+    h === 'lvh.me' ||
+    h.endsWith('.bevel.com') ||
+    h === 'bevel.com' ||
+    h.endsWith('.bevel.is') ||
+    h === 'bevel.is' ||
+    h.endsWith('.2x4m.cc') ||
+    h === '2x4m.cc' ||
+    h.endsWith('.2x4m.systems') ||
+    h.endsWith('.comma.cm')
+  )
+}
+
 /**
  * Auth.js cookies for multi-host OAuth.
  *
@@ -456,19 +519,26 @@ export function createTenantAuthConfig(
         return session
       },
       async redirect({ url, baseUrl }) {
-        // Prefer org home after platform login (set via signIn redirectTo or absolute)
-        if (url.startsWith('/')) return `${baseUrl}${url}`
+        // Never use loopback bind address as browser redirect base
+        // (prod: next start --hostname 127.0.0.1 --port 41009).
+        const publicBase = resolvePublicBaseUrl(baseUrl, tenant, host)
+
+        if (url.startsWith('/') && !url.startsWith('//')) {
+          return `${publicBase}${url}`
+        }
         try {
-          if (new URL(url).origin === baseUrl) return url
-          // Allow cross-subdomain hops to org BEVEL (shared cookie domain)
           const u = new URL(url)
-          if (u.hostname.endsWith('.lvh.me') || u.hostname.endsWith('.bevel.com')) {
-            return url
+          if (isLoopbackHostname(u.hostname)) {
+            // Absolute callback poisoned with localhost — rebuild on public host
+            return `${publicBase}${u.pathname}${u.search}${u.hash}`
           }
+          if (u.origin === publicBase) return url
+          // Cross-host hop to org BEVEL (shared cookie domain / multi-tenant)
+          if (isAllowedCrossHostRedirect(u.hostname)) return url
         } catch {
           /* ignore */
         }
-        return `${baseUrl}/bevel`
+        return `${publicBase}/^general`
       },
     },
     pages: {
@@ -482,7 +552,7 @@ export function createTenantAuthConfig(
 export function homePathForTenant(tenant: Tenant, platformHost?: string): string {
   const entry = platformHost && isPlatformEntryHost(platformHost)
   if (entry && tenant.host !== platformHost?.toLowerCase().split(':')[0]) {
-    return publicTenantUrl(tenant, '/bevel')
+    return publicTenantUrl(tenant, '/^general')
   }
-  return '/bevel'
+  return '/^general'
 }

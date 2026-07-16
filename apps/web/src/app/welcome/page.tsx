@@ -50,6 +50,7 @@ export default async function WelcomePage() {
     redirect(publicTenantUrl(target, '/^general'))
   }
 
-  // Already on the org host (or soft multi-tenant on same host)
+  // Already on the org host — relative redirect only (never rebuild absolute
+  // URLs from AUTH_URL / bind host; that caused https://localhost:41009/%5Egeneral).
   redirect('/^general')
 }

@@ -147,10 +147,24 @@ export function resolveHomeTenantForEmail(email: string): Tenant | null {
 }
 
 export function publicTenantUrl(tenant: Tenant, path = '/bevel'): string {
+  // Prefer explicit public origin (prod systemd / Caddy) over tenant.host when set.
+  const fromEnv = process.env.BEVEL_PUBLIC_URL || process.env.AUTH_URL || process.env.NEXTAUTH_URL
+  let origin: string | null = null
+  if (fromEnv) {
+    try {
+      const u = new URL(fromEnv)
+      const h = u.hostname.toLowerCase()
+      if (h !== 'localhost' && h !== '127.0.0.1' && h !== '0.0.0.0') {
+        origin = u.origin
+      }
+    } catch {
+      /* fall through */
+    }
+  }
   const proto =
     process.env.BEVEL_PUBLIC_PROTOCOL ??
     (process.env.NODE_ENV === 'production' ? 'https' : 'https')
-  const base = `${proto}://${tenant.host}`
+  const base = origin ?? `${proto}://${tenant.host}`
   if (!path.startsWith('/')) return `${base}/${path}`
   return `${base}${path}`
 }
