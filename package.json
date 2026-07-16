@@ -22,6 +22,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
     "bevel": "pnpm exec tsx packages/cli/src/index.ts",
     "doctor": "pnpm bevel doctor",
+    "test:provision": "pnpm exec tsx packages/tenant-config/src/provision.test.ts",
+
     "mobile:get": "cd apps/mobile && flutter pub get",
     "mobile:test": "cd apps/mobile && flutter test",
     "mobile:run:macos": "cd apps/mobile && flutter run -d macos --dart-define=BEVEL_BASE_URL=https://2x4m.bevel.lvh.me",

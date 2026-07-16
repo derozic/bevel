@@ -32,6 +32,8 @@ export default function ClaimPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState<'intro' | 'form' | 'done'>('intro')
+  const [hostPreviewBase, setHostPreviewBase] = useState<string | null>(null)
+  const [softClaim, setSoftClaim] = useState(true)
 
   const email = session?.user?.email ?? ''
   const emailDomain = email.split('@')[1] ?? ''
@@ -44,10 +46,40 @@ export default function ClaimPage() {
     if (!slugTouched) setSlug(slugify(name))
   }, [name, slugTouched])
 
+  useEffect(() => {
+    let cancelled = false
+    void fetch('/api/claim/workspace', { credentials: 'include' })
+      .then((r) => r.json())
+      .then(
+        (data: {
+          softClaim?: boolean
+          softHost?: string | null
+          hostPreviewExample?: string
+        }) => {
+          if (cancelled) return
+          setSoftClaim(Boolean(data.softClaim))
+          if (data.softHost) setHostPreviewBase(data.softHost)
+          else if (typeof window !== 'undefined') {
+            setHostPreviewBase(window.location.hostname)
+          }
+        },
+      )
+      .catch(() => {
+        if (!cancelled && typeof window !== 'undefined') {
+          setHostPreviewBase(window.location.hostname)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const hostPreview = useMemo(() => {
     const s = slug || 'your-org'
-    return `${s}.bevel.lvh.me`
-  }, [slug])
+    const base = hostPreviewBase || 'bevel.2x4m.cc'
+    if (softClaim) return `${base} · namespace ${s}`
+    return `${s}.bevel.is`
+  }, [slug, hostPreviewBase, softClaim])
 
   async function claim() {
     setError(null)
@@ -61,16 +93,26 @@ export default function ClaimPage() {
       })
       const data = (await res.json().catch(() => ({}))) as {
         error?: string
+        code?: string
         slug?: string
         url?: string
       }
       if (!res.ok) {
-        setError(data.error || `Could not claim workspace (${res.status})`)
+        const detail = data.error || `Could not claim workspace (${res.status})`
+        setError(
+          data.code === 'io'
+            ? `${detail} Ask an operator to set BEVEL_TENANTS_ROOT and writable permissions.`
+            : detail,
+        )
         return
       }
       setStep('done')
-      // Soft multi-tenant: stay on this host for onboarding when claim host lacks Caddy yet
-      router.push(`/onboarding?workspace=${encodeURIComponent(data.slug || slug)}`)
+      // Soft multi-tenant: stay on this host for onboarding
+      const next =
+        data.url && data.url.startsWith('/')
+          ? data.url
+          : `/onboarding?workspace=${encodeURIComponent(data.slug || slug)}`
+      router.push(next)
     } catch {
       setError('Network error — try again.')
     } finally {

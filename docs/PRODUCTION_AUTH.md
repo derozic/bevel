@@ -44,6 +44,17 @@ For `bevel` also:
 Environment=BEVEL_PUBLIC_URL=https://bevel.2x4m.cc
 ```
 
+## Claim workspace (500 → writable tenants)
+
+See [CLAIM_WORKSPACE.md](./CLAIM_WORKSPACE.md). Minimum on the host:
+
+```bash
+sudo mkdir -p /opt/bevel/tenants
+sudo chown -R deploy:deploy /opt/bevel
+# systemd: BEVEL_TENANTS_ROOT=/opt/bevel/tenants + ReadWritePaths=/opt/bevel
+curl -sS https://bevel.2x4m.cc/api/claim/workspace | jq .tenantsRootWritable
+```
+
 ## Deploy checklist
 
 1. Ship BEVEL build with auth redirect fix to `/opt/bevel`.
