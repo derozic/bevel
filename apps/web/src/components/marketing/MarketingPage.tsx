@@ -1,15 +1,12 @@
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 import type {
   FeatureAccess,
   ResolvedFeatureSet,
   TenantPlan,
 } from '@bevel/schema'
-import { Button } from '@bevel/ui'
-import { BevelMark } from '@/components/BevelMark'
+import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { BEVEL_NAME } from '@/lib/bevel'
-import { MARKETING_NAV } from '@/lib/marketing'
 
 export function MarketingPage({
   title,
@@ -37,30 +34,7 @@ export function MarketingPage({
         <div className="bevel-home-grid" />
       </div>
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
-        <Link href="/" className="flex items-center gap-3 text-foreground">
-          <BevelMark size="md" />
-        </Link>
-        <nav className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
-          {MARKETING_NAV.map((item) => (
-            <Button
-              key={item.href}
-              asChild
-              variant="ghost"
-              size="sm"
-              className="hidden sm:inline-flex"
-            >
-              <Link href={item.href}>{item.label}</Link>
-            </Button>
-          ))}
-          <Button asChild variant="outline" size="sm">
-            <Link href="/login">Sign in</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/claim">Claim workspace</Link>
-          </Button>
-        </nav>
-      </header>
+      <MarketingSiteHeader actions="marketing" />
 
       <main className="relative z-10 mx-auto max-w-3xl px-6 pb-20 pt-10">
         {kicker ? (

@@ -15,15 +15,14 @@ import type {
   TenantPlan,
 } from '@bevel/schema'
 import { Button, Separator, cn } from '@bevel/ui'
-import { BevelMark } from '@/components/BevelMark'
 import { ChannelPreview } from '@/components/home/ChannelPreview'
+import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import {
   BEVEL_HOME_PATH,
   BEVEL_NAME,
   BEVEL_PRODUCT,
 } from '@/lib/bevel'
-import { MARKETING_NAV } from '@/lib/marketing'
 
 type HomePageProps = {
   tenantName: string
@@ -126,51 +125,13 @@ export function HomePage({
         <div className="bevel-home-grid" />
       </div>
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
-        <Link
-          href="/"
-          className="flex items-center gap-3 text-foreground transition hover:opacity-90"
-        >
-          <span className="flex size-9 items-center justify-center rounded-lg border border-border bg-surface">
-            <BevelCutMark />
-          </span>
-          <BevelMark size="md" />
-        </Link>
-        <nav className="flex items-center gap-1 sm:gap-2">
-          {MARKETING_NAV.map((item) => (
-            <Button
-              key={item.href}
-              asChild
-              variant="ghost"
-              size="sm"
-              className="hidden md:inline-flex"
-            >
-              <Link href={item.href}>{item.label}</Link>
-            </Button>
-          ))}
-          {signedIn ? (
-            <>
-              {userName ? (
-                <span className="hidden max-w-[10rem] truncate text-sm text-muted sm:inline">
-                  {userName}
-                </span>
-              ) : null}
-              <Button asChild size="md">
-                <Link href={BEVEL_HOME_PATH}>Open workspace</Link>
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button asChild variant="outline" size="md">
-                <Link href="/login">Sign in</Link>
-              </Button>
-              <Button asChild size="md">
-                <Link href={primaryHref}>{primaryLabel}</Link>
-              </Button>
-            </>
-          )}
-        </nav>
-      </header>
+      <MarketingSiteHeader
+        actions="home"
+        signedIn={signedIn}
+        userLabel={userName}
+        primaryHref={primaryHref}
+        primaryLabel={primaryLabel}
+      />
 
       <main className="relative z-10">
         <section className="mx-auto grid max-w-6xl gap-12 px-6 pb-20 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:pb-28 lg:pt-16">
@@ -392,19 +353,4 @@ realtime:
   )
 }
 
-function BevelCutMark() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      fill="none"
-      aria-hidden="true"
-      className="text-accent"
-    >
-      <path d="M2 14.5V3.5L7.5 9 2 14.5Z" fill="currentColor" opacity="0.35" />
-      <path d="M2 3.5h14L9 10.5 2 3.5Z" fill="currentColor" />
-      <path d="M16 3.5v11L9 10.5 16 14.5V3.5Z" fill="currentColor" opacity="0.55" />
-    </svg>
-  )
-}
+

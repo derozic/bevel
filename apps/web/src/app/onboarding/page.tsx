@@ -11,6 +11,7 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/24/outline'
 import { Button } from '@bevel/ui'
+import { BevelCutMark } from '@/components/BevelCutMark'
 import { BevelMark } from '@/components/BevelMark'
 import { BEVEL_HOME_PATH, BEVEL_NAME } from '@/lib/bevel'
 
@@ -79,8 +80,16 @@ function OnboardingInner() {
         <div className="bevel-home-grid" />
       </div>
 
-      <header className="relative z-10 mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
-        <BevelMark size="md" />
+      <header className="relative z-10 mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-5">
+        <Link
+          href="/"
+          className="flex items-center gap-3 text-foreground transition hover:opacity-90"
+        >
+          <span className="flex size-9 items-center justify-center rounded-lg border border-border bg-surface">
+            <BevelCutMark />
+          </span>
+          <BevelMark size="md" />
+        </Link>
         <Button asChild variant="ghost" size="sm">
           <Link href={BEVEL_HOME_PATH}>Skip to workspace</Link>
         </Button>
