@@ -19,22 +19,42 @@ import {
 const moduleDir = dirname(fileURLToPath(import.meta.url))
 
 export function resolveTenantsRoot(): string {
-  const fallback = resolve(moduleDir, '../../../tenants')
-  const fromEnv = process.env.BEVEL_TENANTS_ROOT
-  if (!fromEnv) return fallback
-
-  // Relative paths are cwd-sensitive (apps/web vs monorepo root). Prefer the
-  // path that actually contains tenant folders.
-  const candidates = [
-    resolve(fromEnv),
-    resolve(process.cwd(), fromEnv),
-    resolve(process.cwd(), '../..', fromEnv),
-    fallback,
+  const monorepoFallback = resolve(moduleDir, '../../../tenants')
+  // Production Next (cwd=apps/web): prefer monorepo tenants next to deploy root
+  const cwdFallbacks = [
+    resolve(process.cwd(), 'tenants'),
+    resolve(process.cwd(), '../../tenants'),
+    resolve(process.cwd(), '../tenants'),
   ]
-  for (const candidate of candidates) {
+  const dataFallback = process.env.BEVEL_DATA_ROOT
+    ? resolve(process.env.BEVEL_DATA_ROOT, 'tenants')
+    : null
+
+  const fromEnv = process.env.BEVEL_TENANTS_ROOT
+  if (fromEnv) {
+    // Relative paths are cwd-sensitive (apps/web vs monorepo root). Prefer the
+    // path that actually contains tenant folders; otherwise return absolute so
+    // claim can create it.
+    const candidates = [
+      resolve(fromEnv),
+      resolve(process.cwd(), fromEnv),
+      resolve(process.cwd(), '../..', fromEnv),
+      monorepoFallback,
+    ]
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) return candidate
+    }
+    return resolve(fromEnv)
+  }
+
+  for (const candidate of [
+    monorepoFallback,
+    ...cwdFallbacks,
+    dataFallback,
+  ].filter(Boolean) as string[]) {
     if (existsSync(candidate)) return candidate
   }
-  return fallback
+  return monorepoFallback
 }
 
 export function tenantDir(slug: string, root = resolveTenantsRoot()): string {
