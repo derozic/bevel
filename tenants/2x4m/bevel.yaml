@@ -1,8 +1,10 @@
 tenant: 2x4m
 name: 2x4m
-domain: bevel.2x4m.lvh.me
+domain: bevel.2x4m.cc
 hosts:
-  # Legacy hosts redirect via Caddy; primary is bevel.2x4m.lvh.me / bevel.2x4m.cc
+  # Primary production host + local preview aliases
+  - bevel.2x4m.cc
+  - bevel.2x4m.lvh.me
   - 2x4m.lvh.me
 
 # Plan + release access drive feature set (docs/FEATURE_SETS.md)
@@ -35,14 +37,23 @@ features:
 
 auth:
   mode: google
+  # Align with 2x4m platform authorized-domains (packages/auth)
   allowed_domains:
+    - 2x4m.cc
+    - 2x4m.systems
     - derozic.com
-    - 2x4m.com
-  # Platform login (bevel.lvh.me): Workspace users on these domains land in 2x4m
+    - comma.cm
+  allowed_emails:
+    - twobyform@gmail.com
+    - sderozic@gmail.com
+    - scott@comma.cm
+  # Platform login: Workspace users on these domains land in 2x4m
   # with that org's channels + history (home workspace).
   default_for_domains:
+    - 2x4m.cc
+    - 2x4m.systems
     - derozic.com
-    - 2x4m.com
+    - comma.cm
   require_github_for_work: true
 
 realtime:
@@ -61,7 +72,7 @@ transports:
 deployment:
   preview_url: https://bevel.2x4m.lvh.me
   production_url: https://bevel.2x4m.cc
-  target: vercel
+  target: custom
 
 work_repos:
   - derozic/2x4m
