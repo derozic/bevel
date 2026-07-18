@@ -906,16 +906,21 @@
 .fleet-chat-avatar,
 .fleet-chat-avatar-fallback {
   flex-shrink: 0;
-  border-radius: 9999px;
-  border: 1.5px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: 0.75rem;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 14%, transparent);
   object-fit: cover;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent);
 }
 
-.fleet-human-avatar[data-size='sm'],
-.fleet-chat-avatar,
-.fleet-chat-avatar-fallback {
+.fleet-human-avatar[data-size='sm'] {
   height: 1.5rem;
   width: 1.5rem;
+}
+
+.fleet-chat-avatar,
+.fleet-chat-avatar-fallback {
+  height: 2.25rem;
+  width: 2.25rem;
 }
 
 /* Keeps bubble alignment when avatars are hidden via prefs */
