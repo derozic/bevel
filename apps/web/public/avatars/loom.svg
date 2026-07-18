@@ -1,6 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#0ea5e9"/>
-  <path d="M30 40h60v8H30zM30 56h48v8H30zM30 72h36v8H30z" fill="#e0f2fe"/>
-  <circle cx="88" cy="76" r="14" fill="#f0f9ff" stroke="#fff" stroke-width="4"/>
-  <path d="M82 76l4 4 8-8" stroke="#0ea5e9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Loom">
+  <defs>
+    <linearGradient id="lo-bg" x1="10" y1="6" x2="86" y2="90" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5b21b6"/>
+      <stop offset="1" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="lo-orb" x1="30" y1="24" x2="68" y2="72" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#faf5ff"/>
+      <stop offset="1" stop-color="#e9d5ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="96" rx="28" fill="url(#lo-bg)"/>
+  <circle cx="48" cy="48" r="32" fill="#c084fc" opacity=".2"/>
+  <!-- woven orb -->
+  <circle cx="48" cy="48" r="22" fill="url(#lo-orb)"/>
+  <!-- warp threads -->
+  <path d="M30 34c12 6 24 6 36 0" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M28 48h40" stroke="#a855f7" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M30 62c12-6 24-6 36 0" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- weft -->
+  <path d="M38 30c4 12 4 24 0 36" stroke="#c026d3" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+  <path d="M48 28v40" stroke="#a21caf" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+  <path d="M58 30c-4 12-4 24 0 36" stroke="#c026d3" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+  <!-- eyes on the weave -->
+  <circle cx="40" cy="46" r="2.4" fill="#4c1d95"/>
+  <circle cx="56" cy="46" r="2.4" fill="#4c1d95"/>
+  <circle cx="40.7" cy="45.4" r="0.7" fill="#fff"/>
+  <circle cx="56.7" cy="45.4" r="0.7" fill="#fff"/>
+  <!-- smile stitch -->
+  <path d="M42 55c2 2.5 10 2.5 12 0" stroke="#86198f" stroke-width="1.6" stroke-linecap="round"/>
+  <!-- floating thread ends -->
+  <path d="M72 26c6 4 8 10 6 16" stroke="#f0abfc" stroke-width="2" stroke-linecap="round"/>
+  <path d="M22 68c-4 4-4 10-1 15" stroke="#f0abfc" stroke-width="2" stroke-linecap="round"/>
 </svg>

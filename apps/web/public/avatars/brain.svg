@@ -1,7 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#7c3aed"/>
-  <circle cx="60" cy="52" r="22" fill="#ede9fe"/>
-  <path d="M38 78c6 14 18 22 22 22s16-8 22-22" stroke="#faf5ff" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="52" cy="50" r="4" fill="#7c3aed"/>
-  <circle cx="68" cy="50" r="4" fill="#7c3aed"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="Brain">
+  <defs>
+    <linearGradient id="br-bg" x1="8" y1="4" x2="90" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4c1d95"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="br-face" x1="30" y1="26" x2="70" y2="78" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ede9fe"/>
+      <stop offset="1" stop-color="#c4b5fd"/>
+    </linearGradient>
+    <filter id="br-soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="96" height="96" rx="28" fill="url(#br-bg)"/>
+  <!-- soft glow -->
+  <circle cx="48" cy="42" r="34" fill="#a78bfa" opacity=".25"/>
+  <!-- brain lobes -->
+  <g filter="url(#br-soft)">
+    <path d="M32 44c0-12 7-20 16-20 3 0 6 1 8 3 2-2 5-3 8-3 9 0 16 8 16 20 0 4-1 7-3 10 3 2 5 6 5 11 0 9-7 16-16 16-3 0-6-1-8-2-2 1-5 2-8 2-9 0-16-7-16-16 0-5 2-9 5-11-2-3-3-6-3-10z" fill="url(#br-face)"/>
+    <path d="M48 28v50M36 40c6 2 10 2 12 0M48 40c2 2 6 2 12 0M34 52c8 3 12 3 14 0M48 52c2 3 6 3 14 0M36 64c6 2 10 2 12 0M48 64c2 2 6 2 12 0" stroke="#7c3aed" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+  </g>
+  <!-- eyes (circuit) -->
+  <circle cx="40" cy="48" r="3.2" fill="#4c1d95"/>
+  <circle cx="56" cy="48" r="3.2" fill="#4c1d95"/>
+  <circle cx="40.8" cy="47.2" r="1" fill="#f5f3ff"/>
+  <circle cx="56.8" cy="47.2" r="1" fill="#f5f3ff"/>
+  <!-- node sparks -->
+  <circle cx="28" cy="34" r="2" fill="#fbbf24"/>
+  <circle cx="70" cy="36" r="1.6" fill="#34d399"/>
+  <circle cx="66" cy="70" r="1.8" fill="#38bdf8"/>
 </svg>

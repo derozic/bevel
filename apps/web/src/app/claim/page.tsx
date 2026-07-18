@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Button, cn } from '@bevel/ui'
 import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { GoogleSignInButton } from '@/app/login/GoogleSignInButton'
 import { BEVEL_NAME } from '@/lib/bevel'
 
 function slugify(name: string): string {
@@ -162,14 +163,17 @@ export default function ClaimPage() {
                 We provision the tenant, bind your domain, and send you to onboarding.
               </li>
             </ol>
-            <Button asChild size="lg" className="w-full">
-              <Link href="/login?callbackUrl=%2Fclaim">
-                Continue with Google Workspace
-              </Link>
-            </Button>
+            {/* One-step OAuth — stay on claim after Google (no detour that drops callback). */}
+            <GoogleSignInButton
+              callbackUrl="/claim"
+              label="Continue with Google Workspace"
+            />
             <p className="text-center text-xs text-muted">
               Already have a workspace?{' '}
-              <Link href="/login" className="text-accent hover:underline">
+              <Link
+                href="/login?callbackUrl=%2Fwelcome"
+                className="text-accent hover:underline"
+              >
                 Sign in
               </Link>
             </p>

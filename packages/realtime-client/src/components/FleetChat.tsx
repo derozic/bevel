@@ -46,6 +46,40 @@ import { BevelPoweredBy } from './BevelPoweredBy'
 const SEAT_RETRY_MAX = 2
 const SEAT_RETRY_DELAY_MS = 700
 
+/** Known agent portrait paths served from apps/web/public/avatars. */
+const KNOWN_AGENT_AVATARS: Record<string, string> = {
+  brain: '/avatars/brain.svg',
+  loom: '/avatars/loom.svg',
+  lego: '/avatars/lego.svg',
+  northstar: '/avatars/northstar.svg',
+  tegan: '/avatars/tegan.svg',
+  johnny: '/avatars/johnny.svg',
+  hermes: '/avatars/hermes.svg',
+  terry: '/avatars/terry.svg',
+  forge: '/avatars/forge.svg',
+}
+
+/**
+ * Prefer catalog avatar URL; ignore non-URL icon tokens (e.g. "cpu-chip").
+ * Fall back to known public portraits by agent id / name.
+ */
+function resolveAgentAvatarSrc(
+  agent: FleetAgent | undefined,
+  agentId?: string,
+  speaker?: string,
+): string | undefined {
+  const raw = agent?.avatar?.trim()
+  if (raw && (raw.startsWith('/') || raw.startsWith('http') || raw.endsWith('.svg') || raw.endsWith('.png') || raw.endsWith('.jpg') || raw.endsWith('.webp'))) {
+    return raw
+  }
+  const key = (agent?.id || agentId || speaker || '').trim().toLowerCase()
+  if (key && KNOWN_AGENT_AVATARS[key]) return KNOWN_AGENT_AVATARS[key]
+  const byName = Object.keys(KNOWN_AGENT_AVATARS).find((id) =>
+    (speaker || '').toLowerCase().includes(id),
+  )
+  return byName ? KNOWN_AGENT_AVATARS[byName] : undefined
+}
+
 /** Never surface Colyseus "error undefined" placeholders in the UI. */
 function safeIssue(issue: BevelConnectionIssue): BevelConnectionIssue {
   const title = sanitizeErrorText(issue.title)
@@ -290,12 +324,14 @@ function MessageRow({
     agent,
   )
 
+  const agentAvatarSrc = resolveAgentAvatarSrc(agent, m.agentId, m.speaker)
+
   return (
     <div className="fleet-chat-msg-row fleet-chat-msg-row--agent" {...rowProps}>
       {showAvatars ? (
-        agent?.avatar ? (
+        agentAvatarSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={agent.avatar} alt="" className="fleet-chat-avatar" />
+          <img src={agentAvatarSrc} alt="" className="fleet-chat-avatar" />
         ) : (
           <span
             className="fleet-chat-avatar-fallback"
@@ -306,7 +342,7 @@ function MessageRow({
                 : { backgroundColor: '#7c3aed' }
             }
           >
-            {(m.speaker || 'A').charAt(0)}
+            {(m.speaker || 'A').slice(0, 2).toUpperCase()}
           </span>
         )
       ) : (

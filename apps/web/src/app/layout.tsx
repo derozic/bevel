@@ -44,7 +44,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content={productName ?? 'BEVEL'} />
-        <link rel="apple-touch-icon" href={logoUrl || '/icons/icon-192.png'} />
+        {/* Chrome rejects SVG for apple-touch-icon / installed-app icons. */}
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
       </head>
       <body style={themeStyle} suppressHydrationWarning>
         <AuthProvider>

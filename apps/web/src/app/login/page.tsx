@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import {
@@ -10,28 +11,39 @@ import {
   isGoogleAuthConfigured,
   isOtpAuthEnabled,
 } from '@bevel/auth'
-import { BevelMark } from '@/components/BevelMark'
 import { auth } from '@/auth'
-import { BEVEL_NAME, BEVEL_TRADEMARK_NOTICE } from '@/lib/bevel'
 import { GitHubSignInButton, GoogleSignInButton } from './GoogleSignInButton'
 import { OtpSignIn } from './OtpSignIn'
 
+/** Match 2x4m platform authorized-domains. */
+const PLATFORM_DOMAINS = [
+  { domain: '2x4m.cc', label: '@2x4m.cc' },
+  { domain: '2x4m.systems', label: '@2x4m.systems' },
+  { domain: 'derozic.com', label: '@derozic.com' },
+]
+
+const PLATFORM_EXPLICIT_EMAILS = [
+  'twobyform@gmail.com',
+  'sderozic@gmail.com',
+]
+
 const ERROR_COPY: Record<string, string> = {
   Configuration:
-    'Sign-in hit a server configuration error. Usually the OAuth callback host does not match AUTH_URL, or PKCE cookies could not hop to the platform callback. Hard-refresh, clear site cookies for *.lvh.me, and try again.',
-  AccessDenied: `That Google Workspace account is not mapped to a ${BEVEL_NAME} organization yet. Claim a workspace to secure your namespace.`,
+    'Sign-in hit a server configuration error. Confirm Google OAuth redirect URIs include https://bevel.2x4m.cc/api/auth/callback/google, then hard-refresh.',
+  AccessDenied:
+    'Access denied. Use an authorized 2x4m workspace email domain, or claim a workspace for your organization.',
   OAuthAccountNotLinked:
     'This email is already linked to another sign-in method. Try the original provider.',
   OAuthCallback:
-    'Google returned an error. Check the OAuth redirect URI includes the platform host (bevel.lvh.me).',
+    'Google returned an error. Confirm the OAuth redirect URI matches https://bevel.2x4m.cc/api/auth/callback/google.',
   OAuthSignin: 'Could not start Google sign-in. Try again in a moment.',
   MissingCSRF:
-    'Sign-in form expired (CSRF). Hard-refresh this page, then try Continue with Google again. If it keeps failing, clear cookies for this site and *.lvh.me.',
+    'Sign-in form expired. Hard-refresh this page, then try Continue with Google again.',
   Verification:
     'Sign-in link expired or already used. Start Google sign-in again from this page.',
   Default: 'Sign-in failed. Try again, or contact your workspace admin.',
   Callback:
-    'Sign-in callback failed. Confirm the Google redirect URI matches AUTH_URL (platform host).',
+    'Sign-in callback failed. Confirm AUTH_URL is https://bevel.2x4m.cc and the Google redirect URI matches.',
 }
 
 export default async function LoginPage({
@@ -58,9 +70,17 @@ export default async function LoginPage({
     .split(':')[0]
   const platformEntry = isPlatformEntryHost(host)
 
-  // Already signed in → org discovery
+  const callbackUrl =
+    params.callbackUrl &&
+    params.callbackUrl.startsWith('/') &&
+    !params.callbackUrl.startsWith('//')
+      ? params.callbackUrl
+      : '/welcome'
+
+  // Honor callbackUrl when already signed in (e.g. /login?callbackUrl=/claim).
+  // Previously always forced /welcome, which broke claim and other deep links.
   if (session?.user) {
-    redirect('/welcome')
+    redirect(callbackUrl)
   }
 
   const googleOk =
@@ -70,128 +90,125 @@ export default async function LoginPage({
     tenant.auth.providers.includes('github') && isGitHubAuthConfigured()
   const otpOk = isOtpAuthEnabled()
 
-  // Prefer explicit callback, else always welcome (domain → org router)
-  const callbackUrl =
-    params.callbackUrl &&
-    params.callbackUrl.startsWith('/') &&
-    !params.callbackUrl.startsWith('//')
-      ? params.callbackUrl
-      : '/welcome'
-
   const workspaceLabel = (
     tenant.theme.productName ??
     tenant.name ??
     tenant.slug
   ).replace(/\s+Agents$/i, '')
 
+  const domains =
+    tenant.auth.allowedEmailDomains && tenant.auth.allowedEmailDomains.length > 0
+      ? tenant.auth.allowedEmailDomains.map((domain) => {
+          const known = PLATFORM_DOMAINS.find((d) => d.domain === domain)
+          return known ?? { domain, label: `@${domain}` }
+        })
+      : PLATFORM_DOMAINS
+
+  const explicitEmails =
+    tenant.auth.allowedEmails && tenant.auth.allowedEmails.length > 0
+      ? tenant.auth.allowedEmails
+      : PLATFORM_EXPLICIT_EMAILS
+
   return (
-    <main className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-16">
-      <div
-        className="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-accent/25 blur-3xl"
-        aria-hidden="true"
-      />
-
-      <div className="relative z-10 space-y-6">
-        <Link href="/" className="inline-flex items-center gap-3 text-foreground">
-          <span className="flex size-9 items-center justify-center rounded-lg border border-border bg-surface">
-            <span className="text-xs font-semibold tracking-[0.2em] text-accent">
-              B
-            </span>
-          </span>
-          <BevelMark size="md" />
-        </Link>
-
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            {platformEntry
-              ? 'Find your workspace'
-              : `Sign in to ${workspaceLabel}`}
-          </h1>
-          <p className="text-sm leading-relaxed text-muted">
-            {platformEntry ? (
-              <>
-                Sign in with Google Workspace, or a one-time code by email or
-                mobile. We route you to your organization&apos;s {BEVEL_NAME}.
-              </>
-            ) : (
-              <>
-                Use Google, email code, or mobile code to open channels in{' '}
-                {workspaceLabel}.
-              </>
-            )}
-          </p>
-        </div>
-
-        {errorMessage ? (
-          <div
-            role="alert"
-            className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-foreground"
-          >
-            {errorMessage}
-          </div>
-        ) : null}
-
-        <div className="space-y-3 rounded-2xl border border-border bg-surface/60 p-5">
-          {googleOk ? (
-            <GoogleSignInButton callbackUrl={callbackUrl} />
-          ) : (
-            <div className="rounded-xl border border-border bg-background/50 px-4 py-3 text-sm text-muted">
-              Google sign-in is not configured on this server.
-            </div>
-          )}
-
-          {githubOk ? <GitHubSignInButton callbackUrl={callbackUrl} /> : null}
-
-          {otpOk ? (
-            <>
-              <div className="relative py-1 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
-                <span className="relative z-10 bg-surface/60 px-2">or</span>
-                <span
-                  className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border"
-                  aria-hidden
-                />
-              </div>
-              <OtpSignIn callbackUrl={callbackUrl} />
-            </>
-          ) : null}
-        </div>
-
-        <ul className="space-y-2 text-sm text-muted">
-          <li className="flex gap-2">
-            <span className="text-accent">01</span>
-            Google, email OTP, or mobile OTP verifies who you are
-          </li>
-          <li className="flex gap-2">
-            <span className="text-accent">02</span>
-            We map your email domain (or host for phone) to your organization
-          </li>
-          <li className="flex gap-2">
-            <span className="text-accent">03</span>
-            You open that org&apos;s channels and historical chats
-          </li>
-        </ul>
-
-        <p className="text-sm text-muted">
-          New organization?{' '}
-          <Link href="/claim" className="font-medium text-accent hover:underline">
-            Claim a workspace
-          </Link>{' '}
-          to secure your namespace.
-        </p>
-
-        {errorKey === 'AccessDenied' ? (
-          <Link
-            href="/claim"
-            className="block rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-center text-sm font-semibold text-foreground transition hover:bg-accent/15"
-          >
-            Claim workspace for your domain
-          </Link>
-        ) : null}
-
-        <p className="text-[10px] uppercase tracking-[0.16em] text-muted/80">
-          {BEVEL_TRADEMARK_NOTICE}
-        </p>
+    <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm sm:p-10">
+      <div className="mb-6 flex justify-center">
+        <Image
+          src="/brand/2x4m/logo.svg"
+          alt="2x4m"
+          width={48}
+          height={48}
+          className="h-10 w-auto"
+          priority
+        />
       </div>
-    </main>
+
+      <h1 className="text-center font-display text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">
+        {platformEntry
+          ? 'Find your 2x4m workspace'
+          : `Sign in to ${workspaceLabel}`}
+      </h1>
+      <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-gray-600">
+        Same Google Workspace sign-in as the rest of 2x4m.cc. Open channels,
+        agents, and workspace tools for authorized domains.
+      </p>
+
+      {errorMessage ? (
+        <div
+          role="alert"
+          className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+        >
+          {errorMessage}
+        </div>
+      ) : null}
+
+      <div className="mt-8 space-y-4">
+        {googleOk ? (
+          <GoogleSignInButton
+            callbackUrl={callbackUrl}
+            label="Continue with Google"
+          />
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+            Google sign-in is not configured on this server.
+          </div>
+        )}
+
+        {githubOk ? <GitHubSignInButton callbackUrl={callbackUrl} /> : null}
+
+        {otpOk ? (
+          <>
+            <div className="relative py-1 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+              <span className="relative z-10 bg-white px-2">or</span>
+              <span
+                className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gray-200"
+                aria-hidden
+              />
+            </div>
+            <OtpSignIn callbackUrl={callbackUrl} />
+          </>
+        ) : null}
+      </div>
+
+      <div className="mt-8 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
+        <p className="text-xs font-bold uppercase tracking-wide text-gray-900">
+          Authorized access
+        </p>
+        <ul className="mt-2 space-y-1 text-xs text-gray-600">
+          {domains.map(({ domain, label }) => (
+            <li key={domain}>{label}</li>
+          ))}
+          {explicitEmails.map((email) => (
+            <li key={email}>{email}</li>
+          ))}
+        </ul>
+      </div>
+
+      <p className="mt-6 text-center text-xs text-gray-500">
+        <Link
+          href="https://2x4m.cc/auth/signin"
+          className="font-semibold text-gray-800 underline-offset-2 hover:underline"
+        >
+          Platform sign-in
+        </Link>
+        {' · '}
+        <Link
+          href="https://2x4m.cc"
+          className="font-semibold text-gray-800 underline-offset-2 hover:underline"
+        >
+          Platform home
+        </Link>
+        {errorKey === 'AccessDenied' ? (
+          <>
+            {' · '}
+            <Link
+              href="/claim"
+              className="font-semibold text-gray-800 underline-offset-2 hover:underline"
+            >
+              Claim workspace
+            </Link>
+          </>
+        ) : null}
+      </p>
+    </div>
   )
 }

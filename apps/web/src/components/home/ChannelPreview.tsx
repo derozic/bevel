@@ -1,6 +1,6 @@
 'use client'
 
-import { Avatar, AvatarFallback, cn } from '@bevel/ui'
+import { Avatar, AvatarFallback, AvatarImage, cn } from '@bevel/ui'
 
 /** Static product preview for the marketing home — not a live session. */
 
@@ -9,25 +9,33 @@ const MESSAGES = [
     who: 'You',
     role: 'human' as const,
     body: 'Ship the tenant doctor CLI today. Cover CNAME, SSL, and realtime namespace checks.',
-    accent: 'bg-muted',
+    avatarSrc: '/avatars/you.svg',
+    fallback: 'YO',
+    ring: 'ring-stone-400/40',
   },
   {
     who: 'Brain',
     role: 'agent' as const,
     body: 'Routing to Loom for the prompt plan and Lego for the CLI implementation.',
-    accent: 'bg-accent',
+    avatarSrc: '/avatars/brain.svg',
+    fallback: 'BR',
+    ring: 'ring-violet-400/50',
   },
   {
     who: 'Loom',
     role: 'agent' as const,
     body: 'Drafted the doctor checklist: config, DNS, theme, namespace, auth. Handing off to @Lego.',
-    accent: 'bg-purple-500',
+    avatarSrc: '/avatars/loom.svg',
+    fallback: 'LO',
+    ring: 'ring-fuchsia-400/50',
   },
   {
     who: 'Lego',
     role: 'agent' as const,
     body: 'Opened work on derozic/bevel. Ticket #42 created — implementing offline mode first.',
-    accent: 'bg-success',
+    avatarSrc: '/avatars/lego.svg',
+    fallback: 'LE',
+    ring: 'ring-emerald-400/50',
   },
 ]
 
@@ -58,14 +66,15 @@ export function ChannelPreview() {
       <div className="space-y-4 p-4 sm:p-5">
         {MESSAGES.map((msg) => (
           <div key={msg.who + msg.body.slice(0, 12)} className="flex gap-3">
-            <Avatar className={cn('mt-0.5 size-8 rounded-lg border-0', msg.accent)}>
-              <AvatarFallback
-                className={cn(
-                  'rounded-lg text-[10px] font-semibold uppercase tracking-wide text-white',
-                  msg.accent,
-                )}
-              >
-                {msg.who.slice(0, 2)}
+            <Avatar
+              className={cn(
+                'mt-0.5 size-9 shrink-0 rounded-xl ring-2 ring-offset-1 ring-offset-surface',
+                msg.ring,
+              )}
+            >
+              <AvatarImage src={msg.avatarSrc} alt="" className="rounded-xl object-cover" />
+              <AvatarFallback className="rounded-xl text-[10px] font-semibold uppercase tracking-wide">
+                {msg.fallback}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 space-y-1">
