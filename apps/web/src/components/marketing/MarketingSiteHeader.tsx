@@ -80,7 +80,7 @@ function HomeActions({
   return (
     <>
       <Button asChild variant="outline" size="md">
-        <Link href="/login">Sign in</Link>
+        <Link href="/login?callbackUrl=%2Fwelcome">Sign in</Link>
       </Button>
       <Button asChild size="md">
         <Link href={primaryHref}>{primaryLabel}</Link>
@@ -110,15 +110,11 @@ function ClaimActions({
       </>
     )
   }
+  // Already on /claim — one clear path: sign in returns here to finish claim.
   return (
-    <>
-      <Button asChild variant="outline" size="md">
-        <Link href="/login?callbackUrl=%2Fclaim">Sign in</Link>
-      </Button>
-      <Button asChild size="md">
-        <Link href="/claim">Claim workspace</Link>
-      </Button>
-    </>
+    <Button asChild variant="outline" size="md">
+      <Link href="/login?callbackUrl=%2Fclaim">Sign in</Link>
+    </Button>
   )
 }
 
@@ -126,7 +122,7 @@ function MarketingActions() {
   return (
     <>
       <Button asChild variant="outline" size="sm">
-        <Link href="/login">Sign in</Link>
+        <Link href="/login?callbackUrl=%2Fwelcome">Sign in</Link>
       </Button>
       <Button asChild size="sm">
         <Link href="/claim">Claim workspace</Link>
