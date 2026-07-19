@@ -44,6 +44,7 @@ const PLATFORM_ENTRY_TENANT: Tenant = {
     multiRegion: false,
   },
   theme: {
+    accent: '#7c5cff',
     productName: 'BEVEL',
     mode: 'dark',
   },
