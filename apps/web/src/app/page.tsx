@@ -26,19 +26,21 @@ export default async function Page() {
     .toLowerCase()
     .split(':')[0]
 
-  const tenant = await getTenantFromRequest()
-  const session = await auth()
-
-  // Apex platform entry (bevel.is) — route humans into sign-in / workspace pick.
-  if (!tenant && isPlatformEntryHost(host)) {
+  // Apex platform entry (bevel.is) — sign-in / workspace pick before any auth() call.
+  if (isPlatformEntryHost(host)) {
+    const session = await auth()
     if (session?.user) redirect('/welcome')
     redirect('/login?callbackUrl=%2Fwelcome')
   }
+
+  const tenant = await getTenantFromRequest()
 
   // Tenant host without resolution → claim / workspace finder
   if (!tenant) {
     redirect('/workspaces')
   }
+
+  const session = await auth()
 
   return (
     <HomePage
