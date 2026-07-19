@@ -23,6 +23,8 @@
     "bevel": "pnpm exec tsx packages/cli/src/index.ts",
     "doctor": "pnpm bevel doctor",
     "test:provision": "pnpm exec tsx packages/tenant-config/src/provision.test.ts",
+    "test:mentions": "pnpm exec tsx packages/realtime-client/src/lib/mentions.test.ts",
+    "test:unit": "pnpm test:provision && pnpm test:mentions",
 
     "mobile:get": "cd apps/mobile && flutter pub get",
     "mobile:test": "cd apps/mobile && flutter test",

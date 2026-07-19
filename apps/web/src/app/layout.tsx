@@ -4,6 +4,7 @@ import { getTenantFromRequest, tenantThemeCssVars } from '@bevel/tenant-config'
 import { AuthProvider } from '@bevel/auth/client'
 import { PreferencesHost } from '@/components/preferences/PreferencesHost'
 import { PwaRegister } from '@/components/PwaRegister'
+import { MagentaAnalytics } from '@/components/MagentaAnalytics'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -48,8 +49,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+        {/* Magenta first-party suite injected via body component */}
       </head>
       <body style={themeStyle} suppressHydrationWarning>
+        <MagentaAnalytics />
         <AuthProvider>
           <PreferencesHost>
             <PwaRegister />

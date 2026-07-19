@@ -28,6 +28,7 @@ const PUBLIC_PATHS = [
   '/terms',
   '/security',
   '/download',
+  '/status',
   '/_next',
   '/favicon.ico',
 ]
