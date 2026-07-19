@@ -1,5 +1,10 @@
 import type { Metadata } from 'next'
-import { requireTenantFromRequest } from '@bevel/tenant-config'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import {
+  getTenantFromRequest,
+  isPlatformEntryHost,
+} from '@bevel/tenant-config'
 import { HomePage } from '@/components/home/HomePage'
 import { auth } from '@/auth'
 import { BEVEL_PRODUCT } from '@/lib/bevel'
@@ -11,8 +16,29 @@ export const metadata: Metadata = {
 }
 
 export default async function Page() {
-  const tenant = await requireTenantFromRequest()
+  const headerStore = await headers()
+  const host = (
+    headerStore.get('x-bevel-host') ??
+    headerStore.get('x-forwarded-host') ??
+    headerStore.get('host') ??
+    ''
+  )
+    .toLowerCase()
+    .split(':')[0]
+
+  const tenant = await getTenantFromRequest()
   const session = await auth()
+
+  // Apex platform entry (bevel.is) — route humans into sign-in / workspace pick.
+  if (!tenant && isPlatformEntryHost(host)) {
+    if (session?.user) redirect('/welcome')
+    redirect('/login?callbackUrl=%2Fwelcome')
+  }
+
+  // Tenant host without resolution → claim / workspace finder
+  if (!tenant) {
+    redirect('/workspaces')
+  }
 
   return (
     <HomePage

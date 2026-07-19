@@ -25,10 +25,12 @@ export const PLATFORM_ENTRY_HOSTS = new Set([
 export const PLATFORM_HOSTS = new Set([
   'bevel.is',
   'www.bevel.is',
+  'app.bevel.is',
   'admin.bevel.is',
   'api.bevel.is',
   'realtime.bevel.is',
   'docs.bevel.is',
+  'status.bevel.is',
   'cname.bevel.is',
   'bevel.com',
   'www.bevel.com',

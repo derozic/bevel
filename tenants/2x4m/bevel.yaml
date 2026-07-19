@@ -6,6 +6,8 @@ hosts:
   - bevel.2x4m.cc
   - bevel.2x4m.lvh.me
   - 2x4m.lvh.me
+  # Optional dedicated tenant host under apex zone
+  - 2x4m.bevel.is
 
 # Plan + release access drive feature set (docs/FEATURE_SETS.md)
 # plan: free | trial | pro | team | enterprise
