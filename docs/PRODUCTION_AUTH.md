@@ -1,8 +1,8 @@
-# Production auth — `bevel.2x4m.cc` and loopback traps
+# Production auth — `bevel.is`, `bevel.2x4m.cc`, and loopback traps
 
-## Symptom
+## Symptom A — localhost after login
 
-After Google sign-in on `https://bevel.2x4m.cc/login`, the browser lands on:
+After Google sign-in, the browser lands on:
 
 ```
 https://localhost:41009/%5Egeneral
@@ -12,36 +12,58 @@ https://localhost:41009/%5Egeneral
 `41009` is the **systemd bind port** for BEVEL on the 2x4m EC2 host
 (`next start --port 41009 --hostname 127.0.0.1`).
 
-## Root cause
+### Root cause
 
 1. Ansible unit for `bevel` sets `skip_shared_env: true` (correct — separate app from 2x4m monorepo env).
 2. Older `service.j2` only injected `AUTH_URL` / `NEXTAUTH_URL` when **not** `skip_shared_env`.
 3. Auth.js therefore built post-login redirects from the **request / bind base** → `http://localhost:41009`.
 4. Relative callback `/^general` became `https://localhost:41009/%5Egeneral`.
 
-## Fixes
-
-### Code (BEVEL monorepo)
+### Fix
 
 - `packages/auth` redirect callback rejects loopback bases and prefers  
-  `AUTH_URL` → `NEXTAUTH_URL` → `BEVEL_PUBLIC_URL` → request host → `tenant.host`.
+  **request host** → `AUTH_URL` → `NEXTAUTH_URL` → `BEVEL_PUBLIC_URL` → `tenant.host`.
 - Allows cross-host hops to `*.2x4m.cc`, `*.bevel.is`, etc.
-- `publicTenantUrl` ignores loopback env URLs.
+- `publicTenantUrl` always uses **tenant.host** (never rewrites org hops to platform `BEVEL_PUBLIC_URL`).
 
-### Infra (2x4m Ansible)
+## Symptom B — signed out after hop `bevel.is` → `bevel.2x4m.cc`
 
-`roles/app/templates/service.j2` always sets for **every** Node service:
+Session cookies cannot be shared across different registrable domains
+(`.bevel.is` vs `.2x4m.cc`). Local multi-tenant works under `.lvh.me` only.
+
+### Fix — dual path
+
+1. **Same-host OAuth** when the user starts on the org host (`bevel.2x4m.cc`):  
+   set `AUTH_TRUST_HOST=true` and **do not pin** `AUTH_URL` to a single host so Auth.js
+   builds `redirect_uri` from the request Host. Add both Google redirect URIs:
 
 ```
-Environment=NEXTAUTH_URL=https://{{ host }}
-Environment=AUTH_URL=https://{{ host }}
+https://bevel.is/api/auth/callback/google
+https://bevel.2x4m.cc/api/auth/callback/google
+```
+
+2. **Cross-domain handoff** when login starts on platform (`bevel.is`) and home tenant
+   is on `bevel.2x4m.cc`:
+   - `/welcome` issues a short-lived code via FastAPI `POST /api/v1/auth/handoff`
+     (Postgres table `auth_handoff_codes`, internal key required)
+   - Redirect to `https://bevel.2x4m.cc/api/auth/handoff?code=…&callbackUrl=/^general`
+   - Org host redeems code → Auth.js credentials provider `handoff` → host-local session
+
+Cookie domain: `AUTH_COOKIE_DOMAIN=.bevel.is` applies only when the request host is under
+`.bevel.is`. On `bevel.2x4m.cc` cookies stay host-only.
+
+### Infra (2x4m Ansible / systemd)
+
+Prefer:
+
+```
 Environment=AUTH_TRUST_HOST=true
-```
-
-For `bevel` also:
-
-```
-Environment=BEVEL_PUBLIC_URL=https://bevel.2x4m.cc
+Environment=BEVEL_PUBLIC_URL=https://bevel.is
+Environment=AUTH_COOKIE_DOMAIN=.bevel.is
+Environment=BEVEL_API_URL=http://127.0.0.1:43203
+Environment=FLEET_INTERNAL_API_KEY=…
+# Avoid AUTH_URL pin when one Next process serves multiple production hosts.
+# Environment=AUTH_URL=https://bevel.is
 ```
 
 ## Claim workspace (500 → writable tenants)

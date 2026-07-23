@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     public_web_url: str = "https://bevel.lvh.me"
     public_realtime_url: str = "https://realtime.bevel.lvh.me"
 
+    # Postgres (asyncpg). Production: postgresql+asyncpg://bevel:***@127.0.0.1:5432/bevel
+    database_url: str | None = None
+    # Skip DB connect in pure unit tests when unset and auto-connect fails
+    require_database: bool = True
+
     def tenants_root(self) -> Path:
         if self.bevel_tenants_root:
             return Path(self.bevel_tenants_root)
@@ -36,6 +41,18 @@ class Settings(BaseSettings):
         if env:
             return Path(env)
         return self.bevel_repo_root / "tenants"
+
+    def resolved_database_url(self) -> str:
+        from bevel_api.database import get_database_url
+
+        if self.database_url:
+            url = self.database_url.strip()
+            if url.startswith("postgresql://"):
+                return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            if url.startswith("postgres://"):
+                return url.replace("postgres://", "postgresql+asyncpg://", 1)
+            return url
+        return get_database_url()
 
 
 settings = Settings()

@@ -159,9 +159,10 @@ OAuth: add authorized origins/redirects for `https://bevel.is` (and org hosts as
 - [ ] EC2 (or other) + Caddy with TLS for `*.bevel.is` / listed hosts
 - [ ] A/AAAA (or ALIAS) records for apex + services
 - [ ] Secrets in 1Password + server env (`AUTH_SECRET`, `FLEET_INTERNAL_API_KEY`, OAuth, Twilio)
-- [ ] PostgreSQL production URL (no SQLite)
-- [ ] Google OAuth production redirect URIs
-- [ ] Health checks: `https://api.bevel.is/health`, web login, realtime
+- [ ] PostgreSQL production URL (no SQLite) — see [PRODUCTION_API.md](./PRODUCTION_API.md)
+- [ ] FastAPI unit on `:43203` + Caddy `api.bevel.is` → API (not Next)
+- [ ] Google OAuth production redirect URIs (`bevel.is` + `bevel.2x4m.cc`)
+- [ ] Health checks: `https://api.bevel.is/health` (DB ok), web login both hosts, realtime
 
 ## CLI reference
 

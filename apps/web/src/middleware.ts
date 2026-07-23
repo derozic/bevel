@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   '/api/health',
   '/api/auth',
   '/api/auth/otp',
+  '/api/auth/handoff',
   '/api/claim',
   '/api/agent-programs',
   '/api/github/webhook',

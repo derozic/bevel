@@ -81,9 +81,21 @@ function useSecureCookies(): boolean {
   )
 }
 
-/** Cookie domain so platform login can hop to org hosts (e.g. .lvh.me). */
-function cookieDomain(): string | undefined {
-  return process.env.AUTH_COOKIE_DOMAIN || process.env.NEXTAUTH_COOKIE_DOMAIN || undefined
+/**
+ * Cookie domain so platform login can hop to org hosts under the same parent
+ * (e.g. .lvh.me, .bevel.is). Never apply Domain=.bevel.is when the request host
+ * is on another registrable domain (bevel.2x4m.cc) — that would drop the session.
+ */
+function cookieDomain(requestHost?: string): string | undefined {
+  const configured =
+    process.env.AUTH_COOKIE_DOMAIN || process.env.NEXTAUTH_COOKIE_DOMAIN || undefined
+  if (!configured) return undefined
+  if (!requestHost) return configured
+  const host = requestHost.toLowerCase().split(':')[0] || ''
+  const bare = configured.replace(/^\./, '').toLowerCase()
+  if (host === bare || host.endsWith(`.${bare}`)) return configured
+  // Host is outside the cookie domain (e.g. bevel.2x4m.cc vs .bevel.is)
+  return undefined
 }
 
 function isLoopbackHostname(hostname: string): boolean {
@@ -107,13 +119,15 @@ function resolvePublicBaseUrl(
   tenant: Tenant,
   requestHost?: string,
 ): string {
+  // Prefer the live request host so same-host OAuth on bevel.2x4m.cc / bevel.is
+  // does not force AUTH_URL (platform pin) into post-login redirects.
   const candidates = [
-    process.env.AUTH_URL,
-    process.env.NEXTAUTH_URL,
-    process.env.BEVEL_PUBLIC_URL,
     requestHost && !isLoopbackHostname(requestHost.split(':')[0]!)
       ? `https://${requestHost.split(':')[0]}`
       : null,
+    process.env.AUTH_URL,
+    process.env.NEXTAUTH_URL,
+    process.env.BEVEL_PUBLIC_URL,
     `https://${tenant.host}`,
     baseUrl,
   ]
@@ -129,6 +143,14 @@ function resolvePublicBaseUrl(
     }
   }
   return `https://${tenant.host}`
+}
+
+function apiBaseUrl(): string {
+  return (
+    process.env.BEVEL_API_URL ||
+    process.env.NEXT_PUBLIC_BEVEL_API_URL ||
+    'http://127.0.0.1:43203'
+  ).replace(/\/$/, '')
 }
 
 /** Absolute post-login redirects allowed across BEVEL / 2x4m production hosts. */
@@ -234,7 +256,46 @@ export function createTenantAuthConfig(
   const platformEntry = host ? isPlatformEntryHost(host) : false
   const providers: NextAuthConfig['providers'] = []
   const secure = useSecureCookies()
-  const domain = cookieDomain()
+  const domain = cookieDomain(host)
+
+  // Cross-host handoff (bevel.is → bevel.2x4m.cc) — one-time code via FastAPI.
+  providers.push(
+    Credentials({
+      id: 'handoff',
+      name: 'Handoff',
+      credentials: {
+        code: { label: 'Code', type: 'text' },
+      },
+      authorize: async (credentials) => {
+        const code =
+          typeof credentials?.code === 'string' ? credentials.code.trim() : ''
+        if (!code) return null
+        try {
+          const res = await fetch(`${apiBaseUrl()}/api/v1/auth/handoff/redeem`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+            cache: 'no-store',
+          })
+          if (!res.ok) return null
+          const data = (await res.json()) as {
+            email?: string
+            name?: string
+            imageUrl?: string | null
+          }
+          if (!data.email) return null
+          return {
+            id: data.email,
+            email: data.email,
+            name: data.name || data.email.split('@')[0] || data.email,
+            image: data.imageUrl || undefined,
+          }
+        } catch {
+          return null
+        }
+      },
+    }),
+  )
 
   if (
     (tenant.auth.providers.includes('google') || platformEntry) &&
@@ -376,6 +437,8 @@ export function createTenantAuthConfig(
     callbacks: {
       async signIn({ user, account }) {
         if (!user.email) return false
+        // Cross-host handoff codes already validated by FastAPI redeem.
+        if (account?.provider === 'handoff') return true
         // Phone OTP: open workspaces only (closed orgs use Google/email allowlists).
         if (
           account?.provider === 'otp' &&
