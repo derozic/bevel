@@ -7,7 +7,11 @@ from typing import Any
 import strawberry
 from strawberry.scalars import JSON
 
+from bevel_api.database import database, get_session
 from bevel_api.lib import processes, realtime_proxy, tenants
+from bevel_api.repositories import channels as channels_repo
+from bevel_api.repositories import messages as messages_repo
+from bevel_api.repositories import tenants as tenants_repo
 
 
 @strawberry.type
@@ -15,6 +19,7 @@ class Health:
     status: str
     service: str
     version: str
+    database_status: str = "unknown"
 
 
 @strawberry.type
@@ -51,6 +56,16 @@ class Channel:
 
 
 @strawberry.type
+class Message:
+    id: str
+    speaker_id: str
+    speaker_name: str
+    body: str
+    created_at: str | None
+    mentioned_agent_ids: list[str]
+
+
+@strawberry.type
 class Agent:
     id: str
     name: str
@@ -67,6 +82,14 @@ class PublicUrls:
     admin: str
     login: str
     workspace: str
+
+
+@strawberry.type
+class PostMessageResult:
+    ok: bool
+    id: str
+    body: str
+    mentioned_agent_ids: list[str]
 
 
 def _service(s: processes.ServiceStatus) -> ServiceStatus:
@@ -100,7 +123,13 @@ def _tenant(row: dict[str, Any]) -> Tenant:
 class Query:
     @strawberry.field
     def health(self) -> Health:
-        return Health(status="ok", service="bevel-api", version="0.1.0")
+        db = "ok" if database.is_connected else "disconnected"
+        return Health(
+            status="ok" if database.is_connected else "degraded",
+            service="bevel-api",
+            version="0.1.0",
+            database_status=db,
+        )
 
     @strawberry.field
     def services(self) -> list[ServiceStatus]:
@@ -113,7 +142,26 @@ class Query:
         return _service(processes.get_status(name))
 
     @strawberry.field
-    def tenants(self) -> list[Tenant]:
+    async def tenants(self) -> list[Tenant]:
+        if database.is_connected:
+            try:
+                async with get_session() as session:
+                    rows = await tenants_repo.list_tenants(session)
+                    if rows:
+                        return [
+                            Tenant(
+                                slug=r.slug,
+                                name=r.name,
+                                domain=r.domain,
+                                hosts=list(r.hosts or []),
+                                auth_mode=r.auth_mode,
+                                realtime_namespace=r.realtime_namespace,
+                                has_theme=bool(r.theme),
+                            )
+                            for r in rows
+                        ]
+            except Exception:
+                pass
         return [_tenant(t) for t in tenants.list_tenants() if "slug" in t]
 
     @strawberry.field
@@ -124,7 +172,26 @@ class Query:
             return None
 
     @strawberry.field
-    def channels(self, tenant_slug: str = "demo") -> list[Channel]:
+    async def channels(self, tenant_slug: str = "2x4m") -> list[Channel]:
+        if database.is_connected:
+            try:
+                async with get_session() as session:
+                    row = await tenants_repo.get_by_slug(session, tenant_slug)
+                    if row:
+                        chs = await channels_repo.list_for_tenant(session, row.id)
+                        if not chs:
+                            chs = await channels_repo.ensure_defaults(session, row.id)
+                        return [
+                            Channel(
+                                slug=c.slug,
+                                name=c.name,
+                                tags=list(c.tags or []),
+                                href=f"/bevel/{c.slug}",
+                            )
+                            for c in chs
+                        ]
+            except Exception:
+                pass
         try:
             rows = tenants.tenant_channels(tenant_slug)
         except FileNotFoundError:
@@ -138,6 +205,38 @@ class Query:
             )
             for r in rows
         ]
+
+    @strawberry.field
+    async def messages(
+        self,
+        tenant_slug: str = "2x4m",
+        channel_slug: str = "general",
+        limit: int = 50,
+    ) -> list[Message]:
+        if not database.is_connected:
+            return []
+        async with get_session() as session:
+            row = await tenants_repo.get_by_slug(session, tenant_slug)
+            if not row:
+                return []
+            ch = await channels_repo.ensure_channel(session, row.id, channel_slug)
+            msgs = await messages_repo.list_for_channel(
+                session,
+                tenant_id=row.id,
+                channel_id=ch.id,
+                limit=limit,
+            )
+            return [
+                Message(
+                    id=m.id,
+                    speaker_id=m.speaker_id,
+                    speaker_name=m.speaker_name,
+                    body=m.body,
+                    created_at=m.created_at.isoformat() if m.created_at else None,
+                    mentioned_agent_ids=list(m.mentioned_agent_ids or []),
+                )
+                for m in msgs
+            ]
 
     @strawberry.field
     def agents(self) -> list[Agent]:
@@ -203,6 +302,41 @@ class Mutation:
         if name not in processes.SERVICE_NAMES:
             raise ValueError(f"unknown service: {name}")
         return _service(processes.stop_service(name))
+
+    @strawberry.mutation
+    async def post_message(
+        self,
+        body: str,
+        tenant_slug: str = "2x4m",
+        channel_slug: str = "general",
+        speaker_id: str = "system",
+        speaker_name: str = "system",
+    ) -> PostMessageResult:
+        if not database.is_connected:
+            raise RuntimeError("Database is not connected")
+        async with get_session() as session:
+            row = await tenants_repo.get_by_slug(session, tenant_slug)
+            if not row:
+                raise ValueError(f"tenant not found: {tenant_slug}")
+            ch = await channels_repo.ensure_channel(session, row.id, channel_slug)
+            record = await messages_repo.append(
+                session,
+                tenant_id=row.id,
+                channel_id=ch.id,
+                channel_slug=ch.slug,
+                msg={
+                    "body": body,
+                    "speakerId": speaker_id,
+                    "speakerName": speaker_name,
+                    "speakerType": "agent",
+                },
+            )
+            return PostMessageResult(
+                ok=True,
+                id=record.id,
+                body=record.body,
+                mentioned_agent_ids=list(record.mentioned_agent_ids or []),
+            )
 
 
 schema = strawberry.Schema(query=Query, mutation=Mutation)

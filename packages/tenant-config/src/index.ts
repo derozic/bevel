@@ -43,6 +43,8 @@ export {
   resolveWorkspacesForEmail,
   resolveHomeTenantForEmail,
   publicTenantUrl,
+  registrableDomain,
+  needsAuthHandoff,
   isPlatformHost,
   isPlatformEntryHost,
   refreshTenantRegistry,

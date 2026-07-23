@@ -146,25 +146,68 @@ export function resolveHomeTenantForEmail(email: string): Tenant | null {
   return null
 }
 
+function isLoopbackHost(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  return (
+    h === 'localhost' ||
+    h === '127.0.0.1' ||
+    h === '0.0.0.0' ||
+    h === '::1' ||
+    h.endsWith('.localhost')
+  )
+}
+
+/**
+ * Absolute URL for an org workspace host.
+ * Always uses `tenant.host` (never BEVEL_PUBLIC_URL / AUTH_URL) so platform entry
+ * does not rewrite org hops to bevel.is when the tenant lives on bevel.2x4m.cc.
+ * Env fallback only when tenant.host is missing or loopback.
+ */
 export function publicTenantUrl(tenant: Tenant, path = '/bevel'): string {
-  // Prefer explicit public origin (prod systemd / Caddy) over tenant.host when set.
-  const fromEnv = process.env.BEVEL_PUBLIC_URL || process.env.AUTH_URL || process.env.NEXTAUTH_URL
-  let origin: string | null = null
-  if (fromEnv) {
-    try {
-      const u = new URL(fromEnv)
-      const h = u.hostname.toLowerCase()
-      if (h !== 'localhost' && h !== '127.0.0.1' && h !== '0.0.0.0') {
-        origin = u.origin
-      }
-    } catch {
-      /* fall through */
-    }
-  }
   const proto =
     process.env.BEVEL_PUBLIC_PROTOCOL ??
     (process.env.NODE_ENV === 'production' ? 'https' : 'https')
-  const base = origin ?? `${proto}://${tenant.host}`
+
+  let host = (tenant.host || '').toLowerCase().split(':')[0] || ''
+  if (!host || isLoopbackHost(host)) {
+    const fromEnv =
+      process.env.BEVEL_PUBLIC_URL ||
+      process.env.AUTH_URL ||
+      process.env.NEXTAUTH_URL
+    if (fromEnv) {
+      try {
+        const u = new URL(fromEnv)
+        if (!isLoopbackHost(u.hostname)) host = u.hostname
+      } catch {
+        /* keep host */
+      }
+    }
+  }
+  if (!host) host = 'bevel.is'
+  const base = `${proto}://${host}`
   if (!path.startsWith('/')) return `${base}/${path}`
   return `${base}${path}`
+}
+
+/** Registrable domain for cookie / handoff decisions (e.g. bevel.is vs 2x4m.cc). */
+export function registrableDomain(hostname: string): string {
+  const h = hostname.toLowerCase().split(':')[0] || ''
+  const parts = h.split('.').filter(Boolean)
+  if (parts.length <= 2) return h
+  // Special multi-part public suffixes we care about
+  const last2 = parts.slice(-2).join('.')
+  if (last2 === 'lvh.me' || last2 === '2x4m.cc' || last2 === '2x4m.systems') {
+    return last2
+  }
+  return last2
+}
+
+/** True when session cookies cannot be shared across these hosts. */
+export function needsAuthHandoff(fromHost: string, toHost: string): boolean {
+  const a = fromHost.toLowerCase().split(':')[0] || ''
+  const b = toHost.toLowerCase().split(':')[0] || ''
+  if (!a || !b || a === b) return false
+  // Same parent (e.g. *.lvh.me / *.bevel.is) can share AUTH_COOKIE_DOMAIN
+  if (registrableDomain(a) === registrableDomain(b)) return false
+  return true
 }
