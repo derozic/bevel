@@ -6,7 +6,11 @@ import {
   TENANT_HOST_HEADER,
 } from './constants'
 import { platformEntryTenant } from './platform-entry'
-import { lookupTenantByHost, lookupTenantBySlug } from './registry'
+import {
+  isPlatformHost,
+  lookupTenantByHost,
+  lookupTenantBySlug,
+} from './registry'
 
 export { TENANT_HEADER, TENANT_HOST_HEADER }
 
@@ -36,7 +40,9 @@ export async function getTenantFromRequest(): Promise<Tenant | null> {
   if (fromRegistry) return fromRegistry
   // Platform entry hosts (bevel.is) are not YAML tenants — return synthetic
   // so login/auth UI can render without 500s.
-  if (isPlatformEntryHost(normalized)) {
+  // Apex + status/admin/docs hosts are not YAML tenants — synthetic platform
+  // tenant so auth and settings shell never 500.
+  if (isPlatformEntryHost(normalized) || isPlatformHost(normalized)) {
     return platformEntryTenant(normalized)
   }
   return null

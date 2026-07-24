@@ -5,6 +5,8 @@ import { AuthProvider } from '@bevel/auth/client'
 import { PreferencesHost } from '@/components/preferences/PreferencesHost'
 import { PwaRegister } from '@/components/PwaRegister'
 import { MagentaAnalytics } from '@/components/MagentaAnalytics'
+import { CommandPaletteProvider } from '@/components/console/command-palette'
+import { DaypartProvider } from '@/components/console/daypart-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -54,10 +56,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body style={themeStyle} suppressHydrationWarning>
         <MagentaAnalytics />
         <AuthProvider>
-          <PreferencesHost>
-            <PwaRegister />
-            {children}
-          </PreferencesHost>
+          <DaypartProvider>
+            <CommandPaletteProvider>
+              <PreferencesHost>
+                <PwaRegister />
+                {children}
+              </PreferencesHost>
+            </CommandPaletteProvider>
+          </DaypartProvider>
         </AuthProvider>
       </body>
     </html>

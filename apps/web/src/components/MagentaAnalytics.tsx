@@ -20,6 +20,15 @@ export function MagentaAnalytics() {
         {`window._magenta={siteId:'bevel',apiBase:'${apiBase}',debug:${debug ? "true" : "false"}};`}
       </Script>
       <Script src={`${apiBase}/api/analytics/script/`} strategy="afterInteractive" />
+      <noscript>
+        <img
+          src={`${apiBase}/api/analytics/pixel.gif?site=bevel&event=pageview`}
+          width={1}
+          height={1}
+          alt=""
+          style={{ display: "none" }}
+        />
+      </noscript>
     </>
   );
 }

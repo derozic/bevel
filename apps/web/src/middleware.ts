@@ -30,6 +30,7 @@ const PUBLIC_PATHS = [
   '/security',
   '/download',
   '/status',
+  '/console',
   '/_next',
   '/favicon.ico',
 ]
