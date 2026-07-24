@@ -51,6 +51,11 @@ export {
 } from './registry'
 export { PLATFORM_ENTRY_HOSTS, PLATFORM_HOSTS } from './constants'
 export {
+  PLATFORM_ENTRY_TENANT,
+  platformEntryTenant,
+  isPlatformEntryTenantSlug,
+} from './platform-entry'
+export {
   loadDeclarativeTenant,
   loadCompiledTenant,
   loadThemeTokens,

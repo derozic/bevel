@@ -1,6 +1,11 @@
 import { headers } from 'next/headers'
 import { TenantSchema, type Tenant } from '@bevel/schema'
-import { TENANT_HEADER, TENANT_HOST_HEADER } from './constants'
+import {
+  isPlatformEntryHost,
+  TENANT_HEADER,
+  TENANT_HOST_HEADER,
+} from './constants'
+import { platformEntryTenant } from './platform-entry'
 import { lookupTenantByHost, lookupTenantBySlug } from './registry'
 
 export { TENANT_HEADER, TENANT_HOST_HEADER }
@@ -26,7 +31,15 @@ export async function getTenantFromRequest(): Promise<Tenant | null> {
     headerStore.get('host')
 
   if (!host) return null
-  return lookupTenantByHost(normalizeHost(host))
+  const normalized = normalizeHost(host)
+  const fromRegistry = lookupTenantByHost(normalized)
+  if (fromRegistry) return fromRegistry
+  // Platform entry hosts (bevel.is) are not YAML tenants — return synthetic
+  // so login/auth UI can render without 500s.
+  if (isPlatformEntryHost(normalized)) {
+    return platformEntryTenant(normalized)
+  }
+  return null
 }
 
 export async function requireTenantFromRequest(): Promise<Tenant> {

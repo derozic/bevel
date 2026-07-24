@@ -3,8 +3,10 @@ import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import {
+  getTenantFromRequest,
   isPlatformEntryHost,
-  requireTenantFromRequest,
+  isPlatformEntryTenantSlug,
+  platformEntryTenant,
 } from '@bevel/tenant-config'
 import {
   isGitHubAuthConfigured,
@@ -54,7 +56,6 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ callbackUrl?: string; error?: string }>
 }) {
-  const tenant = await requireTenantFromRequest()
   const session = await auth()
   const params = await searchParams
   const errorKey = params.error ?? ''
@@ -72,6 +73,14 @@ export default async function LoginPage({
     .toLowerCase()
     .split(':')[0]
   const platformEntry = isPlatformEntryHost(host)
+  // Soft resolve: org hosts use YAML/DB registry; apex uses synthetic platform tenant.
+  const tenant =
+    (await getTenantFromRequest()) ??
+    (platformEntry ? platformEntryTenant(host || 'bevel.is') : null)
+  if (!tenant) {
+    redirect('/workspaces')
+  }
+  const isPlatformTenant = isPlatformEntryTenantSlug(tenant.slug)
 
   const callbackUrl =
     params.callbackUrl &&
@@ -87,7 +96,9 @@ export default async function LoginPage({
   }
 
   const googleOk =
-    (tenant.auth.providers.includes('google') || platformEntry) &&
+    (tenant.auth.providers.includes('google') ||
+      platformEntry ||
+      isPlatformTenant) &&
     isGoogleAuthConfigured()
   const githubOk =
     tenant.auth.providers.includes('github') && isGitHubAuthConfigured()
@@ -100,7 +111,9 @@ export default async function LoginPage({
   ).replace(/\s+Agents$/i, '')
 
   const domains =
-    tenant.auth.allowedEmailDomains && tenant.auth.allowedEmailDomains.length > 0
+    !isPlatformTenant &&
+    tenant.auth.allowedEmailDomains &&
+    tenant.auth.allowedEmailDomains.length > 0
       ? tenant.auth.allowedEmailDomains.map((domain) => {
           const known = PLATFORM_DOMAINS.find((d) => d.domain === domain)
           return known ?? { domain, label: `@${domain}` }
@@ -108,7 +121,9 @@ export default async function LoginPage({
       : PLATFORM_DOMAINS
 
   const explicitEmails =
-    tenant.auth.allowedEmails && tenant.auth.allowedEmails.length > 0
+    !isPlatformTenant &&
+    tenant.auth.allowedEmails &&
+    tenant.auth.allowedEmails.length > 0
       ? tenant.auth.allowedEmails
       : PLATFORM_EXPLICIT_EMAILS
 

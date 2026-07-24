@@ -28,8 +28,22 @@ async function probe(
     const ok = okWhen(res.status, body)
     let detail: string | undefined
     try {
-      const j = JSON.parse(body) as { version?: string; ok?: boolean }
+      const j = JSON.parse(body) as {
+        version?: string
+        ok?: boolean
+        status?: string
+        database?: { status?: string }
+        realtime?: string
+        degraded?: boolean
+      }
       if (j.version) detail = `v${j.version}`
+      if (j.database?.status) {
+        detail = [detail, `db:${j.database.status}`].filter(Boolean).join(' · ')
+      }
+      if (typeof j.realtime === 'string') {
+        detail = [detail, `rt:${j.realtime}`].filter(Boolean).join(' · ')
+      }
+      if (j.degraded) detail = [detail, 'degraded'].filter(Boolean).join(' · ')
     } catch {
       /* non-json */
     }
@@ -61,12 +75,58 @@ export default async function StatusPage() {
   const proto = h.get('x-forwarded-proto') || 'https'
   const origin = `${proto}://${host}`
 
-  // Also probe platform siblings when we share the EC2 edge.
+  const apiBase = (
+    process.env.NEXT_PUBLIC_BEVEL_API_URL ||
+    process.env.BEVEL_API_URL ||
+    'https://api.bevel.is'
+  ).replace(/\/$/, '')
+  const realtimeBase = (
+    process.env.NEXT_PUBLIC_REALTIME_URL ||
+    process.env.REALTIME_URL ||
+    'https://realtime.bevel.is'
+  ).replace(/\/$/, '')
+
+  // Core product surfaces for bevel.2x4m.cc / bevel.is reliability.
   const probes = await Promise.all([
-    probe('BEVEL web', `${origin}/api/health`, (s, b) => s === 200 && b.includes('bevel')),
-    probe('BEVEL home', `${origin}/`, (s) => s >= 200 && s < 400),
-    probe('2x4m API', 'https://api.2x4m.cc/health', (s, b) => s === 200 && b.includes('healthy')),
-    probe('2x4m market', 'https://market.2x4m.cc/', (s) => s >= 200 && s < 400),
+    probe(
+      'Workspace web',
+      'https://bevel.2x4m.cc/api/health',
+      (s, b) => s === 200 && b.includes('bevel-web'),
+    ),
+    probe(
+      'Workspace home',
+      'https://bevel.2x4m.cc/',
+      (s) => s >= 200 && s < 400,
+    ),
+    probe(
+      'Workspace login',
+      'https://bevel.2x4m.cc/login',
+      (s) => s >= 200 && s < 400,
+    ),
+    probe(
+      'Platform entry',
+      'https://bevel.is/login',
+      (s) => s >= 200 && s < 400,
+    ),
+    probe(
+      'Control plane API',
+      `${apiBase}/health`,
+      (s, b) =>
+        s === 200 &&
+        b.includes('"status":"ok"') &&
+        b.includes('"database"') &&
+        b.includes('"status":"ok"'),
+    ),
+    probe(
+      'Realtime',
+      `${realtimeBase}/health`,
+      (s, b) => s === 200 && b.includes('ok'),
+    ),
+    probe(
+      'This host',
+      `${origin}/api/health`,
+      (s, b) => s === 200 && b.includes('bevel'),
+    ),
   ])
 
   const allOk = probes.every((p) => p.ok)
@@ -89,7 +149,7 @@ export default async function StatusPage() {
           <h1>{allOk ? 'All systems operational' : 'Degraded performance'}</h1>
           <p>
             {allOk
-              ? 'Workspace channels, auth, and platform APIs are responding normally.'
+              ? 'Workspace web, login, Postgres API, and realtime are responding normally for bevel.2x4m.cc.'
               : 'One or more checks failed. We are investigating — core routes may still work.'}
           </p>
           <p className="status-checked">
@@ -109,13 +169,15 @@ export default async function StatusPage() {
 
         <footer className="status-footer">
           <p>
-            Hosted on a single EC2 edge with PostgreSQL for tenants, channels,
-            messages, announcements, and push tokens. YAML is GitOps seed only.
+            Single EC2 edge: Next web, FastAPI + PostgreSQL, Colyseus realtime.
+            Product data is Postgres-only (no SQLite or file JSON stores).
           </p>
           <p>
-            <Link href="/">Back to BEVEL</Link>
+            <Link href="https://bevel.2x4m.cc/">Workspace</Link>
             {' · '}
-            <a href="https://api.2x4m.cc/health">Platform API health</a>
+            <a href="https://api.bevel.is/health">API health</a>
+            {' · '}
+            <a href="https://realtime.bevel.is/health">Realtime health</a>
           </p>
         </footer>
       </div>
