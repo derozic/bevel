@@ -7,8 +7,15 @@ FastAPI control plane for BEVEL™ with:
 - **PostgreSQL** (SQLAlchemy 2 async + asyncpg + Alembic) — **no SQLite**
 - **MCP** stdio server (`bevel-mcp`) that calls the REST API
 
-Domain data (tenants, channels, messages, auth handoff codes) lives in Postgres.
-YAML under `tenants/*` is seed/GitOps input only.
+Domain data lives in **PostgreSQL only** (no SQLite, no file JSON, no in-memory maps):
+
+- tenants, users, channels, messages
+- auth handoff codes
+- announcements
+- push tokens
+
+YAML under `tenants/*` is **seed/GitOps input only** (upserted on boot). Legacy
+JSONL under `data/fleet/` is a **one-time import** when a tenant has zero messages.
 
 ## Ports / hosts
 

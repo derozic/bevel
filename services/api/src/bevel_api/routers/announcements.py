@@ -1,4 +1,4 @@
-"""Announcement bar REST — public active list + operator CRUD."""
+"""Announcement bar REST — public active list + operator CRUD (Postgres)."""
 
 from __future__ import annotations
 
@@ -6,13 +6,16 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from bevel_api.lib import announcements as store
+from bevel_api.deps import get_session
 from bevel_api.lib.internal_auth import enforce_internal, require_internal
+from bevel_api.repositories import announcements as announcements_repo
 
 router = APIRouter(prefix="/v1", tags=["Announcements"])
 
 InternalAuth = Annotated[None, Depends(require_internal)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 class GradientStopIn(BaseModel):
@@ -78,8 +81,9 @@ class AnnouncementUpdateIn(BaseModel):
 
 
 @router.get("/announcements")
-def list_announcements(
+async def list_announcements(
     request: Request,
+    session: SessionDep,
     active: bool = Query(default=False),
     tenant: str | None = Query(default=None),
 ) -> dict[str, Any]:
@@ -89,55 +93,71 @@ def list_announcements(
     - active=false → full operator list (requires internal key / loopback)
     """
     if active:
-        return {"announcements": store.list_active(tenant_slug=tenant)}
+        rows = await announcements_repo.list_active(session, tenant_slug=tenant)
+        return {
+            "announcements": [announcements_repo.to_api_dict(r) for r in rows],
+            "source": "postgres",
+        }
     enforce_internal(request)
-    return {"announcements": store.list_all()}
+    rows = await announcements_repo.list_all(session)
+    return {
+        "announcements": [announcements_repo.to_api_dict(r) for r in rows],
+        "source": "postgres",
+    }
 
 
 @router.get("/announcements/{announcement_id}")
-def get_announcement(
+async def get_announcement(
     announcement_id: str,
     request: Request,
+    session: SessionDep,
 ) -> dict[str, Any]:
     enforce_internal(request)
-    item = store.get_one(announcement_id)
+    item = await announcements_repo.get_one(session, announcement_id)
     if not item:
         raise HTTPException(404, "Announcement not found")
-    return item
+    return announcements_repo.to_api_dict(item)
 
 
 @router.post("/announcements", status_code=201)
-def create_announcement(
+async def create_announcement(
     body: AnnouncementCreateIn,
     _auth: InternalAuth,
+    session: SessionDep,
 ) -> dict[str, Any]:
     payload = body.model_dump(exclude_none=True)
     if payload.get("style"):
         payload["style"] = body.style.model_dump() if body.style else None
-    return store.create(payload)
+    try:
+        row = await announcements_repo.create(session, payload)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return announcements_repo.to_api_dict(row)
 
 
 @router.patch("/announcements/{announcement_id}")
-def update_announcement(
+async def update_announcement(
     announcement_id: str,
     body: AnnouncementUpdateIn,
     _auth: InternalAuth,
+    session: SessionDep,
 ) -> dict[str, Any]:
     payload = body.model_dump(exclude_unset=True)
     if "style" in payload and body.style is not None:
         payload["style"] = body.style.model_dump()
-    item = store.update(announcement_id, payload)
+    item = await announcements_repo.update(session, announcement_id, payload)
     if not item:
         raise HTTPException(404, "Announcement not found")
-    return item
+    return announcements_repo.to_api_dict(item)
 
 
 @router.delete("/announcements/{announcement_id}")
-def delete_announcement(
+async def delete_announcement(
     announcement_id: str,
     _auth: InternalAuth,
+    session: SessionDep,
 ) -> dict[str, str]:
-    ok = store.delete(announcement_id)
+    ok = await announcements_repo.delete(session, announcement_id)
     if not ok:
         raise HTTPException(404, "Announcement not found")
     return {"status": "deleted", "id": announcement_id}

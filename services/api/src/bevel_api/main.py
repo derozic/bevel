@@ -56,7 +56,8 @@ app = FastAPI(
     title="BEVEL API",
     description=(
         "Control plane for BEVEL™ — multi-tenant workspace channels for humans and agents. "
-        "REST + GraphQL over PostgreSQL for tenants, channels, messages, and auth handoff."
+        "REST + GraphQL over PostgreSQL only (tenants, channels, messages, handoff, "
+        "announcements, push tokens). No SQLite or file-backed domain stores."
     ),
     version="0.1.0",
     docs_url="/docs",

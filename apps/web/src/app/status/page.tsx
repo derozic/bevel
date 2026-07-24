@@ -109,8 +109,8 @@ export default async function StatusPage() {
 
         <footer className="status-footer">
           <p>
-            Hosted on a single EC2 edge with PostgreSQL for platform data.
-            BEVEL workspaces use file-backed tenant config (no SQLite).
+            Hosted on a single EC2 edge with PostgreSQL for tenants, channels,
+            messages, announcements, and push tokens. YAML is GitOps seed only.
           </p>
           <p>
             <Link href="/">Back to BEVEL</Link>

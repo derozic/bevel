@@ -9,7 +9,10 @@
 | Realtime (Colyseus) | `127.0.0.1:43208` | `realtime.bevel.is` |
 | Postgres | `127.0.0.1:5432` | (local only) DB `bevel` |
 
-**No SQLite. No Docker. No in-memory domain store.**
+**No SQLite. No Docker. No in-memory domain store. No file JSON for product data.**
+
+Postgres tables: `tenants`, `users`, `channels`, `messages`, `auth_handoff_codes`,
+`announcements`, `push_tokens`.
 
 ## One-time Postgres
 

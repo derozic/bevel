@@ -11,10 +11,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bevel_api.config import settings
+from bevel_api.db.models.announcement import Announcement
 from bevel_api.db.models.channel import Channel
 from bevel_api.db.models.message import Message
+from bevel_api.db.models.push_token import PushToken
 from bevel_api.db.models.tenant import Tenant
 from bevel_api.lib import tenants as yaml_tenants
+from bevel_api.repositories import announcements as announcements_repo
 from bevel_api.repositories import channels as channels_repo
 from bevel_api.repositories import messages as messages_repo
 from bevel_api.repositories import tenants as tenants_repo
@@ -23,11 +26,15 @@ log = logging.getLogger("bevel_api.seed")
 
 
 async def seed_if_empty(session: AsyncSession) -> dict[str, Any]:
-    """Upsert all YAML tenants and ensure default channels. Import JSONL once."""
+    """Upsert YAML tenants into Postgres, default channels, announcement seeds.
+
+    JSONL import is one-shot migration only (never a runtime write path).
+    """
     stats: dict[str, Any] = {
         "tenants_upserted": 0,
         "channels_ensured": 0,
         "jsonl_imported": 0,
+        "announcements_seeded": 0,
     }
 
     for slug in yaml_tenants.list_tenant_slugs():
@@ -49,6 +56,7 @@ async def seed_if_empty(session: AsyncSession) -> dict[str, Any]:
             imported = await _import_jsonl_for_tenant(session, row)
             stats["jsonl_imported"] += imported
 
+    stats["announcements_seeded"] = await announcements_repo.seed_defaults(session)
     await session.flush()
     return stats
 
@@ -100,10 +108,16 @@ async def database_counts(session: AsyncSession) -> dict[str, int]:
     tenants = await session.scalar(select(func.count()).select_from(Tenant)) or 0
     channels = await session.scalar(select(func.count()).select_from(Channel)) or 0
     messages = await session.scalar(select(func.count()).select_from(Message)) or 0
+    announcements = (
+        await session.scalar(select(func.count()).select_from(Announcement)) or 0
+    )
+    push_tokens = await session.scalar(select(func.count()).select_from(PushToken)) or 0
     return {
         "tenants": int(tenants),
         "channels": int(channels),
         "messages": int(messages),
+        "announcements": int(announcements),
+        "push_tokens": int(push_tokens),
     }
 
 
