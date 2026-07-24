@@ -6,6 +6,7 @@
 |---------|------|--------|
 | Next web | `127.0.0.1:41009` | `bevel.is`, `bevel.2x4m.cc` |
 | FastAPI | `127.0.0.1:43203` | `api.bevel.is` |
+| Realtime (Colyseus) | `127.0.0.1:43208` | `realtime.bevel.is` |
 | Postgres | `127.0.0.1:5432` | (local only) DB `bevel` |
 
 **No SQLite. No Docker. No in-memory domain store.**
@@ -92,12 +93,65 @@ Environment=FLEET_INTERNAL_API_KEY=SECRET
 Environment=NEXT_PUBLIC_BEVEL_API_URL=https://api.bevel.is
 ```
 
-Realtime should set `API_INTERNAL_URL=http://127.0.0.1:43203` (or public API) so fleet hydrate/persist hits Postgres-backed fleet routes.
+### Realtime unit sketch (`/etc/systemd/system/bevel-realtime.service`)
+
+```ini
+[Unit]
+Description=BEVEL realtime (Colyseus WebSocket)
+After=network.target bevel-api.service
+Wants=bevel-api.service
+
+[Service]
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/bevel/services/realtime
+EnvironmentFile=-/opt/bevel/services/realtime/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Realtime env (`/opt/bevel/services/realtime/.env`):
+
+```ini
+REALTIME_PORT=43208
+API_INTERNAL_URL=http://127.0.0.1:43203
+FLEET_INTERNAL_API_KEY=SECRET
+AUTH_SECRET=same-as-web
+AGENTS_REPO_ROOT=/opt/bevel
+AGENTS_SESSIONS_DIR=/opt/bevel/data/sessions
+```
+
+Build before start: `cd /opt/bevel/services/realtime && pnpm run build`.
+
+Caddy:
+
+```caddy
+realtime.bevel.is {
+	reverse_proxy 127.0.0.1:43208
+}
+```
+
+Web production env (baked at `next build`):
+
+```ini
+NEXT_PUBLIC_REALTIME_URL=https://realtime.bevel.is
+REALTIME_URL=https://realtime.bevel.is
+REALTIME_SERVER_URL=http://127.0.0.1:43208
+NEXT_PUBLIC_BEVEL_API_URL=https://api.bevel.is
+BEVEL_API_URL=http://127.0.0.1:43203
+```
 
 ## Smoke
 
 ```bash
 curl -sS https://api.bevel.is/health | jq .
+# expect database.status=ok and realtime=ok
+curl -sS https://realtime.bevel.is/health | jq .
 curl -sS https://api.bevel.is/api/v1/tenants | jq .
 curl -sS -H "X-Fleet-Internal-Key: $FLEET_INTERNAL_API_KEY" \
   https://api.bevel.is/api/v1/fleet/channels?tenant=2x4m | jq .
