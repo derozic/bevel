@@ -17,27 +17,15 @@ import { auth } from '@/auth'
 import { GitHubSignInButton, GoogleSignInButton } from './GoogleSignInButton'
 import { OtpSignIn } from './OtpSignIn'
 
-/** Match 2x4m platform authorized-domains. */
-const PLATFORM_DOMAINS = [
-  { domain: '2x4m.cc', label: '@2x4m.cc' },
-  { domain: '2x4m.systems', label: '@2x4m.systems' },
-  { domain: 'derozic.com', label: '@derozic.com' },
-]
-
-const PLATFORM_EXPLICIT_EMAILS = [
-  'twobyform@gmail.com',
-  'sderozic@gmail.com',
-]
-
 const ERROR_COPY: Record<string, string> = {
   Configuration:
-    'Sign-in hit a server configuration error. Confirm Google OAuth redirect URIs include https://bevel.2x4m.cc/api/auth/callback/google, then hard-refresh.',
+    'Sign-in hit a server configuration error. Confirm Google OAuth redirect URIs include this host’s /api/auth/callback/google, then hard-refresh.',
   AccessDenied:
-    'Access denied. Use an authorized 2x4m workspace email domain, or claim a workspace for your organization.',
+    'Access denied. Use an email domain authorized for this workspace, or claim a new workspace for your organization.',
   OAuthAccountNotLinked:
     'This email is already linked to another sign-in method. Try the original provider.',
   OAuthCallback:
-    'Google returned an error. Confirm the OAuth redirect URI matches https://bevel.2x4m.cc/api/auth/callback/google.',
+    'Google returned an error. Confirm the OAuth redirect URI matches this host’s /api/auth/callback/google.',
   OAuthSignin: 'Could not start Google sign-in. Try again in a moment.',
   MissingCSRF:
     'Sign-in form expired. Hard-refresh this page, then try Continue with Google again.',
@@ -81,6 +69,7 @@ export default async function LoginPage({
     redirect('/workspaces')
   }
   const isPlatformTenant = isPlatformEntryTenantSlug(tenant.slug)
+  const isPlatform = platformEntry || isPlatformTenant
 
   const callbackUrl =
     params.callbackUrl &&
@@ -90,7 +79,6 @@ export default async function LoginPage({
       : '/welcome'
 
   // Honor callbackUrl when already signed in (e.g. /login?callbackUrl=/claim).
-  // Previously always forced /welcome, which broke claim and other deep links.
   if (session?.user) {
     redirect(callbackUrl)
   }
@@ -110,29 +98,45 @@ export default async function LoginPage({
     tenant.slug
   ).replace(/\s+Agents$/i, '')
 
+  // Org workspaces only: list that tenant’s allowed domains. Never show another
+  // customer’s domains (e.g. 2x4m) on the platform entry host.
   const domains =
-    !isPlatformTenant &&
+    !isPlatform &&
     tenant.auth.allowedEmailDomains &&
     tenant.auth.allowedEmailDomains.length > 0
-      ? tenant.auth.allowedEmailDomains.map((domain) => {
-          const known = PLATFORM_DOMAINS.find((d) => d.domain === domain)
-          return known ?? { domain, label: `@${domain}` }
-        })
-      : PLATFORM_DOMAINS
+      ? tenant.auth.allowedEmailDomains.map((domain) => ({
+          domain,
+          label: `@${domain}`,
+        }))
+      : []
 
   const explicitEmails =
-    !isPlatformTenant &&
+    !isPlatform &&
     tenant.auth.allowedEmails &&
     tenant.auth.allowedEmails.length > 0
       ? tenant.auth.allowedEmails
-      : PLATFORM_EXPLICIT_EMAILS
+      : []
+
+  const logoSrc =
+    !isPlatform && tenant.theme.logoUrl
+      ? tenant.theme.logoUrl
+      : '/icons/icon-192.png'
+  const logoAlt = isPlatform ? 'BEVEL' : workspaceLabel
+
+  const title = isPlatform
+    ? 'Find your workspace'
+    : `Sign in to ${workspaceLabel}`
+
+  const subtitle = isPlatform
+    ? 'Sign in with Google or email to open your organization workspace — or claim a new one. Channels for humans and agents.'
+    : `Sign in with an authorized account for ${workspaceLabel}. Open channels, agents, and workspace tools.`
 
   return (
     <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm sm:p-10">
       <div className="mb-6 flex justify-center">
         <Image
-          src="/brand/2x4m/logo.svg"
-          alt="2x4m"
+          src={logoSrc}
+          alt={logoAlt}
           width={48}
           height={48}
           className="h-10 w-auto"
@@ -141,13 +145,10 @@ export default async function LoginPage({
       </div>
 
       <h1 className="text-center font-display text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">
-        {platformEntry
-          ? 'Find your 2x4m workspace'
-          : `Sign in to ${workspaceLabel}`}
+        {title}
       </h1>
       <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-gray-600">
-        Same Google Workspace sign-in as the rest of 2x4m.cc. Open channels,
-        agents, and workspace tools for authorized domains.
+        {subtitle}
       </p>
 
       {errorMessage ? (
@@ -187,45 +188,96 @@ export default async function LoginPage({
         ) : null}
       </div>
 
-      <div className="mt-8 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
-        <p className="text-xs font-bold uppercase tracking-wide text-gray-900">
-          Authorized access
-        </p>
-        <ul className="mt-2 space-y-1 text-xs text-gray-600">
-          {domains.map(({ domain, label }) => (
-            <li key={domain}>{label}</li>
-          ))}
-          {explicitEmails.map((email) => (
-            <li key={email}>{email}</li>
-          ))}
-        </ul>
-      </div>
-
-      <p className="mt-6 text-center text-xs text-gray-500">
-        <Link
-          href="https://2x4m.cc/auth/signin"
-          className="font-semibold text-gray-800 underline-offset-2 hover:underline"
-        >
-          Platform sign-in
-        </Link>
-        {' · '}
-        <Link
-          href="https://2x4m.cc"
-          className="font-semibold text-gray-800 underline-offset-2 hover:underline"
-        >
-          Platform home
-        </Link>
-        {errorKey === 'AccessDenied' ? (
-          <>
-            {' · '}
+      {isPlatform ? (
+        <div className="mt-8 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-900">
+            New organization?
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-gray-600">
+            Claim a BEVEL workspace for your company domain. No customer brands
+            are shown here — you only see your workspace after sign-in.
+          </p>
+          <p className="mt-3">
             <Link
               href="/claim"
-              className="font-semibold text-gray-800 underline-offset-2 hover:underline"
+              className="text-xs font-semibold text-gray-900 underline-offset-2 hover:underline"
             >
               Claim workspace
             </Link>
+            {' · '}
+            <Link
+              href="/workspaces"
+              className="text-xs font-semibold text-gray-900 underline-offset-2 hover:underline"
+            >
+              Browse workspaces
+            </Link>
+          </p>
+        </div>
+      ) : domains.length > 0 || explicitEmails.length > 0 ? (
+        <div className="mt-8 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-900">
+            Authorized for this workspace
+          </p>
+          <ul className="mt-2 space-y-1 text-xs text-gray-600">
+            {domains.map(({ domain, label }) => (
+              <li key={domain}>{label}</li>
+            ))}
+            {explicitEmails.map((email) => (
+              <li key={email}>{email}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <p className="mt-6 text-center text-xs text-gray-500">
+        {isPlatform ? (
+          <>
+            <Link
+              href="/download"
+              className="font-semibold text-gray-800 underline-offset-2 hover:underline"
+            >
+              Download app
+            </Link>
+            {' · '}
+            <Link
+              href="/about"
+              className="font-semibold text-gray-800 underline-offset-2 hover:underline"
+            >
+              About BEVEL
+            </Link>
+            {errorKey === 'AccessDenied' ? (
+              <>
+                {' · '}
+                <Link
+                  href="/claim"
+                  className="font-semibold text-gray-800 underline-offset-2 hover:underline"
+                >
+                  Claim workspace
+                </Link>
+              </>
+            ) : null}
           </>
-        ) : null}
+        ) : (
+          <>
+            <Link
+              href="https://bevel.is"
+              className="font-semibold text-gray-800 underline-offset-2 hover:underline"
+            >
+              BEVEL platform
+            </Link>
+            {errorKey === 'AccessDenied' ? (
+              <>
+                {' · '}
+                <Link
+                  href="https://bevel.is/claim"
+                  className="font-semibold text-gray-800 underline-offset-2 hover:underline"
+                >
+                  Claim workspace
+                </Link>
+              </>
+            ) : null}
+          </>
+        )}
       </p>
     </div>
   )
