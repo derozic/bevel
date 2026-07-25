@@ -78,6 +78,11 @@ echo "==> API (uv + alembic + restart)"
 sudo -u deploy bash -lc '
   set -euo pipefail
   cd /opt/bevel/services/api
+  # Load production secrets (same EnvironmentFile as systemd)
+  if [[ -f .env ]]; then set -a; # shellcheck disable=SC1091
+    source .env
+    set +a
+  fi
   if [[ -f .venv/bin/activate ]]; then source .venv/bin/activate; fi
   uv sync
   uv run alembic upgrade head
