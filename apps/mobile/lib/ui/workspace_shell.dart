@@ -200,7 +200,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
             Text(
-              _currentUri?.host ?? BevelConfig.baseUrl,
+              _currentUri?.host ?? Uri.parse(BevelConfig.workspaceUrl).host,
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(0xFF9AA8B5),
@@ -338,11 +338,18 @@ class _ErrorPane extends StatelessWidget {
                 style: const TextStyle(color: Color(0xFF9AA8B5), height: 1.4),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'On macOS, ensure the app has network client entitlement '
-                'and Caddy is serving your .lvh.me tenant.',
+              Text(
+                BevelConfig.isProduction
+                    ? 'Check network access, then Retry. Production hosts: '
+                        'bevel.is and bevel.2x4m.cc.'
+                    : 'On macOS, ensure the app has network client entitlement '
+                        'and Caddy is serving your .lvh.me tenant.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF6B7A88), fontSize: 12, height: 1.4),
+                style: const TextStyle(
+                  color: Color(0xFF6B7A88),
+                  fontSize: 12,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 20),
               Row(

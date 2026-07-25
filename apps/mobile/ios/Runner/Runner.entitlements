@@ -12,9 +12,10 @@
 	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:2x4m.bevel.lvh.me</string>
+		<string>applinks:bevel.2x4m.lvh.me</string>
 		<string>applinks:bevel.lvh.me</string>
-		<string>applinks:app.bevel.com</string>
+		<string>applinks:bevel.is</string>
+		<string>applinks:bevel.2x4m.cc</string>
 	</array>
 </dict>
 </plist>

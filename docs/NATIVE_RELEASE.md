@@ -58,7 +58,7 @@ dist/native/<version>/
 ```bash
 cd apps/mobile
 flutter run -d macos \
-  --dart-define=BEVEL_BASE_URL=https://2x4m.bevel.lvh.me \
+  --dart-define=BEVEL_BASE_URL=https://bevel.2x4m.lvh.me \
   --dart-define=BEVEL_API_URL=https://api.bevel.lvh.me
 ```
 

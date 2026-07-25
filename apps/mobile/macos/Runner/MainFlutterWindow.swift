@@ -2,6 +2,9 @@ import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
+  /// Retained for the window lifetime so media huddle discovery stays registered.
+  private var mediaDeviceChannel: MediaDeviceChannel?
+
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
@@ -16,6 +19,11 @@ class MainFlutterWindow: NSWindow {
     self.backgroundColor = NSColor(calibratedRed: 0.039, green: 0.055, blue: 0.071, alpha: 1)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+
+    // Host mic/speaker/camera discovery for audio huddles (CoreAudio + AVFoundation).
+    mediaDeviceChannel = MediaDeviceChannel(
+      messenger: flutterViewController.engine.binaryMessenger
+    )
 
     super.awakeFromNib()
   }

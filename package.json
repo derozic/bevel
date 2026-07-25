@@ -28,7 +28,8 @@
 
     "mobile:get": "cd apps/mobile && flutter pub get",
     "mobile:test": "cd apps/mobile && flutter test",
-    "mobile:run:macos": "cd apps/mobile && flutter run -d macos --dart-define=BEVEL_BASE_URL=https://2x4m.bevel.lvh.me",
+    "mobile:run:macos": "cd apps/mobile && flutter run -d macos --dart-define=BEVEL_BASE_URL=https://bevel.is --dart-define=BEVEL_API_URL=https://api.bevel.is --dart-define=BEVEL_WORKSPACE_URL=https://bevel.2x4m.cc",
+    "mobile:run:macos:local": "cd apps/mobile && flutter run -d macos --dart-define=BEVEL_BASE_URL=https://bevel.2x4m.lvh.me --dart-define=BEVEL_API_URL=https://api.bevel.lvh.me --dart-define=BEVEL_WORKSPACE_URL=https://bevel.2x4m.lvh.me",
     "mobile:release": "bash scripts/mobile/release.sh",
     "mobile:release:macos": "bash scripts/mobile/release.sh macos",
     "mobile:release:android": "bash scripts/mobile/release.sh android",

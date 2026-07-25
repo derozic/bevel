@@ -139,7 +139,19 @@ class DeepLinkService {
           raw: uri,
         );
       }
+      // bevel://auth/complete?code=… — return from system-browser OAuth.
       if (host == 'auth' || uri.path.startsWith('/auth')) {
+        final segs = uri.pathSegments;
+        final action = host == 'auth'
+            ? (segs.isNotEmpty ? segs.first.toLowerCase() : 'complete')
+            : (segs.length > 1 ? segs[1].toLowerCase() : 'complete');
+        if (action == 'complete' || action == 'callback') {
+          return BevelDeepLinkAction(
+            kind: 'auth_complete',
+            route: '/',
+            raw: uri,
+          );
+        }
         return BevelDeepLinkAction(kind: 'navigate', route: '/', raw: uri);
       }
       if (host == 'login' || uri.path == '/login') {

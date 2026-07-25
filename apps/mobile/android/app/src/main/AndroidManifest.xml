@@ -60,7 +60,7 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="app.bevel.com"/>
-                <data android:scheme="https" android:host="2x4m.bevel.lvh.me"/>
+                <data android:scheme="https" android:host="bevel.2x4m.lvh.me"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>

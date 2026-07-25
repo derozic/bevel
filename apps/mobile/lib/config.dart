@@ -1,14 +1,16 @@
 /// BEVEL native client configuration.
 ///
-/// Override at build time:
-///   flutter run --dart-define=BEVEL_BASE_URL=https://bevel.2x4m.lvh.me
+/// **Default is live production** (bevel.is / api.bevel.is / bevel.2x4m.cc).
+/// Local Caddy overrides only when you explicitly pass dart-defines:
 ///
-/// Production Silicon release:
-///   BEVEL_ENV=production ./scripts/mobile/release.sh macos
-///   → bevel.is / api.bevel.is / bevel.2x4m.cc
+///   flutter run -d macos \
+///     --dart-define=BEVEL_BASE_URL=https://bevel.2x4m.lvh.me \
+///     --dart-define=BEVEL_API_URL=https://api.bevel.lvh.me \
+///     --dart-define=BEVEL_WORKSPACE_URL=https://bevel.2x4m.lvh.me
 ///
-/// Host order matters: Caddy serves **bevel.2x4m.lvh.me**, not 2x4m.bevel.lvh.me
-/// (the latter has no TLS site → ERR_SSL_PROTOCOL_ERROR).
+/// Release (same as defaults):
+///   ./scripts/mobile/release.sh macos
+///   # or BEVEL_ENV=local for .lvh.me
 class BevelConfig {
   BevelConfig._();
 
@@ -16,18 +18,16 @@ class BevelConfig {
   static const String appTagline =
       'Channels for humans and agents';
 
-  /// Platform entry origin (find workspace, first login). Production: bevel.is.
-  /// Local default matches Caddy: bevel.2x4m.lvh.me (not 2x4m.bevel.lvh.me).
+  /// Platform entry (login, claim, download). Live: bevel.is.
   static const String baseUrl = String.fromEnvironment(
     'BEVEL_BASE_URL',
-    defaultValue: 'https://bevel.2x4m.lvh.me',
+    defaultValue: 'https://bevel.is',
   );
 
-  /// Workspace chat origin after auth. Production: bevel.2x4m.cc.
-  /// Falls back to [baseUrl] when unset so local single-host still works.
+  /// Workspace chat origin. Live: bevel.2x4m.cc.
   static const String _workspaceUrlRaw = String.fromEnvironment(
     'BEVEL_WORKSPACE_URL',
-    defaultValue: '',
+    defaultValue: 'https://bevel.2x4m.cc',
   );
 
   static String get workspaceUrl =>
@@ -88,7 +88,7 @@ class BevelConfig {
     if (h.endsWith('.bevel.is')) return true;
     if (h.endsWith('.2x4m.cc') && h.contains('bevel')) return true;
 
-    // Local multi-tenant surfaces (Caddy .lvh.me)
+    // Local multi-tenant surfaces (Caddy .lvh.me) when dart-defines override.
     if (h.endsWith('.lvh.me') || h == 'lvh.me') return true;
 
     // Same registrable domain as configured entry or workspace.
@@ -107,10 +107,10 @@ class BevelConfig {
     return isAllowedInAppHost(uri.host);
   }
 
-  /// Control-plane API for push tokens, fleet return, health.
+  /// Control-plane API — always live by default (api.bevel.is).
   static const String apiBaseUrl = String.fromEnvironment(
     'BEVEL_API_URL',
-    defaultValue: 'https://api.bevel.lvh.me',
+    defaultValue: 'https://api.bevel.is',
   );
 
   /// OAuth IdP hosts and Auth.js sign-in paths that must leave the WebView.
@@ -160,6 +160,10 @@ class BevelConfig {
   /// True when this build points at production hosts (not local .lvh.me).
   static bool get isProduction {
     final h = Uri.parse(baseUrl).host.toLowerCase();
-    return h == 'bevel.is' || h.endsWith('.bevel.is') || h.contains('2x4m.cc');
+    final api = Uri.parse(apiBaseUrl).host.toLowerCase();
+    return h == 'bevel.is' ||
+        h.endsWith('.bevel.is') ||
+        h.contains('2x4m.cc') ||
+        api == 'api.bevel.is';
   }
 }

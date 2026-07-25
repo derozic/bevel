@@ -129,6 +129,15 @@ class _BevelHomePageState extends State<BevelHomePage> {
     });
 
     switch (action.kind) {
+      case 'auth_complete':
+        // System-browser OAuth finished → land in workspace shell.
+        // Cookie hop Safari→WKWebView may still need a refresh; user can Retry.
+        setState(() {
+          _status =
+              'Signed in — opening workspace. If you still see login, tap Retry.';
+        });
+        _openWorkspace(path: action.route ?? '/');
+        break;
       case 'hermes_status':
         _openNativeHub(focusHermes: true);
         break;
@@ -230,7 +239,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
   Future<void> _openHermes() async {
     final handoff = (_pendingHandoff ??
             _hermes.handoffForWorkspace(
-              workspaceUrl: BevelConfig.baseUrl,
+              workspaceUrl: BevelConfig.workspaceUrl,
               prompt:
                   'Operator opened Hermes from BEVEL home. Coordinate with fleet @hermes and the active workspace.',
               mode: 'orchestrate',
@@ -241,6 +250,22 @@ class _BevelHomePageState extends State<BevelHomePage> {
     setState(() {
       _pendingHandoff = result.handoff;
       _status = result.message;
+    });
+  }
+
+  Future<void> _continueWithGoogle() async {
+    setState(() => _status = 'Opening secure sign-in…');
+    final ok = await _oauth.openSystemLogin();
+    if (!mounted) return;
+    if (!ok) {
+      // Fallback: open login inside shell (still may bounce IdP out).
+      setState(() => _status = 'Opening login in workspace window…');
+      _openWorkspace(path: BevelConfig.loginPath);
+      return;
+    }
+    setState(() {
+      _status =
+          'Finish Google in the browser window. We will open your workspace when you return.';
     });
   }
 
@@ -311,10 +336,10 @@ class _BevelHomePageState extends State<BevelHomePage> {
             tooltip: 'Copy workspace URL',
             onPressed: () async {
               await Clipboard.setData(
-                ClipboardData(text: BevelConfig.baseUrl),
+                ClipboardData(text: BevelConfig.workspaceUrl),
               );
               if (mounted) {
-                setState(() => _status = 'Copied ${BevelConfig.baseUrl}');
+                setState(() => _status = 'Copied ${BevelConfig.workspaceUrl}');
               }
             },
             icon: const Icon(Icons.link_rounded),
@@ -324,14 +349,12 @@ class _BevelHomePageState extends State<BevelHomePage> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: const BoxConstraints(maxWidth: 520),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
               children: [
                 Text(
-                  isMac
-                      ? 'Mac workspace for humans and agents'
-                      : BevelConfig.appTagline,
+                  BevelConfig.appTagline,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFFF4F7F5),
@@ -340,23 +363,38 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 const SizedBox(height: 8),
                 Text(
                   isMac
-                      ? 'Native Apple Silicon app with in-window workspace, '
-                          'Hermes Desktop handoffs, system share, notifications, '
-                          'and deep links (bevel:// + Hermes return paths).'
-                      : 'Native-first on iOS and Android: HealthKit / Health Connect, '
-                          'system share, notifications, deep links, and award-tier '
-                          'iconography — one Flutter codebase including Apple Silicon Mac.',
+                      ? 'One click to sign in. Workspace opens in this window — '
+                          'no browser tabs, no cookie confusion.'
+                      : 'Native workspace shell with Health, share, notifications, '
+                          'and deep links — one Flutter codebase including Mac.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFF9AA8B5),
                         height: 1.45,
                       ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 28),
+                Semantics(
+                  identifier: 'bevel.home.continue_google',
+                  button: true,
+                  label: 'Continue with Google',
+                  child: FilledButton.icon(
+                    onPressed: _continueWithGoogle,
+                    icon: const Icon(Icons.login_rounded),
+                    label: const Text('Continue with Google'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Semantics(
                   identifier: 'bevel.home.open_workspace',
                   button: true,
-                  label: 'Open workspace window',
-                  child: FilledButton.icon(
+                  label: 'Open workspace',
+                  child: FilledButton.tonalIcon(
                     onPressed: () => _openWorkspace(),
                     icon: const Icon(Icons.forum_outlined),
                     label: Text(
@@ -376,7 +414,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
                     identifier: 'bevel.home.open_hermes',
                     button: true,
                     label: 'Open Hermes Desktop with handoff',
-                    child: FilledButton.tonalIcon(
+                    child: OutlinedButton.icon(
                       onPressed: _openHermes,
                       icon: const Icon(Icons.auto_awesome_outlined),
                       label: const Text('Open in Hermes Desktop'),
@@ -384,32 +422,20 @@ class _BevelHomePageState extends State<BevelHomePage> {
                   ),
                 ],
                 const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final ok = await _oauth.openSystemLogin();
-                    if (!ok && mounted) {
-                      _openWorkspace(path: BevelConfig.loginPath);
-                    }
-                  },
-                  icon: const Icon(Icons.login_rounded),
-                  label: const Text('Sign in (system browser)'),
-                ),
-                const SizedBox(height: 10),
                 Semantics(
                   identifier: 'bevel.home.native_hub',
                   button: true,
                   label: 'Native integrations',
-                  child: OutlinedButton.icon(
+                  child: TextButton.icon(
                     onPressed: caps == null ? null : () => _openNativeHub(),
-                    icon: const Icon(Icons.health_and_safety_outlined),
+                    icon: const Icon(Icons.hub_outlined, size: 18),
                     label: const Text('Native integrations'),
                   ),
                 ),
-                const SizedBox(height: 10),
                 TextButton.icon(
-                  onPressed: () => _openExternal(BevelConfig.workspaceUri()),
+                  onPressed: () => _openExternal(BevelConfig.entryUri()),
                   icon: const Icon(Icons.open_in_browser_rounded, size: 18),
-                  label: const Text('Open in system browser'),
+                  label: const Text('Open in browser (recovery)'),
                 ),
                 if (hermesLabel != null) ...[
                   const SizedBox(height: 20),
@@ -428,58 +454,26 @@ class _BevelHomePageState extends State<BevelHomePage> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 28),
-                Text(
-                  isMac ? 'Desktop' : 'Release targets',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: const Color(0xFF9AA8B5),
-                        letterSpacing: 0.6,
+                if (isMac) ...[
+                  const SizedBox(height: 24),
+                  Card(
+                    child: ListTile(
+                      leading: Icon(Icons.desktop_mac_rounded,
+                          color: scheme.primary),
+                      title: const Text('Apple Silicon'),
+                      subtitle: Text(
+                        caps?.isAppleSiliconMac == true
+                            ? 'arm64 · ${caps?.deviceModel ?? "Mac"}'
+                            : 'macOS desktop build',
                       ),
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  child: ListTile(
-                    leading:
-                        Icon(Icons.desktop_mac_rounded, color: scheme.primary),
-                    title: const Text('Mac (Apple Silicon)'),
-                    subtitle: Text(
-                      caps?.isAppleSiliconMac == true
-                          ? 'arm64 · ${caps?.deviceModel ?? "Mac"} · Hermes interop'
-                          : 'arm64 Flutter desktop build',
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => _openWorkspace(),
-                  ),
-                ),
-                if (!isMac) ...[
-                  const SizedBox(height: 10),
-                  Card(
-                    child: ListTile(
-                      leading: Icon(Icons.phone_iphone_rounded,
-                          color: scheme.primary),
-                      title: const Text('iOS'),
-                      subtitle:
-                          const Text('HealthKit · Share · APNs · Icon Composer'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => _openWorkspace(),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Card(
-                    child: ListTile(
-                      leading: Icon(Icons.phone_android_rounded,
-                          color: scheme.primary),
-                      title: const Text('Android'),
-                      subtitle: const Text(
-                          'Health Connect · Share · FCM · Adaptive icon'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => _openWorkspace(),
                     ),
                   ),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 Text(
-                  'Workspace: ${BevelConfig.baseUrl}\n'
+                  'Entry: ${BevelConfig.baseUrl}\n'
+                  'Workspace: ${BevelConfig.workspaceUrl}\n'
+                  'API: ${BevelConfig.apiBaseUrl}\n'
                   'Client v${BevelConfig.versionLabel}'
                   '${caps != null ? ' · ${caps.platformLabel}' : ''}'
                   '${caps?.isAppleSiliconMac == true ? ' · arm64' : ''}'
