@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,6 +8,9 @@ import 'config.dart';
 import 'desktop/window_bootstrap.dart';
 import 'native/deep_links.dart';
 import 'native/health_service.dart';
+import 'native/hermes_bridge.dart';
+import 'native/hermes_handoff.dart';
+import 'native/hermes_return_reporter.dart';
 import 'native/native_capabilities.dart';
 import 'native/notification_service.dart';
 import 'native/oauth_browser.dart';
@@ -71,8 +76,11 @@ class _BevelHomePageState extends State<BevelHomePage> {
   final _notifications = NotificationService();
   final _deepLinks = DeepLinkService();
   final _oauth = const OAuthBrowser();
+  final _hermes = HermesBridge();
 
   NativeCapabilities? _caps;
+  HermesBridgeStatus? _hermesStatus;
+  HermesHandoffV1? _pendingHandoff;
   String? _status;
   String? _lastDeepLink;
 
@@ -92,36 +100,94 @@ class _BevelHomePageState extends State<BevelHomePage> {
         await _health.configure();
       }
       if (caps.supportsDeepLinks) {
-        await _deepLinks.listen((uri) {
-          if (!mounted) return;
-          final route = DeepLinkService.routeFor(uri);
-          setState(() {
-            _lastDeepLink = uri.toString();
-            _status = 'Deep link: ${route ?? uri}';
-          });
-          if (route != null) {
-            _openWorkspace(path: route);
-          }
-        });
+        await _deepLinks.listen(_onDeepLink);
+      }
+      HermesBridgeStatus? hermesStatus;
+      if (caps.supportsHermesBridge) {
+        hermesStatus = await _hermes.probe();
       }
       if (!mounted) return;
-      setState(() => _caps = caps);
+      setState(() {
+        _caps = caps;
+        _hermesStatus = hermesStatus;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _status = 'Native probe limited: $e');
     }
   }
 
+  void _onDeepLink(Uri uri) {
+    if (!mounted) return;
+    final action = DeepLinkService.parse(uri);
+    setState(() {
+      _lastDeepLink = uri.toString();
+      _status = 'Deep link: ${action.kind} → ${action.route ?? uri}';
+      if (action.handoff != null) {
+        _pendingHandoff = action.handoff;
+      }
+    });
+
+    switch (action.kind) {
+      case 'hermes_status':
+        _openNativeHub(focusHermes: true);
+        break;
+      case 'hermes_return':
+        final summary = action.returnSummary;
+        final st = action.returnStatus ?? 'done';
+        final channel = action.channel;
+        setState(() {
+          _status = summary == null || summary.isEmpty
+              ? 'Hermes returned: $st'
+              : 'Hermes returned ($st): $summary';
+        });
+        // Prefer short public channel path for focus.
+        final path = channel != null && channel.isNotEmpty
+            ? '/^${channel.toLowerCase()}'
+            : (action.route != null && action.route != '/native-hub'
+                ? action.route!
+                : '/');
+        _openWorkspace(path: path);
+        // Best-effort: post return note to FastAPI when fleet key is configured.
+        if (channel != null && channel.isNotEmpty) {
+          unawaited(
+            HermesReturnReporter.postChannelNote(
+              channel: channel,
+              status: st,
+              summary: summary,
+            ),
+          );
+        }
+        break;
+      case 'hermes_open':
+        if (action.handoff != null) {
+          setState(() => _pendingHandoff = action.handoff);
+        }
+        if (action.route != null) {
+          _openWorkspace(path: action.route!);
+        }
+        break;
+      default:
+        if (action.route != null) {
+          _openWorkspace(path: action.route!);
+        }
+    }
+  }
+
   @override
   void dispose() {
     _deepLinks.dispose();
+    _hermes.dispose();
     super.dispose();
   }
 
   void _openWorkspace({String path = '/'}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => WorkspaceShellPage(initialPath: path),
+        builder: (_) => WorkspaceShellPage(
+          initialPath: path,
+          hermes: _hermes,
+        ),
       ),
     );
   }
@@ -140,7 +206,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
     }
   }
 
-  void _openNativeHub() {
+  void _openNativeHub({bool focusHermes = false}) {
     final caps = _caps;
     if (caps == null) return;
     Navigator.of(context).push(
@@ -150,9 +216,32 @@ class _BevelHomePageState extends State<BevelHomePage> {
           sharing: _sharing,
           health: _health,
           notifications: _notifications,
+          hermes: _hermes,
+          initialHermesStatus: _hermesStatus,
+          focusHermes: focusHermes,
+          onHermesStatus: (s) {
+            if (mounted) setState(() => _hermesStatus = s);
+          },
         ),
       ),
     );
+  }
+
+  Future<void> _openHermes() async {
+    final handoff = (_pendingHandoff ??
+            _hermes.handoffForWorkspace(
+              workspaceUrl: BevelConfig.baseUrl,
+              prompt:
+                  'Operator opened Hermes from BEVEL home. Coordinate with fleet @hermes and the active workspace.',
+              mode: 'orchestrate',
+            ))
+        .withDefaultReturn();
+    final result = await _hermes.openWithHandoff(handoff);
+    if (!mounted) return;
+    setState(() {
+      _pendingHandoff = result.handoff;
+      _status = result.message;
+    });
   }
 
   @override
@@ -160,6 +249,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
     final scheme = Theme.of(context).colorScheme;
     final caps = _caps;
     final isMac = caps?.platformLabel == 'macos';
+    final hermesLabel = _hermesStatus?.summary;
 
     return Scaffold(
       appBar: AppBar(
@@ -206,9 +296,15 @@ class _BevelHomePageState extends State<BevelHomePage> {
           ],
         ),
         actions: [
+          if (caps?.supportsHermesBridge == true)
+            IconButton(
+              tooltip: 'Open Hermes Desktop',
+              onPressed: _openHermes,
+              icon: const Icon(Icons.auto_awesome_outlined),
+            ),
           IconButton(
             tooltip: 'Native integrations',
-            onPressed: caps == null ? null : _openNativeHub,
+            onPressed: caps == null ? null : () => _openNativeHub(),
             icon: const Icon(Icons.hub_outlined),
           ),
           IconButton(
@@ -244,9 +340,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 const SizedBox(height: 8),
                 Text(
                   isMac
-                      ? 'Native Apple Silicon app with in-window workspace '
-                          '(WKWebView), system share, notifications, and deep links. '
-                          'Requires network client entitlement and a running tenant.'
+                      ? 'Native Apple Silicon app with in-window workspace, '
+                          'Hermes Desktop handoffs, system share, notifications, '
+                          'and deep links (bevel:// + Hermes return paths).'
                       : 'Native-first on iOS and Android: HealthKit / Health Connect, '
                           'system share, notifications, deep links, and award-tier '
                           'iconography — one Flutter codebase including Apple Silicon Mac.',
@@ -256,21 +352,40 @@ class _BevelHomePageState extends State<BevelHomePage> {
                       ),
                 ),
                 const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: () => _openWorkspace(),
-                  icon: const Icon(Icons.forum_outlined),
-                  label: Text(isMac ? 'Open workspace window' : 'Open workspace'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 14,
+                Semantics(
+                  identifier: 'bevel.home.open_workspace',
+                  button: true,
+                  label: 'Open workspace window',
+                  child: FilledButton.icon(
+                    onPressed: () => _openWorkspace(),
+                    icon: const Icon(Icons.forum_outlined),
+                    label: Text(
+                      isMac ? 'Open workspace window' : 'Open workspace',
+                    ),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                     ),
                   ),
                 ),
+                if (caps?.supportsHermesBridge == true) ...[
+                  const SizedBox(height: 10),
+                  Semantics(
+                    identifier: 'bevel.home.open_hermes',
+                    button: true,
+                    label: 'Open Hermes Desktop with handoff',
+                    child: FilledButton.tonalIcon(
+                      onPressed: _openHermes,
+                      icon: const Icon(Icons.auto_awesome_outlined),
+                      label: const Text('Open in Hermes Desktop'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed: () async {
-                    // Google OAuth is fragile inside WKWebView — system browser.
                     final ok = await _oauth.openSystemLogin();
                     if (!ok && mounted) {
                       _openWorkspace(path: BevelConfig.loginPath);
@@ -280,18 +395,39 @@ class _BevelHomePageState extends State<BevelHomePage> {
                   label: const Text('Sign in (system browser)'),
                 ),
                 const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: caps == null ? null : _openNativeHub,
-                  icon: const Icon(Icons.health_and_safety_outlined),
-                  label: const Text('Native integrations'),
+                Semantics(
+                  identifier: 'bevel.home.native_hub',
+                  button: true,
+                  label: 'Native integrations',
+                  child: OutlinedButton.icon(
+                    onPressed: caps == null ? null : () => _openNativeHub(),
+                    icon: const Icon(Icons.health_and_safety_outlined),
+                    label: const Text('Native integrations'),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 TextButton.icon(
-                  onPressed: () =>
-                      _openExternal(BevelConfig.workspaceUri()),
+                  onPressed: () => _openExternal(BevelConfig.workspaceUri()),
                   icon: const Icon(Icons.open_in_browser_rounded, size: 18),
                   label: const Text('Open in system browser'),
                 ),
+                if (hermesLabel != null) ...[
+                  const SizedBox(height: 20),
+                  Card(
+                    child: ListTile(
+                      leading: Icon(
+                        _hermesStatus?.serveOnline == true
+                            ? Icons.check_circle_outline
+                            : Icons.auto_awesome_outlined,
+                        color: scheme.primary,
+                      ),
+                      title: const Text('Hermes Desktop'),
+                      subtitle: Text(hermesLabel),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => _openNativeHub(focusHermes: true),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 28),
                 Text(
                   isMac ? 'Desktop' : 'Release targets',
@@ -303,11 +439,12 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 const SizedBox(height: 12),
                 Card(
                   child: ListTile(
-                    leading: Icon(Icons.desktop_mac_rounded, color: scheme.primary),
+                    leading:
+                        Icon(Icons.desktop_mac_rounded, color: scheme.primary),
                     title: const Text('Mac (Apple Silicon)'),
                     subtitle: Text(
                       caps?.isAppleSiliconMac == true
-                          ? 'arm64 · ${caps?.deviceModel ?? "Mac"} · in-app WKWebView'
+                          ? 'arm64 · ${caps?.deviceModel ?? "Mac"} · Hermes interop'
                           : 'arm64 Flutter desktop build',
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded),
@@ -318,10 +455,11 @@ class _BevelHomePageState extends State<BevelHomePage> {
                   const SizedBox(height: 10),
                   Card(
                     child: ListTile(
-                      leading:
-                          Icon(Icons.phone_iphone_rounded, color: scheme.primary),
+                      leading: Icon(Icons.phone_iphone_rounded,
+                          color: scheme.primary),
                       title: const Text('iOS'),
-                      subtitle: const Text('HealthKit · Share · APNs · Icon Composer'),
+                      subtitle:
+                          const Text('HealthKit · Share · APNs · Icon Composer'),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => _openWorkspace(),
                     ),
@@ -332,8 +470,8 @@ class _BevelHomePageState extends State<BevelHomePage> {
                       leading: Icon(Icons.phone_android_rounded,
                           color: scheme.primary),
                       title: const Text('Android'),
-                      subtitle:
-                          const Text('Health Connect · Share · FCM · Adaptive icon'),
+                      subtitle: const Text(
+                          'Health Connect · Share · FCM · Adaptive icon'),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => _openWorkspace(),
                     ),

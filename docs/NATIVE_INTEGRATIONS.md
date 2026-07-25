@@ -1,6 +1,6 @@
 # BEVEL native integrations (iOS · Android · macOS)
 
-Deep platform APIs — not a thin WebView wrapper. The Flutter client at `apps/mobile` owns **sharing**, **Health**, **notifications**, **deep links**, and **icon / HIG standards**.
+Deep platform APIs — not a thin WebView wrapper. The Flutter client at `apps/mobile` owns **sharing**, **Health**, **notifications**, **deep links**, **Hermes Desktop interop**, and **icon / HIG standards**.
 
 ## Architecture
 
@@ -10,7 +10,9 @@ lib/native/
   sharing_service.dart       # share_plus → system share sheet
   health_service.dart        # HealthKit + Health Connect
   notification_service.dart  # local alerts; APNs/FCM extension points
-  deep_links.dart            # bevel:// + https app links
+  deep_links.dart            # bevel:// + https app links + hermes/*
+  hermes_bridge.dart         # Hermes.app / CLI / gateway probe + launch
+  hermes_handoff.dart        # v1 clipboard + deep-link payload
 lib/ui/native_hub_page.dart  # operator / QA surface for integrations
 ```
 
@@ -19,8 +21,11 @@ lib/ui/native_hub_page.dart  # operator / QA surface for integrations
 | System share | UIActivityViewController | `ACTION_SEND` | Share services |
 | Health read/write | **HealthKit** | **Health Connect** | — (future) |
 | Notifications | UNUserNotification + APNs hook | channels + FCM hook | local |
-| Deep links | Universal Links + `bevel://` | App Links + `bevel://` | custom URL |
+| Deep links | Universal Links + `bevel://` | App Links + `bevel://` | `bevel://` + Hermes return |
+| Hermes Desktop | — | — | **Bridge + handoffs** |
 | Icons | Icon Composer layered set | Adaptive + mono | dock icons |
+
+Hermes details: [HERMES_DESKTOP.md](./HERMES_DESKTOP.md).
 
 ## Sharing
 
@@ -105,9 +110,12 @@ Do not request CallKit entitlements until the signaling path is production-ready
 | Scheme | Example | Route |
 |--------|---------|--------|
 | Custom | `bevel://channel/product` | `/bevel/product` |
+| Hermes open | `bevel://hermes/open?channel=product&mode=build` | channel + pending handoff |
+| Hermes return | `bevel://hermes/return?channel=product&status=done` | toast + channel focus |
+| Hermes status | `bevel://hermes/status` | Native Hub Hermes card |
 | HTTPS | `https://app.bevel.com/bevel/...` | path passthrough |
 
-Configure Associated Domains (iOS) and Digital Asset Links (Android) for production hosts before store review.
+Configure Associated Domains (iOS) and Digital Asset Links (Android) for production hosts before store review. macOS listens via `app_links` + `CFBundleURLSchemes` (`bevel`).
 
 ## Platform standards
 
@@ -128,10 +136,13 @@ Health and notification strings must match real behavior. Document data use in A
 - [ ] Steps sample returns after grant  
 - [ ] Notification permission + test alert  
 - [ ] `bevel://channel/test` opens cold and warm  
+- [ ] Hermes Probe + Open Hermes on macOS  
+- [ ] `bevel://hermes/status` focuses Hermes card  
 - [ ] Adaptive icon + monochrome look correct on Pixel / iPhone  
 - [ ] Icon Composer export still legible at 29pt  
 
 ## Related
 
+- [HERMES_DESKTOP.md](./HERMES_DESKTOP.md) — Hermes Desktop interop  
 - [NATIVE_RELEASE.md](./NATIVE_RELEASE.md) — build bundles  
 - Download page: `/download` on the web app  
