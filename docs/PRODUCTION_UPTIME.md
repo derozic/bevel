@@ -40,13 +40,37 @@ journalctl -u bevel-api -u bevel-realtime -u 2x4m-bevel -n 50 --no-pager
 
 ## Deploy checklist (no downtime order)
 
-1. `git fetch && git reset --hard origin/main` as `deploy` in `/opt/bevel`
-2. API: `cd services/api && uv sync && uv run alembic upgrade head && systemctl restart bevel-api`
-3. Realtime: `cd services/realtime && pnpm run build && systemctl restart bevel-realtime`
-4. Web: update `apps/web/.env.production` public URLs → `next build` → `systemctl restart 2x4m-bevel`
+**One-command (preferred while iterating):**
+
+```bash
+# from laptop, after git push
+./scripts/deploy-production.sh              # origin/main
+./scripts/deploy-production.sh HEAD         # current branch tip (must be pushed)
+./scripts/deploy-production.sh <sha>        # specific commit
+```
+
+SSH alias: `bevel-prod` → `ubuntu@34.200.88.66` (`~/.ssh/2x4m_ed25519`).
+
+Manual steps (same order the script uses):
+
+1. `git fetch && git reset --hard <ref>` as `deploy` in `/opt/bevel`
+2. API: `source services/api/.env` → `uv sync` → `alembic upgrade head` → `systemctl restart bevel-api`
+3. Realtime: `pnpm run build` → `systemctl restart bevel-realtime`
+4. Web: `NODE_OPTIONS=--max-old-space-size=1536 pnpm run build` in `apps/web` → `systemctl restart 2x4m-bevel`
 5. Smoke the four curls above
 
 **Never** `pkill caddy` — reload only (`caddy reload --config /etc/caddy/Caddyfile`).
+
+### Continuous live testing
+
+Push the branch you are building, then redeploy that tip:
+
+```bash
+git push origin HEAD
+./scripts/deploy-production.sh HEAD
+```
+
+Silicon Mac app always talks to live `api.bevel.is` by default (see `apps/mobile/lib/config.dart`).
 
 ## Failure modes
 
