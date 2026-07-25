@@ -18,6 +18,7 @@ class NativeCapabilities {
     required this.supportsHealthConnect,
     required this.supportsHealthKit,
     required this.supportsDeepLinks,
+    required this.supportsHermesBridge,
     required this.isAppleSiliconMac,
   });
 
@@ -32,6 +33,8 @@ class NativeCapabilities {
   final bool supportsHealthConnect;
   final bool supportsHealthKit;
   final bool supportsDeepLinks;
+  /// macOS/desktop: detect + launch Hermes Desktop / local gateway.
+  final bool supportsHermesBridge;
   final bool isAppleSiliconMac;
 
   static Future<NativeCapabilities> probe() async {
@@ -93,6 +96,8 @@ class NativeCapabilities {
     }
 
     final mobile = !kIsWeb && (Platform.isIOS || Platform.isAndroid);
+    final desktop = !kIsWeb &&
+        (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
     return NativeCapabilities(
       platformLabel: platformLabel,
@@ -105,7 +110,9 @@ class NativeCapabilities {
       supportsHealth: supportsHealthKit || supportsHealthConnect,
       supportsHealthConnect: supportsHealthConnect,
       supportsHealthKit: supportsHealthKit,
-      supportsDeepLinks: mobile,
+      // Custom scheme + app_links on iOS/Android/macOS.
+      supportsDeepLinks: mobile || (!kIsWeb && Platform.isMacOS),
+      supportsHermesBridge: desktop,
       isAppleSiliconMac: isAppleSiliconMac,
     );
   }

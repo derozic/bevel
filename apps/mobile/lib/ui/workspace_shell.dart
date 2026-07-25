@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../config.dart';
+import '../native/hermes_bridge.dart';
 import '../native/oauth_browser.dart';
 import '../native/sharing_service.dart';
 
@@ -15,9 +16,11 @@ class WorkspaceShellPage extends StatefulWidget {
   const WorkspaceShellPage({
     super.key,
     this.initialPath = '/',
+    this.hermes,
   });
 
   final String initialPath;
+  final HermesBridge? hermes;
 
   @override
   State<WorkspaceShellPage> createState() => _WorkspaceShellPageState();
@@ -110,9 +113,82 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _openHermes() async {
+    final bridge = widget.hermes;
+    if (bridge == null) return;
+    final uri = _currentUri ?? BevelConfig.workspaceUri();
+    final channel = _channelFromUri(uri);
+    final tenant = _tenantFromHost(uri.host);
+    final handoff = bridge.handoffForWorkspace(
+      workspaceUrl: uri.toString(),
+      channel: channel,
+      tenant: tenant,
+      mode: 'build',
+      surface: 'desktop',
+      projectPath: null, // resolved by bridge from env / ~/dev
+      prompt:
+          'Continue work from BEVEL workspace: ${uri.toString()}'
+          '${channel != null ? ' (channel ^$channel)' : ''}'
+          '${tenant != null ? ' tenant=$tenant' : ''}. '
+          'Use skill bevel-workspace. When done: open returnUrl '
+          '(bevel://hermes/return) with a short status summary.',
+    ).copyWith(
+      successCriteria:
+          'Return to BEVEL channel with status + evidence; no secrets in chat',
+    );
+    final result = await bridge.openWithHandoff(handoff);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.message)),
+    );
+  }
+
+  /// Support /bevel/{slug}, /^{slug}, and /bevel/c/{slug}.
+  static String? _channelFromUri(Uri uri) {
+    final path = uri.path;
+    if (path.startsWith('/bevel/c/')) {
+      final rest = path.substring('/bevel/c/'.length);
+      final slug = rest.split('/').firstWhere((s) => s.isNotEmpty, orElse: () => '');
+      return slug.isEmpty ? null : slug;
+    }
+    if (path.startsWith('/bevel/')) {
+      final rest = path.substring('/bevel/'.length);
+      final slug = rest.split('/').firstWhere((s) => s.isNotEmpty, orElse: () => '');
+      if (slug.isEmpty || slug == 'talk' || slug == 'session') return null;
+      return slug;
+    }
+    // Public short path: /^general
+    final segs = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (segs.isNotEmpty && segs.first.startsWith('^')) {
+      final slug = segs.first.substring(1);
+      return slug.isEmpty ? null : slug;
+    }
+    // Fragment sometimes used
+    if (uri.fragment.startsWith('^')) {
+      return uri.fragment.substring(1);
+    }
+    return null;
+  }
+
+  static String? _tenantFromHost(String host) {
+    final h = host.toLowerCase();
+    // bevel.2x4m.cc / 2x4m.bevel.lvh.me / 2x4m.lvh.me
+    if (h.contains('2x4m')) return '2x4m';
+    if (h.startsWith('bevel.') && h.endsWith('.lvh.me')) {
+      final mid = h.substring('bevel.'.length, h.length - '.lvh.me'.length);
+      if (mid.isNotEmpty && !mid.contains('.')) return mid;
+    }
+    final parts = h.split('.');
+    if (parts.length >= 3 && parts[1] == 'bevel') {
+      return parts[0];
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final hermes = widget.hermes;
 
     return Scaffold(
       appBar: AppBar(
@@ -149,11 +225,27 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             onPressed: _reload,
             icon: const Icon(Icons.refresh_rounded),
           ),
-          IconButton(
-            tooltip: 'Share',
-            onPressed: _share,
-            icon: const Icon(Icons.ios_share_rounded),
+          Semantics(
+            identifier: 'bevel.shell.share',
+            button: true,
+            label: 'Share workspace',
+            child: IconButton(
+              tooltip: 'Share',
+              onPressed: _share,
+              icon: const Icon(Icons.ios_share_rounded),
+            ),
           ),
+          if (hermes != null && HermesBridge.isSupportedPlatform)
+            Semantics(
+              identifier: 'bevel.shell.open_hermes',
+              button: true,
+              label: 'Open current page in Hermes Desktop',
+              child: IconButton(
+                tooltip: 'Open in Hermes Desktop',
+                onPressed: _openHermes,
+                icon: const Icon(Icons.auto_awesome_outlined),
+              ),
+            ),
           IconButton(
             tooltip: 'Open in browser',
             onPressed: _openExternal,

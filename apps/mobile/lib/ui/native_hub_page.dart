@@ -4,11 +4,12 @@ import 'package:flutter/services.dart';
 import '../config.dart';
 import '../native/deep_links.dart';
 import '../native/health_service.dart';
+import '../native/hermes_bridge.dart';
 import '../native/native_capabilities.dart';
 import '../native/notification_service.dart';
 import '../native/sharing_service.dart';
 
-/// Deep native integrations surface — sharing, Health, notifications, standards.
+/// Deep native integrations surface — sharing, Health, notifications, Hermes, standards.
 class NativeHubPage extends StatefulWidget {
   const NativeHubPage({
     super.key,
@@ -16,12 +17,20 @@ class NativeHubPage extends StatefulWidget {
     required this.sharing,
     required this.health,
     required this.notifications,
+    this.hermes,
+    this.initialHermesStatus,
+    this.focusHermes = false,
+    this.onHermesStatus,
   });
 
   final NativeCapabilities capabilities;
   final SharingService sharing;
   final HealthService health;
   final NotificationService notifications;
+  final HermesBridge? hermes;
+  final HermesBridgeStatus? initialHermesStatus;
+  final bool focusHermes;
+  final ValueChanged<HermesBridgeStatus>? onHermesStatus;
 
   @override
   State<NativeHubPage> createState() => _NativeHubPageState();
@@ -32,10 +41,63 @@ class _NativeHubPageState extends State<NativeHubPage> {
   int? _steps;
   bool _healthAuthed = false;
   bool _notifAuthed = false;
+  HermesBridgeStatus? _hermesStatus;
+  final _hermesKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _hermesStatus = widget.initialHermesStatus;
+    if (widget.focusHermes) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _hermesKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 280),
+            alignment: 0.1,
+          );
+        }
+      });
+    }
+  }
 
   Future<void> _setStatus(String msg) async {
     if (!mounted) return;
     setState(() => _status = msg);
+  }
+
+  Future<void> _probeHermes() async {
+    final bridge = widget.hermes;
+    if (bridge == null) return;
+    final status = await bridge.probe();
+    widget.onHermesStatus?.call(status);
+    if (!mounted) return;
+    setState(() {
+      _hermesStatus = status;
+      _status = status.summary;
+    });
+  }
+
+  Future<void> _openHermes({String surface = 'desktop'}) async {
+    final bridge = widget.hermes;
+    if (bridge == null) return;
+    final base = Uri.parse(BevelConfig.baseUrl);
+    final handoff = bridge.handoffForWorkspace(
+      workspaceUrl: BevelConfig.baseUrl,
+      tenant: base.host.contains('2x4m') ? '2x4m' : null,
+      channel: 'general',
+      mode: surface == 'cli-query' ? 'brief' : 'orchestrate',
+      surface: surface,
+      prompt:
+          'Opened from BEVEL Native Hub ($surface). '
+          'Coordinate with fleet @hermes; use bevel-workspace skill. '
+          'Return via bevel://hermes/return?channel=general when done.',
+      successCriteria: 'Short status summary posted back to BEVEL',
+    );
+    final result = await bridge.openWithHandoff(handoff);
+    if (!mounted) return;
+    setState(() => _status = result.message);
   }
 
   Future<void> _shareWorkspace() async {
@@ -105,14 +167,150 @@ class _NativeHubPageState extends State<NativeHubPage> {
           const SizedBox(height: 8),
           Text(
             'Sharing, ${c.supportsHealthKit ? 'Apple HealthKit' : c.supportsHealthConnect ? 'Health Connect' : 'Health'}, '
-            'notifications, deep links, and platform standards — '
-            'wired for award-tier mobile quality.',
+            'notifications, Hermes Desktop, deep links, and platform standards — '
+            'wired for award-tier mobile / Mac quality.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: const Color(0xFF9AA8B5),
                   height: 1.45,
                 ),
           ),
           const SizedBox(height: 20),
+          if (c.supportsHermesBridge && widget.hermes != null) ...[
+            Semantics(
+              identifier: 'bevel.hub.hermes_card',
+              container: true,
+              label: 'Hermes Desktop connection',
+              child: Card(
+                key: _hermesKey,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.auto_awesome_outlined, color: scheme.primary),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Hermes Desktop',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          if (_hermesStatus?.serveOnline == true)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'serve',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _hermesStatus?.summary ??
+                            'Not probed yet — detect Hermes.app, CLI, and local gateway.',
+                        style: const TextStyle(
+                          color: Color(0xFF9AA8B5),
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                      if (_hermesStatus?.appBundlePath != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          _hermesStatus!.appBundlePath!,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7A88),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                      if (_hermesStatus?.cliPath != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'CLI: ${_hermesStatus!.cliPath}',
+                          style: const TextStyle(
+                            color: Color(0xFF6B7A88),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 8,
+                        children: [
+                          Semantics(
+                            identifier: 'bevel.hub.hermes_probe',
+                            button: true,
+                            label: 'Re-probe Hermes',
+                            child: OutlinedButton(
+                              onPressed: _probeHermes,
+                              child: const Text('Probe'),
+                            ),
+                          ),
+                          Semantics(
+                            identifier: 'bevel.hub.hermes_open',
+                            button: true,
+                            label: 'Launch Hermes Desktop',
+                            child: FilledButton.tonal(
+                              onPressed: () => _openHermes(surface: 'desktop'),
+                              child: const Text('Desktop'),
+                            ),
+                          ),
+                          Semantics(
+                            identifier: 'bevel.hub.hermes_cli',
+                            button: true,
+                            label: 'Launch Hermes CLI in Terminal',
+                            child: OutlinedButton(
+                              onPressed: () => _openHermes(surface: 'cli'),
+                              child: const Text('CLI'),
+                            ),
+                          ),
+                          Semantics(
+                            identifier: 'bevel.hub.hermes_cli_query',
+                            button: true,
+                            label: 'Run Hermes single-query CLI',
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  _openHermes(surface: 'cli-query'),
+                              child: const Text('CLI -q'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Desktop: hermes desktop --cwd · App: com.nousresearch.hermes\n'
+                        'CLI: hermes -s bevel-workspace (Terminal) · chat -q for one shot\n'
+                        'Shared state: ~/.hermes · Resume: hermes -c · Skill slash: /bevel-workspace\n'
+                        'Probe: serve :9119 · messaging gateway :8642 · Return: bevel://hermes/return',
+                        style: TextStyle(
+                          color: Color(0xFF6B7A88),
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           _CapabilityCard(
             title: 'Device',
             lines: [
@@ -168,6 +366,7 @@ class _NativeHubPageState extends State<NativeHubPage> {
             title: 'Deep links',
             lines: [
               'Custom scheme: bevel://channel/{id}',
+              'Hermes: bevel://hermes/open|return|status',
               'Universal / App Links: workspace hosts',
               'Route helper: ${DeepLinkService.routeFor(Uri.parse('bevel://channel/product'))}',
             ],
