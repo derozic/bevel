@@ -67,6 +67,74 @@ export default function SettingsPage() {
         </ul>
       </section>
 
+      <section
+        id="magenta"
+        className="scroll-mt-8 space-y-3 rounded-xl border border-[var(--bevel-border)] bg-[var(--bevel-surface)] p-6"
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--bevel-text-muted)]">
+          Magenta Extensions
+        </h2>
+        <p className="text-sm text-[var(--bevel-text-muted)]">
+          Deliver Bevel marketing surfaces (and partner Preso carousels) through the
+          Magenta snippet and Flutter SDK without shipping source changes for every
+          campaign. Operators configure payloads in Magenta; members never touch code.
+        </p>
+        <ul className="list-disc space-y-2 pl-5 text-sm text-[var(--bevel-text-muted)]">
+          <li>
+            Site id for this product:{" "}
+            <code className="font-mono text-xs text-[var(--bevel-text)]">bevel</code>
+          </li>
+          <li>
+            Loader:{" "}
+            <code className="font-mono text-xs text-[var(--bevel-text)]">
+              https://api.magenta.ac/api/analytics/loader.js?site=bevel
+            </code>
+          </li>
+          <li>
+            Optional placement:{" "}
+            <code className="font-mono text-xs text-[var(--bevel-text)]">
+              {'<div data-magenta-bevel></div>'}
+            </code>
+          </li>
+          <li>
+            Flutter: depend on{" "}
+            <code className="font-mono text-xs text-[var(--bevel-text)]">
+              magenta_flutter
+            </code>{" "}
+            and call{" "}
+            <code className="font-mono text-xs text-[var(--bevel-text)]">
+              loadExtensions()
+            </code>
+          </li>
+        </ul>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <a
+            href="https://admin.magenta.ac/extensions"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-[var(--bevel-border)] px-3 py-1.5 text-[var(--bevel-text)] hover:bg-white/5"
+          >
+            Magenta Extensions catalog
+          </a>
+          <a
+            href="https://api.magenta.ac/api/docs"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-[var(--bevel-border)] px-3 py-1.5 text-[var(--bevel-text)] hover:bg-white/5"
+          >
+            Magenta API docs
+          </a>
+          <a
+            href="https://admin.magenta.ac/settings"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-[var(--bevel-border)] px-3 py-1.5 text-[var(--bevel-text)] hover:bg-white/5"
+          >
+            Magenta settings
+          </a>
+        </div>
+      </section>
+
       <section className="space-y-3 rounded-xl border border-[var(--bevel-border)] bg-[var(--bevel-surface)] p-6">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--bevel-text-muted)]">
           Environment inventory

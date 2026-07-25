@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
 import '../native/deep_links.dart';
 import '../native/health_service.dart';
 import '../native/hermes_bridge.dart';
+import '../native/media_device_discovery.dart';
 import '../native/native_capabilities.dart';
 import '../native/notification_service.dart';
 import '../native/sharing_service.dart';
@@ -42,6 +44,8 @@ class _NativeHubPageState extends State<NativeHubPage> {
   bool _healthAuthed = false;
   bool _notifAuthed = false;
   HermesBridgeStatus? _hermesStatus;
+  MediaDeviceInventory? _mediaDevices;
+  final _discovery = MediaDeviceDiscovery();
   final _hermesKey = GlobalKey();
 
   @override
@@ -146,6 +150,25 @@ class _NativeHubPageState extends State<NativeHubPage> {
     });
   }
 
+  Future<void> _discoverMediaDevices() async {
+    if (!widget.capabilities.supportsDeviceDiscovery) {
+      await _setStatus(
+        'Device discovery needs the Silicon Mac app (not browser install)',
+      );
+      return;
+    }
+    await _setStatus('Requesting mic access + scanning devices…');
+    await _discovery.requestAccess(camera: true);
+    final inventory = await _discovery.enumerate();
+    if (!mounted) return;
+    setState(() {
+      _mediaDevices = inventory;
+      _status = inventory.error ??
+          'Huddle-ready: ${inventory.summary}'
+              '${inventory.microphones.isNotEmpty ? ' · default mic: ${inventory.microphones.where((d) => d.isDefault).map((d) => d.label).firstOrNull ?? inventory.microphones.first.label}' : ''}';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = widget.capabilities;
@@ -167,14 +190,87 @@ class _NativeHubPageState extends State<NativeHubPage> {
           const SizedBox(height: 8),
           Text(
             'Sharing, ${c.supportsHealthKit ? 'Apple HealthKit' : c.supportsHealthConnect ? 'Health Connect' : 'Health'}, '
-            'notifications, Hermes Desktop, deep links, and platform standards — '
-            'wired for award-tier mobile / Mac quality.',
+            'notifications, Hermes Desktop, media device discovery for audio huddles, '
+            'deep links — computer integration the browser install cannot match.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: const Color(0xFF9AA8B5),
                   height: 1.45,
                 ),
           ),
           const SizedBox(height: 20),
+          _ActionCard(
+            title: 'Magenta Extensions',
+            subtitle:
+                'Remote marketing and product payloads (Preso slides, Bevel teaser, CYAN) '
+                'via Magenta snippet / Flutter SDK — no app store release for each campaign.',
+            icon: Icons.extension_outlined,
+            enabled: true,
+            actionLabel: 'Open settings',
+            trailing: 'site_id=bevel',
+            onAction: () async {
+              final uri = Uri.parse(BevelConfig.magentaSettingsUrl);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                await _setStatus('Opened Magenta Extensions settings');
+              } else {
+                await _setStatus('Could not open ${BevelConfig.magentaSettingsUrl}');
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          _ActionCard(
+            title: 'Magenta admin catalog',
+            subtitle: 'Create or enable extension payloads for partner sites.',
+            icon: Icons.dashboard_customize_outlined,
+            enabled: true,
+            actionLabel: 'Open catalog',
+            onAction: () async {
+              final uri = Uri.parse(BevelConfig.magentaExtensionsAdminUrl);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+          ),
+          const SizedBox(height: 20),
+          if (c.supportsDeviceDiscovery) ...[
+            _ActionCard(
+              title: 'Audio huddles · device discovery',
+              subtitle:
+                  'Scan CoreAudio + AVFoundation for mics, speakers, and cameras. '
+                  'Native Silicon discovery is the prerequisite for reliable huddles '
+                  '(browser install cannot do this cleanly).',
+              icon: Icons.headphones_outlined,
+              enabled: true,
+              actionLabel: _mediaDevices == null
+                  ? 'Discover devices'
+                  : 'Re-scan devices',
+              trailing: _mediaDevices?.summary,
+              onAction: _discoverMediaDevices,
+            ),
+            if (_mediaDevices != null && !_mediaDevices!.isEmpty) ...[
+              const SizedBox(height: 8),
+              _CapabilityCard(
+                title: 'Discovered media',
+                lines: [
+                  ..._mediaDevices!.microphones.take(4).map(
+                        (d) =>
+                            'Mic${d.isDefault ? ' *' : ''}: ${d.label}',
+                      ),
+                  ..._mediaDevices!.speakers.take(3).map(
+                        (d) =>
+                            'Out${d.isDefault ? ' *' : ''}: ${d.label}',
+                      ),
+                  ..._mediaDevices!.cameras.take(3).map(
+                        (d) =>
+                            'Cam${d.isDefault ? ' *' : ''}: ${d.label}',
+                      ),
+                ],
+                icon: Icons.mic_none_rounded,
+                accent: scheme.primary,
+              ),
+            ],
+            const SizedBox(height: 12),
+          ],
           if (c.supportsHermesBridge && widget.hermes != null) ...[
             Semantics(
               identifier: 'bevel.hub.hermes_card',
