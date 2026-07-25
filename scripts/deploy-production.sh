@@ -49,23 +49,26 @@ FULL_REF="$1"
 
 sudo git config --global --add safe.directory /opt/bevel || true
 
-echo "==> fetch + checkout"
-sudo -u deploy bash -lc "
+echo "==> fetch + checkout ($FULL_REF)"
+sudo -u deploy env FULL_REF="$FULL_REF" bash -s <<'INNER'
   set -euo pipefail
   cd /opt/bevel
-  git fetch --prune origin
-  # Accept SHA, origin/main, or branch name
-  if git rev-parse --verify '${FULL_REF}^{commit}' >/dev/null 2>&1; then
-    git checkout -f '${FULL_REF}'
-  elif git rev-parse --verify 'origin/${FULL_REF}^{commit}' >/dev/null 2>&1; then
-    git checkout -f 'origin/${FULL_REF}'
+  git fetch --prune origin --tags
+  # Also fetch all remote branches so feature SHAs are present
+  git fetch origin '+refs/heads/*:refs/remotes/origin/*' || true
+  if git cat-file -e "${FULL_REF}^{commit}" 2>/dev/null; then
+    git checkout -f "$FULL_REF"
+  elif git cat-file -e "origin/${FULL_REF}^{commit}" 2>/dev/null; then
+    git checkout -f "origin/${FULL_REF}"
   else
-    git checkout -f origin/main
-    git merge --ff-only '${FULL_REF}' || git reset --hard '${FULL_REF}'
+    echo "ERROR: ref not found after fetch: $FULL_REF"
+    git rev-parse --short origin/main
+    git branch -r | head -20
+    exit 1
   fi
   git reset --hard HEAD
-  echo \"HEAD=\$(git rev-parse --short HEAD) \$(git log -1 --oneline)\"
-"
+  echo "HEAD=$(git rev-parse --short HEAD) $(git log -1 --oneline)"
+INNER
 
 echo "==> free memory for next build if needed"
 # cpu-logind / heavy scrapers have OOM'd next builds before
