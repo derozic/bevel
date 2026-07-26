@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "bevel": {
+      "command": "uv",
+      "args": ["run", "bevel-mcp"],
+      "cwd": "/Users/YOU/dev/bevel/services/api",
+      "env": {
+        "BEVEL_API_URL": "https://api.bevel.is"
+      }
+    },
+    "slack": {
+      "url": "https://mcp.slack.com/mcp",
+      "transport": "http"
+    }
+  }
+}

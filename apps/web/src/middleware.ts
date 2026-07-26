@@ -14,6 +14,11 @@ const PUBLIC_PATHS = [
   // Twilio SMS (inbound webhook + JOHNNY-style vote links from the phone)
   '/api/twilio/webhook',
   '/api/twilio/vote',
+  // BlueBubbles iMessage probe (send still gated in route)
+  '/api/imessage',
+  // Slack OAuth callback + Events API (signature verified in route)
+  '/api/integrations/slack/oauth/callback',
+  '/api/integrations/slack/events',
   '/brand',
   '/sw.js',
   '/manifest.webmanifest',

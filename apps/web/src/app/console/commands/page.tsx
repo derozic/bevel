@@ -75,6 +75,18 @@ export default function DashboardCommandsPage() {
       options: []
     },
     {
+      syntax: "bevel integrations slack <status|connect|test|disconnect>",
+      category: "Integrations",
+      description:
+        "Slack complement bridge (digests, slash /bevel, agent cards). Pair with Slack CLI for app shipping: https://docs.slack.dev/tools/slack-cli",
+      example: "bevel integrations slack connect",
+      options: [
+        { flag: "status", desc: "Show connection + scopes." },
+        { flag: "connect", desc: "Print OAuth URL (web Extensions)." },
+        { flag: "test [channel]", desc: "auth.test and optional chat.postMessage." },
+      ],
+    },
+    {
       syntax: "bevel auth configure [provider]",
       category: "Authentication",
       description: "Store an AI provider key in the encrypted local credential vault.",
