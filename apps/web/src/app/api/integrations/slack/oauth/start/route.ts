@@ -30,22 +30,22 @@ export async function GET() {
 
   const tenant = await getTenantFromRequest()
   const slug = tenant?.slug || 'platform'
-  const state = randomBytes(16).toString('hex')
+  const state = randomBytes(24).toString('hex')
   const cookieStore = await cookies()
-  cookieStore.set('bevel_slack_oauth_state', state, {
+  // HTTPS always for local .lvh.me and production — secure cookies prevent leakage
+  const secureCookie =
+    process.env.NODE_ENV === 'production' ||
+    process.env.AUTH_URL?.startsWith('https://') ||
+    process.env.BEVEL_PUBLIC_URL?.startsWith('https://')
+  const cookieBase = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: Boolean(secureCookie),
+    sameSite: 'lax' as const,
     path: '/',
     maxAge: 600,
-  })
-  cookieStore.set('bevel_slack_oauth_tenant', slug, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 600,
-  })
+  }
+  cookieStore.set('bevel_slack_oauth_state', state, cookieBase)
+  cookieStore.set('bevel_slack_oauth_tenant', slug, cookieBase)
 
   const url = buildSlackAuthorizeUrl(state)
   return NextResponse.redirect(url)

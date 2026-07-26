@@ -12,12 +12,31 @@
   --color-surface-raised: var(--bevel-surface-raised);
   --color-border: var(--bevel-border);
   --color-foreground: var(--bevel-text);
+  /* Semantic text (console + daypart) */
+  --color-text: var(--bevel-text);
+  --color-text-muted: var(--bevel-text-muted);
+  --color-text-faint: var(--sticker-subtle, var(--bevel-text-muted));
   --color-muted: var(--bevel-text-muted);
   --color-accent: var(--bevel-accent);
   --color-accent-muted: var(--bevel-accent-muted);
+  /*
+   * primary-* → brand accent scale (console pages).
+   * Do not use text-background on primary fills in Day Mode — use cta/cta-fg instead.
+   */
+  --color-primary-300: color-mix(in oklch, var(--bevel-accent) 55%, white);
+  --color-primary-400: color-mix(in oklch, var(--bevel-accent) 72%, white);
+  --color-primary-500: var(--bevel-accent);
+  --color-primary-600: color-mix(in oklch, var(--bevel-accent) 82%, black);
+  /*
+   * Solid CTAs: ink fill + cream label flip with daypart (always high contrast).
+   * Prefer bg-cta text-cta-fg over bg-primary-500 text-background.
+   */
+  --color-cta: var(--ink, var(--bevel-text));
+  --color-cta-fg: var(--cream, var(--bevel-bg));
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
+  --color-error: #ef4444;
 
   /* Ink scale used by workspace chrome (maps to tenant --ink / --cream tokens) */
   --color-ink: var(--ink, var(--bevel-text));

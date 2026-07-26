@@ -35,26 +35,41 @@ export async function GET(req: Request) {
     return fail('Invalid OAuth state')
   }
 
-  const exchanged = await exchangeSlackCode(code)
+  let exchanged: Awaited<ReturnType<typeof exchangeSlackCode>>
+  try {
+    exchanged = await exchangeSlackCode(code)
+  } catch (e) {
+    const msg =
+      e instanceof Error ? e.message : 'oauth.v2.access network error'
+    // Never include secrets in redirect query
+    return fail(msg.slice(0, 120))
+  }
   if (!exchanged.ok || !exchanged.access_token) {
     return fail(exchanged.error || 'oauth.v2.access failed')
   }
 
-  const tokenPatch = tokensFromOAuthExchange(exchanged)
-  saveWorkspaceSlack(tenantSlug, {
-    enabled: true,
-    channelMap: {},
-    ...tokenPatch,
-    // Prefer explicit bot fields from exchange
-    teamId: exchanged.team?.id ?? tokenPatch.teamId,
-    teamName: exchanged.team?.name ?? tokenPatch.teamName,
-    botUserId: exchanged.bot_user_id ?? tokenPatch.botUserId,
-    scopes: (exchanged.scope || '').split(',').filter(Boolean),
-    userScopes: exchanged.authed_user?.scope
-      ? exchanged.authed_user.scope.split(',').filter(Boolean)
-      : tokenPatch.userScopes,
-    updatedBy: 'oauth',
-  })
+  try {
+    const tokenPatch = tokensFromOAuthExchange(exchanged)
+    saveWorkspaceSlack(tenantSlug, {
+      enabled: true,
+      channelMap: {},
+      ...tokenPatch,
+      teamId: exchanged.team?.id ?? tokenPatch.teamId,
+      teamName: exchanged.team?.name ?? tokenPatch.teamName,
+      botUserId: exchanged.bot_user_id ?? tokenPatch.botUserId,
+      scopes: (exchanged.scope || '').split(',').filter(Boolean),
+      userScopes: exchanged.authed_user?.scope
+        ? exchanged.authed_user.scope.split(',').filter(Boolean)
+        : tokenPatch.userScopes,
+      updatedBy: 'oauth',
+    })
+  } catch (e) {
+    console.error('[slack/oauth/callback] secret store failed', {
+      tenant: tenantSlug,
+      err: e instanceof Error ? e.message : String(e),
+    })
+    return fail('Could not store Slack credentials securely')
+  }
 
   const rotation = Boolean(
     exchanged.refresh_token || exchanged.authed_user?.refresh_token,

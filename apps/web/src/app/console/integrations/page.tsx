@@ -530,7 +530,7 @@ export default function IntegrationsPage() {
                       ) : (
                         <button
                           onClick={() => openConfigureModal(integration)}
-                          className="w-full py-2 px-3 bg-primary-500 hover:bg-primary-400 text-background rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                          className="w-full py-2.5 px-3 bg-cta text-cta-fg hover:opacity-90 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer hover:scale-[1.02] active:scale-[0.98] shadow-sm ring-1 ring-ink/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         >
                           Connect
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -735,7 +735,7 @@ export default function IntegrationsPage() {
                             className={`
                               w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all
                               ${setupStep === step 
-                                ? "bg-primary-500 text-background font-black" 
+                                ? "bg-cta text-cta-fg font-black" 
                                 : setupStep > step 
                                 ? "bg-primary-500/20 text-primary-400 border border-primary-500/30" 
                                 : "bg-surface text-text-faint border border-border"
@@ -815,7 +815,7 @@ export default function IntegrationsPage() {
                         <button
                           type="button"
                           onClick={() => setSetupStep(2)}
-                          className="w-full py-2.5 px-4 bg-primary-500 hover:bg-primary-400 text-background rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer hover:scale-[1.01]"
+                          className="w-full py-2.5 px-4 bg-cta text-cta-fg hover:opacity-90 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         >
                           Continue Setup
                           <ArrowRight className="w-4 h-4" />
@@ -887,11 +887,11 @@ export default function IntegrationsPage() {
                             type="button"
                             disabled={isVerifying}
                             onClick={() => handleConnect(activeModalIntegration.id)}
-                            className="flex-grow py-2.5 px-4 bg-primary-500 hover:bg-primary-400 text-background rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-grow py-2.5 px-4 bg-cta text-cta-fg hover:opacity-90 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                           >
                             {isVerifying ? (
                               <>
-                                <Loader2 className="w-4 h-4 animate-spin text-background" />
+                                <Loader2 className="w-4 h-4 animate-spin text-cta-fg" />
                                 Validating credentials...
                               </>
                             ) : (
@@ -952,7 +952,7 @@ export default function IntegrationsPage() {
                         <button
                           type="button"
                           onClick={() => handleFinishSetup(activeModalIntegration.id)}
-                          className="w-full py-2.5 px-4 bg-primary-500 hover:bg-primary-400 text-background rounded-xl text-xs font-bold transition-all cursor-pointer hover:scale-[1.01]"
+                          className="w-full py-2.5 px-4 bg-cta text-cta-fg hover:opacity-90 rounded-xl text-xs font-bold transition-all cursor-pointer hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         >
                           Go to Dashboard
                         </button>

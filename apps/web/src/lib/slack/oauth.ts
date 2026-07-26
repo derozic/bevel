@@ -7,6 +7,7 @@
  * @see https://docs.slack.dev/ai/slack-mcp-server
  */
 
+import { slackApiJson, timingSafeEqualString } from './http'
 import { botScopeString, mcpUserScopeString, userScopeString } from './scopes'
 
 /** Hosted Slack MCP (Streamable HTTP). */
@@ -111,13 +112,14 @@ export async function exchangeSlackCode(
     code,
     redirect_uri: slackRedirectUri(),
   })
-  const res = await fetch('https://slack.com/api/oauth.v2.access', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
-  const data = (await res.json()) as SlackOAuthExchange
-  return data
+  return slackApiJson<SlackOAuthExchange>(
+    'https://slack.com/api/oauth.v2.access',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    },
+  )
 }
 
 /** Exchange code from v2_user authorize (MCP user token). */
@@ -130,13 +132,14 @@ export async function exchangeSlackUserCode(
     code,
     redirect_uri: slackRedirectUri(),
   })
-  const res = await fetch('https://slack.com/api/oauth.v2.user.access', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
-  const data = (await res.json()) as SlackOAuthExchange
-  return data
+  return slackApiJson<SlackOAuthExchange>(
+    'https://slack.com/api/oauth.v2.user.access',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    },
+  )
 }
 
 /**
@@ -155,12 +158,14 @@ export async function refreshRotatedToken(
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
   })
-  const res = await fetch('https://slack.com/api/oauth.v2.access', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
-  return (await res.json()) as SlackOAuthExchange
+  return slackApiJson<SlackOAuthExchange>(
+    'https://slack.com/api/oauth.v2.access',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    },
+  )
 }
 
 /**
@@ -176,15 +181,17 @@ export async function exchangeLongLivedToken(
     client_secret: slackClientSecret(),
     token: longLivedToken,
   })
-  const res = await fetch('https://slack.com/api/oauth.v2.exchange', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
-  return (await res.json()) as SlackOAuthExchange
+  return slackApiJson<SlackOAuthExchange>(
+    'https://slack.com/api/oauth.v2.exchange',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    },
+  )
 }
 
-/** HMAC verification for Events / interactions (Phase 1+). */
+/** HMAC verification for Events / interactions (Phase 1+). Timing-safe. */
 export async function verifySlackSignature(opts: {
   signingSecret: string
   signature: string
@@ -193,9 +200,10 @@ export async function verifySlackSignature(opts: {
 }): Promise<boolean> {
   const { signingSecret, signature, timestamp, rawBody } = opts
   if (!signingSecret || !signature || !timestamp) return false
+  if (!signature.startsWith('v0=')) return false
   const ts = Number(timestamp)
   if (!Number.isFinite(ts)) return false
-  // 5 minute skew
+  // 5 minute skew (replay protection)
   if (Math.abs(Date.now() / 1000 - ts) > 60 * 5) return false
 
   const base = `v0:${timestamp}:${rawBody}`
@@ -215,5 +223,5 @@ export async function verifySlackSignature(opts: {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
   const expected = `v0=${hex}`
-  return expected === signature
+  return timingSafeEqualString(expected, signature)
 }

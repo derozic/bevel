@@ -101,40 +101,70 @@ export async function sendIMessage(opts: {
     `${base}/message/text?${passQ}`,
   ]
 
-  const payload = {
-    chatGuid: `iMessage;-;${address}`,
-    address,
-    message,
-    method: 'apple-script',
-  }
+  // AppleScript requires a unique tempGuid per attempt.
+  const methodEnv = process.env.BLUEBUBBLES_METHOD?.trim()
+  const methods = methodEnv
+    ? [methodEnv]
+    : ['apple-script', 'private-api']
 
   let lastError = 'No endpoint responded'
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${cfg.password}`,
-        },
-        body: JSON.stringify(payload),
-      })
-      const text = await res.text()
-      let raw: unknown = text
+  for (const method of methods) {
+    const tempGuid = `bevel-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+    const payload: Record<string, unknown> = {
+      chatGuid: `iMessage;-;${address}`,
+      address,
+      message,
+      method,
+      tempGuid,
+    }
+    for (const url of candidates) {
       try {
-        raw = text ? JSON.parse(text) : null
-      } catch {
-        /* keep text */
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cfg.password}`,
+          },
+          body: JSON.stringify(payload),
+          // Keep under 12s so UI / API don't hang on stuck Messages.app
+          signal: AbortSignal.timeout(12_000),
+        })
+        const text = await res.text()
+        let raw: unknown = text
+        try {
+          raw = text ? JSON.parse(text) : null
+        } catch {
+          /* keep text */
+        }
+        if (res.ok) {
+          return { ok: true, status: res.status, raw }
+        }
+        lastError = `HTTP ${res.status}: ${text.slice(0, 200)}`
+        const msg =
+          typeof raw === 'object' && raw
+            ? JSON.stringify(raw)
+            : text
+        // Duplicate queue from a prior attempt = effectively sent/queued
+        if (/already queued/i.test(msg)) {
+          return { ok: true, status: 200, raw, simulated: false }
+        }
+        if (res.status === 401 || res.status === 403) {
+          return { ok: false, status: res.status, error: lastError, raw }
+        }
+        if (
+          res.status === 500 &&
+          /Private API is not enabled/i.test(msg)
+        ) {
+          break // next method
+        }
+        if (res.status === 404) {
+          continue // next URL shape
+        }
+        // other errors: try next method (not every URL with same payload)
+        break
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : String(e)
       }
-      if (res.ok) {
-        return { ok: true, status: res.status, raw }
-      }
-      lastError = `HTTP ${res.status}: ${text.slice(0, 200)}`
-      if (res.status !== 404) {
-        return { ok: false, status: res.status, error: lastError, raw }
-      }
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : String(e)
     }
   }
 
