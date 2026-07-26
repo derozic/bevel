@@ -10,11 +10,16 @@ import '../config.dart';
 /// (Safari) or ASWebAuthenticationSession; here we use [LaunchMode.externalApplication]
 /// which surfaces Safari / Chrome Custom Tabs depending on the OS.
 ///
-/// After sign-in, Auth.js sets cookies on AUTH_COOKIE_DOMAIN (e.g. `.lvh.me`).
-/// The native shell then reloads the workspace via deep link `bevel://auth/complete`.
+/// Production flow (platform entry at bevel.is):
+///   1. openSystemLogin() → https://bevel.is/login?native=1&return=bevel://auth/complete
+///   2. Google OAuth completes in Safari
+///   3. Auth handoff code + bevel://auth/complete deep link
+///   4. App reloads workspace (bevel.2x4m.cc) inside WKWebView
+///
 /// Note: system Safari and WKWebView do not always share cookies on macOS —
-/// prefer OTP email inside the shell when cookie hop fails, or complete the
-/// full session in the system browser.
+/// the handoff-code path (not shared cookie domain) is required across
+/// bevel.is ↔ bevel.2x4m.cc. Until cookie inject lands, prefer finishing
+/// session in system browser then reopening the workspace shell.
 class OAuthBrowser {
   const OAuthBrowser();
 
@@ -23,12 +28,13 @@ class OAuthBrowser {
   }
 
   Future<bool> openGoogleSignIn() {
-    final base = BevelConfig.workspaceUri('/api/auth/signin/google');
+    // Sign-in always starts on platform entry host (not workspace tenant).
+    final base = BevelConfig.entryUri('/api/auth/signin/google');
     return open(base);
   }
 
   Future<bool> openGitHubSignIn() {
-    final base = BevelConfig.workspaceUri('/api/auth/signin/github');
+    final base = BevelConfig.entryUri('/api/auth/signin/github');
     return open(base);
   }
 

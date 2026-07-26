@@ -45,5 +45,10 @@
 	<string>NSApplication</string>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
+	<!-- Audio huddles + media device discovery -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>BEVEL needs the microphone for audio huddles and voice channels.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>BEVEL needs the camera for optional video in huddles.</string>
 </dict>
 </plist>

@@ -78,7 +78,8 @@ export default function IntegrationsPage() {
       id: "slack",
       name: "Slack",
       category: "Communication",
-      description: "Post instant status updates and trigger automated actions via chat.",
+      description:
+        "Complement Slack: digests, slash /bevel, agent done cards. Not a Slack clone — agent + work plane bridge.",
       icon: Slack,
       connected: false,
       color: "from-emerald-500/10 to-teal-500/10 hover:border-emerald-500/40",
@@ -131,9 +132,60 @@ export default function IntegrationsPage() {
 
   // Toast notifications state
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [slackOauthReady, setSlackOauthReady] = useState(false);
+  const [slackMcpEndpoint, setSlackMcpEndpoint] = useState(
+    "https://mcp.slack.com/mcp"
+  );
 
   // Category tags list
   const categories = ["All", "Development", "Project Management", "Automation", "Communication", "Productivity"];
+
+  // Live Slack status from Extensions API
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/integrations/slack/status", {
+          credentials: "include",
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          connected?: boolean;
+          teamName?: string;
+          oauthConfigured?: boolean;
+          mcp?: { endpoint?: string };
+        };
+        setSlackOauthReady(Boolean(data.oauthConfigured));
+        if (data.mcp?.endpoint) setSlackMcpEndpoint(data.mcp.endpoint);
+        setIntegrations((prev) =>
+          prev.map((item) =>
+            item.id === "slack"
+              ? {
+                  ...item,
+                  connected: Boolean(data.connected),
+                  stats: data.connected
+                    ? {
+                        primary: data.teamName
+                          ? `Workspace: ${data.teamName}`
+                          : "Slack connected",
+                        secondary: "Bridge + MCP · complement mode",
+                      }
+                    : {
+                        primary: "Not connected",
+                        secondary: `MCP: ${data.mcp?.endpoint || "mcp.slack.com"}`,
+                      },
+                }
+              : item
+          )
+        );
+      } catch {
+        /* offline */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Push custom toast notification
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
@@ -197,7 +249,26 @@ export default function IntegrationsPage() {
   };
 
   // Disconnect active integration
-  const handleDisconnect = (id: string) => {
+  const handleDisconnect = async (id: string) => {
+    if (id === "slack") {
+      try {
+        const res = await fetch("/api/integrations/slack/disconnect", {
+          method: "POST",
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("disconnect failed");
+        setIntegrations((prev) =>
+          prev.map((item) =>
+            item.id === "slack" ? { ...item, connected: false, stats: null } : item
+          )
+        );
+        showToast("Disconnected Slack.", "info");
+      } catch {
+        showToast("Could not disconnect Slack.", "error");
+      }
+      setActiveModalIntegration(null);
+      return;
+    }
     setIntegrations((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, connected: false, stats: null } : item
@@ -209,6 +280,19 @@ export default function IntegrationsPage() {
 
   // Step-by-step setup connection handler
   const handleConnect = (id: string) => {
+    if (id === "slack") {
+      if (!slackOauthReady) {
+        showToast(
+          "Set SLACK_CLIENT_ID + SLACK_CLIENT_SECRET (see docs/SLACK_INTEGRATION.md).",
+          "error"
+        );
+        return;
+      }
+      // OAuth v2 install — real Extensions path
+      window.location.href = "/api/integrations/slack/oauth/start";
+      return;
+    }
+
     if (authMethod === "token" && !apiToken.trim()) {
       showToast("Please enter an API Token or Access Key.", "error");
       return;
@@ -248,7 +332,8 @@ export default function IntegrationsPage() {
   const openConfigureModal = (integration: Integration) => {
     setActiveModalIntegration(integration);
     setSetupStep(1);
-    setAuthMethod("token");
+    // Slack prefers OAuth (Extensions); others still token-first mock
+    setAuthMethod(integration.id === "slack" ? "oauth" : "token");
     setApiToken("");
   };
 
@@ -277,8 +362,21 @@ export default function IntegrationsPage() {
             Integrations
           </h1>
           <p className="text-text-muted mt-1 max-w-2xl text-sm leading-relaxed">
-            Configure third-party service connections, sync credentials, and manage webhooks. 
-            All API keys are encrypted and stored inside your secure local-first repository.
+            Configure third-party service connections, sync credentials, and manage webhooks.
+            Slack uses OAuth +{" "}
+            <a
+              className="text-primary-400 underline-offset-2 hover:underline"
+              href="https://docs.slack.dev/ai/slack-mcp-server"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Slack MCP
+            </a>{" "}
+            (<code className="text-xs">{slackMcpEndpoint}</code>) for agents.
+            Redirect:{" "}
+            <code className="text-xs break-all">
+              /api/integrations/slack/oauth/callback
+            </code>
           </p>
         </div>
 

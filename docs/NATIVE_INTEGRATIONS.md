@@ -1,6 +1,15 @@
 # BEVEL native integrations (iOS · Android · macOS)
 
-Deep platform APIs — not a thin WebView wrapper. The Flutter client at `apps/mobile` owns **sharing**, **Health**, **notifications**, **deep links**, **Hermes Desktop interop**, and **icon / HIG standards**.
+Deep platform APIs — not a thin WebView wrapper. The Flutter client at `apps/mobile` owns **sharing**, **Health**, **notifications**, **deep links**, **Hermes Desktop interop**, **media device discovery (audio huddles)**, and **icon / HIG standards**.
+
+## Install dual-track (product decision)
+
+| Path | Best for | Not enough for |
+|------|----------|----------------|
+| **Apple Silicon Flutter app** (recommended on Mac) | Computer integration, Hermes, stable mic/speaker discovery, audio huddles, native OAuth return | — |
+| **Browser “Install app” (PWA)** | Light dock icon, web notifications, quick channel access | Reliable device discovery, CallKit-grade huddles, Hermes Desktop bridge |
+
+**Rule:** ship features that need host audio/video or OS bridges **only** in the native app. Keep PWA as a convenience shell. Download page (`/download`) explains both paths.
 
 ## Architecture
 
@@ -13,6 +22,10 @@ lib/native/
   deep_links.dart            # bevel:// + https app links + hermes/*
   hermes_bridge.dart         # Hermes.app / CLI / gateway probe + launch
   hermes_handoff.dart        # v1 clipboard + deep-link payload
+  media_device_discovery.dart  # mic/speaker/camera inventory (huddles)
+  call_service.dart          # CallKit / ConnectionService scaffold
+macos/Runner/
+  MediaDeviceChannel.swift   # CoreAudio + AVFoundation enumeration
 lib/ui/native_hub_page.dart  # operator / QA surface for integrations
 ```
 
@@ -23,6 +36,8 @@ lib/ui/native_hub_page.dart  # operator / QA surface for integrations
 | Notifications | UNUserNotification + APNs hook | channels + FCM hook | local |
 | Deep links | Universal Links + `bevel://` | App Links + `bevel://` | `bevel://` + Hermes return |
 | Hermes Desktop | — | — | **Bridge + handoffs** |
+| Device discovery (huddles) | planned | planned | **CoreAudio + AVFoundation** |
+| Audio huddles | WebRTC later | WebRTC later | discovery first → WebRTC |
 | Icons | Icon Composer layered set | Adaptive + mono | dock icons |
 
 Hermes details: [HERMES_DESKTOP.md](./HERMES_DESKTOP.md).
@@ -93,6 +108,22 @@ Google blocks or degrades embedded WebViews. The client:
 
 See [GOOGLE_OAUTH.md](./GOOGLE_OAUTH.md) for Cloud Console redirect URIs.
 
+## Media device discovery → audio huddles
+
+**Prerequisite for huddles:** know which mic/speaker/camera the human intends to use.
+
+Native Silicon path (`MediaDeviceDiscovery` + `MediaDeviceChannel.swift`):
+
+1. Sandbox entitlements: `device.audio-input`, `device.camera`
+2. Usage strings: `NSMicrophoneUsageDescription`, `NSCameraUsageDescription`
+3. Enumerate: AVFoundation capture devices + CoreAudio inputs/outputs
+4. Request access → re-scan for full labels
+5. Feed preferred device ids into WebRTC join (`@bevel/feature-webrtc`)
+
+QA: **Native integrations → Discover devices** on the Mac app.
+
+Browser PWA can call `navigator.mediaDevices.enumerateDevices`, but labels are often empty until a prior `getUserMedia`, defaults are flaky across browser restarts, and there is no Hermes/CallKit bridge. Prefer Silicon for huddle-capable installs.
+
 ## CallKit / ConnectionService (voice health calls)
 
 Scaffold: `lib/native/call_service.dart` (`StubCallService` until product ships).
@@ -101,6 +132,7 @@ Scaffold: `lib/native/call_service.dart` (`StubCallService` until product ships)
 |----------|------------|--------------|
 | iOS | CallKit + PushKit | `flutter_callkit_incoming` |
 | Android | ConnectionService / Telecom | same / platform channel |
+| macOS | device discovery + system audio | MediaDeviceChannel (done) → WebRTC |
 | Signaling | BEVEL realtime invite → ring → answer | WebRTC (`@bevel/feature-webrtc`) |
 
 Do not request CallKit entitlements until the signaling path is production-ready.
@@ -138,8 +170,10 @@ Health and notification strings must match real behavior. Document data use in A
 - [ ] `bevel://channel/test` opens cold and warm  
 - [ ] Hermes Probe + Open Hermes on macOS  
 - [ ] `bevel://hermes/status` focuses Hermes card  
+- [ ] **Discover devices** lists mic/speaker/camera on Silicon  
 - [ ] Adaptive icon + monochrome look correct on Pixel / iPhone  
 - [ ] Icon Composer export still legible at 29pt  
+- [ ] `/download` shows Silicon recommended + PWA secondary  
 
 ## Related
 

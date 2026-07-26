@@ -19,6 +19,8 @@ class NativeCapabilities {
     required this.supportsHealthKit,
     required this.supportsDeepLinks,
     required this.supportsHermesBridge,
+    required this.supportsDeviceDiscovery,
+    required this.supportsAudioHuddles,
     required this.isAppleSiliconMac,
   });
 
@@ -35,6 +37,10 @@ class NativeCapabilities {
   final bool supportsDeepLinks;
   /// macOS/desktop: detect + launch Hermes Desktop / local gateway.
   final bool supportsHermesBridge;
+  /// Host mic/speaker/camera enumeration (native, not browser PWA).
+  final bool supportsDeviceDiscovery;
+  /// Audio huddles require device discovery + WebRTC path.
+  final bool supportsAudioHuddles;
   final bool isAppleSiliconMac;
 
   static Future<NativeCapabilities> probe() async {
@@ -98,6 +104,9 @@ class NativeCapabilities {
     final mobile = !kIsWeb && (Platform.isIOS || Platform.isAndroid);
     final desktop = !kIsWeb &&
         (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+    // Device discovery for huddles: native macOS first; iOS/Android next.
+    final supportsDeviceDiscovery = !kIsWeb && Platform.isMacOS;
+    final supportsAudioHuddles = supportsDeviceDiscovery;
 
     return NativeCapabilities(
       platformLabel: platformLabel,
@@ -113,6 +122,8 @@ class NativeCapabilities {
       // Custom scheme + app_links on iOS/Android/macOS.
       supportsDeepLinks: mobile || (!kIsWeb && Platform.isMacOS),
       supportsHermesBridge: desktop,
+      supportsDeviceDiscovery: supportsDeviceDiscovery,
+      supportsAudioHuddles: supportsAudioHuddles,
       isAppleSiliconMac: isAppleSiliconMac,
     );
   }

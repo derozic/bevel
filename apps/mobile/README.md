@@ -7,7 +7,12 @@ Native client for **iOS**, **Android**, and **macOS Apple Silicon**.
 ```bash
 cd apps/mobile
 flutter pub get
-flutter run -d macos --dart-define=BEVEL_BASE_URL=https://2x4m.bevel.lvh.me
+# Live production (default)
+flutter run -d macos
+# or: pnpm mobile:run:macos
+
+# Local Caddy only when you need it
+pnpm mobile:run:macos:local
 # Device: flutter run -d <ios|android device id>
 ```
 
@@ -38,23 +43,36 @@ dart run flutter_launcher_icons
 From the monorepo root:
 
 ```bash
-./scripts/mobile/release.sh macos     # arm64 .app + zip
+# Local (default .lvh.me)
+./scripts/mobile/release.sh macos
+
+# Production Silicon app → bevel.is / bevel.2x4m.cc
+BEVEL_ENV=production ./scripts/mobile/release.sh macos
+
 ./scripts/mobile/release.sh android   # APK + AAB
 ./scripts/mobile/release.sh ios       # unsigned .app
 ./scripts/mobile/release.sh           # all of the above
 ```
 
+Artifacts: `dist/native/<version>/BEVEL-macos-arm64.app` (+ zip).
+
 See [docs/NATIVE_RELEASE.md](../../docs/NATIVE_RELEASE.md).
 
 ## Configuration
 
-| Define | Default | Purpose |
-|--------|---------|---------|
-| `BEVEL_BASE_URL` | `https://2x4m.bevel.lvh.me` | Workspace origin opened by the client |
+| Define | Local default | Production (`BEVEL_ENV=production`) |
+|--------|---------------|-------------------------------------|
+| `BEVEL_BASE_URL` | `https://bevel.is` | platform entry / login |
+| `BEVEL_WORKSPACE_URL` | `https://bevel.2x4m.cc` | chat shell |
+| `BEVEL_API_URL` | `https://api.bevel.is` | control plane (always live by default) |
+
+Override to local Caddy with `BEVEL_ENV=local` or `pnpm mobile:run:macos:local`.
+
+First login uses system browser Google OAuth (`bevel://auth/complete` return). Full cookie inject into WKWebView is the next reliability milestone.
 
 ## Version
 
-`pubspec.yaml` → `0.1.0+1` (name + build). Bump for each store submission.
+`pubspec.yaml` → `0.2.0+2` (name + build). Bump for each store submission.
 
 ## Developer portal checklist
 

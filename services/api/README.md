@@ -61,7 +61,7 @@ uv sync
 uv run bevel-mcp
 ```
 
-Client config (Cursor / Claude / Grok):
+Client config (Cursor / Claude / Grok) — **BEVEL + Slack MCP**:
 
 ```json
 {
@@ -70,11 +70,18 @@ Client config (Cursor / Claude / Grok):
       "command": "uv",
       "args": ["run", "bevel-mcp"],
       "cwd": "/Users/YOU/dev/bevel/services/api",
-      "env": { "BEVEL_API_URL": "http://127.0.0.1:43203" }
+      "env": { "BEVEL_API_URL": "https://api.bevel.is" }
+    },
+    "slack": {
+      "url": "https://mcp.slack.com/mcp",
+      "transport": "http"
     }
   }
 }
 ```
+
+Repo template: `.mcp.json.example` · Docs: `docs/SLACK_MCP.md`  
+Print live: `bevel integrations slack mcp-config` or `GET /api/integrations/slack/mcp`
 
 Or: `decli bevel mcp`
 

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bevel_app/config.dart';
 import 'package:bevel_app/main.dart';
 import 'package:bevel_app/native/deep_links.dart';
+import 'package:bevel_app/native/media_device_discovery.dart';
 
 void main() {
   testWidgets('BEVEL home shows workspace entry', (tester) async {
@@ -17,7 +18,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('BEVEL'), findsWidgets);
-    // Mac vs mobile copy depends on platform under test
+    expect(find.text('Continue with Google'), findsOneWidget);
     expect(
       find.textContaining('Open workspace'),
       findsWidgets,
@@ -38,6 +39,8 @@ void main() {
       DeepLinkService.routeFor(Uri.parse('bevel://auth/complete')),
       '/',
     );
+    final auth = DeepLinkService.parse(Uri.parse('bevel://auth/complete?code=x'));
+    expect(auth.kind, 'auth_complete');
   });
 
   test('OAuth hosts are detected for system browser', () {
@@ -49,15 +52,35 @@ void main() {
     );
     expect(
       BevelConfig.isOAuthNavigation(
-        Uri.parse('https://2x4m.bevel.lvh.me/api/auth/signin/google'),
+        Uri.parse('https://bevel.2x4m.lvh.me/api/auth/signin/google'),
       ),
       isTrue,
     );
     expect(
       BevelConfig.isOAuthNavigation(
-        Uri.parse('https://2x4m.bevel.lvh.me/bevel'),
+        Uri.parse('https://bevel.2x4m.lvh.me/bevel'),
       ),
       isFalse,
     );
+  });
+
+  test('production host allowlist includes platform and workspace', () {
+    expect(BevelConfig.isAllowedInAppHost('bevel.is'), isTrue);
+    expect(BevelConfig.isAllowedInAppHost('api.bevel.is'), isTrue);
+    expect(BevelConfig.isAllowedInAppHost('bevel.2x4m.cc'), isTrue);
+    expect(BevelConfig.isAllowedInAppHost('realtime.bevel.is'), isTrue);
+    expect(BevelConfig.isAllowedInAppHost('evil.example.com'), isFalse);
+  });
+
+  test('media device models parse inventory maps', () {
+    final d = BevelMediaDevice.fromMap({
+      'id': 'BuiltInMic',
+      'label': 'MacBook Pro Microphone',
+      'kind': 'audioinput',
+      'isDefault': true,
+    });
+    expect(d.id, 'BuiltInMic');
+    expect(d.isDefault, isTrue);
+    expect(d.toJson()['kind'], 'audioinput');
   });
 }

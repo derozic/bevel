@@ -317,6 +317,16 @@ export const bevelUserPreferencesSchema = z.object({
     google: z.object({
       connected: z.boolean(),
     }),
+    /** Slack workspace bridge — tokens live server-side only. */
+    slack: z
+      .object({
+        connected: z.boolean(),
+        teamId: z.string().optional(),
+        teamName: z.string().optional(),
+        /** BEVEL channel slug → Slack channel id */
+        channelMap: z.record(z.string(), z.string()).optional(),
+      })
+      .default({ connected: false }),
   }),
   privacy: z.object({
     discoverability: discoverabilitySchema,
@@ -820,6 +830,7 @@ export const DEFAULT_PREFERENCES: BevelUserPreferences = {
     attio: { connected: false },
     github: { connected: false },
     google: { connected: false },
+    slack: { connected: false },
   },
   privacy: {
     discoverability: 'email',
