@@ -99,22 +99,61 @@ async def post_message(
     session: SessionDep,
     tenant: str | None = Query(default=None),
 ) -> dict[str, Any]:
+    """Upsert a channel message (idempotent by ``id``).
+
+    Clients may re-POST the same id for retries or streaming status updates
+    (``pending`` / ``streaming`` / ``final``). Postgres is the durable SoT.
+    """
     try:
         body = await request.json()
     except Exception as exc:
         raise HTTPException(400, "Invalid JSON") from exc
     if not isinstance(body, dict):
         raise HTTPException(400, "JSON object required")
-    if not (body.get("body") or "").strip() and not body.get("id"):
-        raise HTTPException(400, "body required")
+    # New message needs body; updates (same id) may only change status/body
+    has_id = bool(str(body.get("id") or "").strip())
+    has_body = bool(str(body.get("body") or "").strip())
+    if not has_body and not has_id:
+        raise HTTPException(400, "body required (or id for status update)")
 
     row = await _resolve_tenant(session, tenant)
     ch = await channels_repo.ensure_channel(session, row.id, slug)
-    record = await messages_repo.append(
+    try:
+        record = await messages_repo.append(
+            session,
+            tenant_id=row.id,
+            channel_id=ch.id,
+            channel_slug=ch.slug,
+            msg=body,
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return {
+        "ok": True,
+        "upserted": True,
+        "message": messages_repo.to_api_dict(record),
+    }
+
+
+@router.get("/channels/{slug}/messages/in-progress")
+async def get_in_progress_messages(
+    slug: str,
+    _auth: InternalAuth,
+    session: SessionDep,
+    tenant: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    """Recover pending/streaming messages after client reconnect."""
+    row = await _resolve_tenant(session, tenant)
+    ch = await channels_repo.ensure_channel(session, row.id, slug)
+    msgs = await messages_repo.list_in_progress(
         session,
         tenant_id=row.id,
         channel_id=ch.id,
-        channel_slug=ch.slug,
-        msg=body,
+        limit=limit,
     )
-    return {"ok": True, "message": messages_repo.to_api_dict(record)}
+    return {
+        "tenant": row.slug,
+        "channel": ch.slug,
+        "messages": [messages_repo.to_api_dict(m) for m in msgs],
+    }

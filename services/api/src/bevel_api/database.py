@@ -63,15 +63,26 @@ class Database:
     async def connect(self) -> None:
         if self._engine is not None:
             return
+        # Pool tuned for reliability under short-lived request workers:
+        # pre-ping drops dead connections; recycle avoids stale TCP; overflow
+        # absorbs chat bursts without refusing writes mid-conversation.
+        pool_size = int(os.getenv("DB_POOL_SIZE", "5"))
+        max_overflow = int(os.getenv("DB_POOL_MAX_OVERFLOW", "10"))
+        pool_recycle = int(os.getenv("DB_POOL_RECYCLE", "1800"))
         self._engine = create_async_engine(
             get_database_url(),
             pool_pre_ping=True,
+            pool_size=max(1, pool_size),
+            max_overflow=max(0, max_overflow),
+            pool_recycle=max(60, pool_recycle),
+            pool_timeout=float(os.getenv("DB_POOL_TIMEOUT", "30")),
             echo=os.getenv("SQL_ECHO", "").lower() in {"1", "true", "yes"},
         )
         self._session_factory = async_sessionmaker(
             self._engine,
             class_=AsyncSession,
             expire_on_commit=False,
+            autoflush=True,
         )
 
     async def disconnect(self) -> None:
