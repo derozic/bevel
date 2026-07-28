@@ -111,4 +111,38 @@ Sign-in URL: https://bevel.lvh.me/login?callbackUrl=%2Fbevel
 - Create client: https://console.cloud.google.com/auth/clients/create?project=x4m-493516  
 - Classic create: https://console.cloud.google.com/apis/credentials/oauthclient?project=x4m-493516  
 - Scopes: https://console.cloud.google.com/auth/scopes?project=x4m-493516  
-- Branding: https://console.cloud.google.com/auth/branding?project=x4m-493516  
+- Branding: https://console.cloud.google.com/auth/branding?project=x4m-493516
+
+## Production (bevel.is)
+
+Authorized JavaScript origins:
+
+```
+https://bevel.is
+https://www.bevel.is
+https://bevel.2x4m.cc
+```
+
+Authorized redirect URIs:
+
+```
+https://bevel.is/api/auth/callback/google
+https://www.bevel.is/api/auth/callback/google
+https://bevel.2x4m.cc/api/auth/callback/google
+```
+
+Server env (`apps/web/.env.production` + systemd):
+
+```bash
+AUTH_GOOGLE_ID=....apps.googleusercontent.com
+AUTH_GOOGLE_SECRET=GOCSPX-...
+AUTH_URL=https://bevel.is
+NEXTAUTH_URL=https://bevel.is
+BEVEL_PUBLIC_URL=https://bevel.is
+AUTH_TRUST_HOST=true
+AUTH_COOKIE_DOMAIN=.bevel.is
+```
+
+`invalid_client` means the Client ID is missing/placeholder/wrong — never ship `PLACEHOLDER_*` values.
+`redirect_uri_mismatch` means the exact callback URL above is not listed on the OAuth client.
+
