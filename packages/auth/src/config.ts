@@ -2,6 +2,7 @@ import './types'
 import Google from 'next-auth/providers/google'
 import GitHub from 'next-auth/providers/github'
 import Credentials from 'next-auth/providers/credentials'
+import { customFetch } from 'next-auth'
 import type { NextAuthConfig } from 'next-auth'
 import type { Tenant } from '@bevel/schema'
 import {
@@ -328,6 +329,39 @@ export function createTenantAuthConfig(
         clientSecret,
         allowDangerousEmailAccountLinking: true,
         authorization: { params: googleParams },
+        /**
+         * Google's OIDC discovery sets
+         * `authorization_response_iss_parameter_supported: true`, so oauth4webapi
+         * requires `iss` on the /callback query string. Google often omits it,
+         * which surfaces as CallbackRouteError: response parameter "iss" missing
+         * after a successful Google consent. Strip the flag from discovery JSON.
+         */
+        [customFetch]: async (...args: Parameters<typeof fetch>) => {
+          const input = args[0]
+          const url =
+            typeof input === 'string'
+              ? input
+              : input instanceof URL
+                ? input.href
+                : input.url
+          const res = await fetch(...args)
+          if (!url.includes('.well-known/openid-configuration')) {
+            return res
+          }
+          try {
+            const json = (await res.clone().json()) as Record<string, unknown>
+            json.authorization_response_iss_parameter_supported = false
+            return new Response(JSON.stringify(json), {
+              status: res.status,
+              statusText: res.statusText,
+              headers: {
+                'content-type': 'application/json',
+              },
+            })
+          } catch {
+            return res
+          }
+        },
       }),
     )
   }

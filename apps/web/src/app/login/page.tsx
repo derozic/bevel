@@ -35,7 +35,11 @@ const ERROR_COPY: Record<string, string> = {
     'Sign-in link expired or already used. Start Google sign-in again from this page.',
   Default: 'Sign-in failed. Try again, or contact your workspace admin.',
   Callback:
-    'Sign-in callback failed. Confirm Google redirect URIs include this host, then try again.',
+    'Sign-in callback failed after Google. If this persists, contact support — server auth logs will show the cause.',
+  CallbackRouteError:
+    'Google signed you in, but BEVEL could not finish the session. Reload and try again.',
+  OAuthCallbackError:
+    'Google returned an error during sign-in. Try again, or use a different Google account.',
   HandoffMissing: 'Session handoff code was missing. Sign in again from this host.',
   HandoffFailed:
     'Could not complete cross-host sign-in. Sign in directly on this workspace host, or try again.',
