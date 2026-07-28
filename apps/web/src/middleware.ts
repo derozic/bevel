@@ -56,7 +56,7 @@ function isLoopbackHost(hostname: string): boolean {
  *
  * Behind Caddy, Next listens on http://127.0.0.1:41009. `request.nextUrl` can
  * become `https://localhost:41009` (X-Forwarded-Proto + bind host), which must
- * never appear in Location headers or browsers leave bevel.is.
+ * never appear in Location headers.
  */
 function publicOrigin(request: NextRequest): string {
   const xfHost = (
@@ -111,45 +111,6 @@ function publicUrl(request: NextRequest, pathname: string): URL {
 }
 
 /**
- * Internal rewrite target for the plain-HTTP Node listener.
- *
- * Behind Caddy, `request.url` / `request.nextUrl` become
- * `https://localhost:41009/...` (X-Forwarded-Proto + bind host). Rewriting to
- * that URL makes Next open a TLS socket to itself → EPROTO → 500.
- *
- * Always target `http://127.0.0.1:$PORT` so the middleware proxy speaks HTTP
- * to `next start` (TLS terminates at Caddy only). The second hop hits this
- * process with Host 127.0.0.1 — see loopback skip on /bevel/* redirects.
- */
-function internalRewriteUrl(request: NextRequest, pathname: string): URL {
-  const port =
-    process.env.PORT ||
-    process.env.WEB_PORT ||
-    request.nextUrl.port ||
-    '41009'
-  const path = pathname.startsWith('/') ? pathname : `/${pathname}`
-  return new URL(`${path}${request.nextUrl.search}`, `http://127.0.0.1:${port}`)
-}
-
-function requestHost(request: NextRequest): string {
-  return (
-    request.headers.get('x-forwarded-host') ??
-    request.headers.get('host') ??
-    request.nextUrl.host
-  )
-    .toLowerCase()
-    .split(',')[0]!
-    .trim()
-    .split(':')[0]!
-}
-
-/** True when this request is the middleware's HTTP self-proxy hop. */
-function isInternalProxyHop(request: NextRequest): boolean {
-  const host = (request.headers.get('host') ?? '').toLowerCase().split(':')[0]!
-  return isLoopbackHost(host)
-}
-
-/**
  * Expire Domain-scoped OAuth check cookies left by older deploys.
  * Host-only + Domain=.bevel.is cookies share a name; browsers may send both and
  * Auth.js can parse the stale Domain one → InvalidCheck pkceCodeVerifier.
@@ -180,15 +141,13 @@ function expireStaleDomainOAuthCookies(response: NextResponse): void {
 }
 
 /**
- * Public short paths:
- *   /^general          → rewrite → /bevel/general
- *   /talk/brain        → rewrite → /bevel/talk/brain
- *   /session/:id       → rewrite → /bevel/session/:id
+ * Middleware responsibilities:
+ * - Expire stale Domain-scoped PKCE cookies on /api/auth/*
+ * - Canonicalize legacy /bevel/* → short public URLs (redirect only)
+ * - Normalize rare decoded `/^slug` → encoded `/%5Eslug` so next.config rewrites hit
+ * - Stamp tenant host for non-public paths
  *
- * Legacy:
- *   /bevel/general     → 308 redirect → /^general
- *   /bevel/talk/*      → 308 → /talk/*
- *   /bevel/session/*   → 308 → /session/*
+ * Short-path → /bevel/* **rewrites live in next.config.ts** (no self-proxy).
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -201,79 +160,44 @@ export function middleware(request: NextRequest) {
   }
 
   // ── Canonicalize legacy /bevel/* → short public URLs ─────────────────
-  // Skip when this is the middleware→Node self-proxy hop (Host 127.0.0.1);
-  // that hop must serve the real /bevel/* page, not redirect back to /^…
-  if (!isInternalProxyHop(request)) {
-    if (pathname === '/bevel' || pathname === '/bevel/') {
-      return NextResponse.redirect(publicUrl(request, '/^general'), 308)
+  if (pathname === '/bevel' || pathname === '/bevel/') {
+    return NextResponse.redirect(publicUrl(request, '/%5Egeneral'), 308)
+  }
+
+  if (pathname.startsWith('/bevel/')) {
+    const rest = pathname.slice('/bevel/'.length)
+
+    if (rest.startsWith('talk/')) {
+      return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
     }
-
-    if (pathname.startsWith('/bevel/')) {
-      const rest = pathname.slice('/bevel/'.length)
-
-      if (rest.startsWith('talk/')) {
-        return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
-      }
-      if (rest.startsWith('session/')) {
-        return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
-      }
-      if (rest.startsWith('c/')) {
-        const slug = rest.slice(2).split('/')[0] || 'general'
-        return NextResponse.redirect(
-          publicUrl(request, `/^${slug.toLowerCase()}`),
-          308,
-        )
-      }
-      // /bevel/general → /^general
-      const slug = rest.split('/')[0]
-      if (slug && !slug.includes('.')) {
-        return NextResponse.redirect(
-          publicUrl(request, `/^${slug.toLowerCase()}`),
-          308,
-        )
-      }
+    if (rest.startsWith('session/')) {
+      return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
+    }
+    if (rest.startsWith('c/')) {
+      const slug = rest.slice(2).split('/')[0] || 'general'
+      return NextResponse.redirect(
+        publicUrl(request, `/%5E${slug.toLowerCase()}`),
+        308,
+      )
+    }
+    // /bevel/general → /%5Egeneral (encoded so next.config rewrite matches)
+    const slug = rest.split('/')[0]
+    if (slug && !slug.includes('.')) {
+      return NextResponse.redirect(
+        publicUrl(request, `/%5E${slug.toLowerCase()}`),
+        308,
+      )
     }
   }
 
-  // ── Rewrite short public paths → internal /bevel/* app routes ────────
-  let rewritePath: string | null = null
-
-  // /^general or /%5Egeneral
-  const caretMatch = pathname.match(/^\/(?:\^|%5[eE])([a-z0-9][a-z0-9-]*)$/i)
-  if (caretMatch) {
-    rewritePath = `/bevel/${caretMatch[1]!.toLowerCase()}`
-  }
-
-  // /talk/:agentId
-  if (!rewritePath) {
-    const talkMatch = pathname.match(/^\/talk(?:\/([^/]+))?\/?$/)
-    if (talkMatch) {
-      rewritePath = talkMatch[1]
-        ? `/bevel/talk/${talkMatch[1]}`
-        : '/bevel/talk'
-    }
-  }
-
-  // /session/:id
-  if (!rewritePath) {
-    const sessionMatch = pathname.match(/^\/session\/([^/]+)\/?$/)
-    if (sessionMatch) {
-      rewritePath = `/bevel/session/${sessionMatch[1]}`
-    }
-  }
-
-  // /sessions archive (keep as-is or map later)
-  if (!rewritePath && pathname === '/sessions') {
-    // Realtime archive lives at /sessions on web if we add a page; leave next()
-  }
-
-  if (rewritePath) {
-    const host = requestHost(request)
-    const headers = new Headers(request.headers)
-    headers.set('x-bevel-host', host)
-    return NextResponse.rewrite(internalRewriteUrl(request, rewritePath), {
-      request: { headers },
-    })
+  // Rare: browser sends decoded caret path. Normalize to %5E so next.config
+  // rewrite applies (path-to-regexp sources use the encoded form).
+  const decodedCaret = pathname.match(/^\/\^([a-z0-9][a-z0-9-]*)$/i)
+  if (decodedCaret) {
+    return NextResponse.redirect(
+      publicUrl(request, `/%5E${decodedCaret[1]!.toLowerCase()}`),
+      308,
+    )
   }
 
   return withTenantResolution(request, {

@@ -27,6 +27,38 @@ const nextConfig: NextConfig = {
     '@bevel/analytics',
     '@bevel/async-stream',
   ],
+  /**
+   * Short public paths → real /bevel/* app routes.
+   * Handled here (not middleware rewrite) so Next never HTTP-proxies itself.
+   * Middleware rewrite used https://localhost:41009 behind Caddy → EPROTO 500.
+   *
+   * Encoded caret (%5E) is what most clients send for `/^general`.
+   * Middleware still covers the rare decoded `/^slug` form via redirect to %5E.
+   */
+  async rewrites() {
+    return [
+      {
+        source: '/talk',
+        destination: '/bevel/talk',
+      },
+      {
+        source: '/talk/:agentId*',
+        destination: '/bevel/talk/:agentId*',
+      },
+      {
+        source: '/session/:id',
+        destination: '/bevel/session/:id',
+      },
+      {
+        source: '/%5E:slug',
+        destination: '/bevel/:slug',
+      },
+      {
+        source: '/%5e:slug',
+        destination: '/bevel/:slug',
+      },
+    ]
+  },
 }
 
 export default nextConfig
