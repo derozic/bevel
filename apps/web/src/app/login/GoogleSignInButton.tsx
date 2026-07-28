@@ -75,7 +75,7 @@ function OAuthSignInButton({
     }
   }, [])
 
-  // Match 2x4m platform sign-in CTAs (full-width pill, high contrast)
+  // Full-width pill CTA (platform + workspace login)
   const baseClass =
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60'
   const variantClass =

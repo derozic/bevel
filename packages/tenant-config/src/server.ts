@@ -36,16 +36,12 @@ export async function getTenantFromRequest(): Promise<Tenant | null> {
 
   if (!host) return null
   const normalized = normalizeHost(host)
-  const fromRegistry = lookupTenantByHost(normalized)
-  if (fromRegistry) return fromRegistry
-  // Platform entry hosts (bevel.is) are not YAML tenants — return synthetic
-  // so login/auth UI can render without 500s.
-  // Apex + status/admin/docs hosts are not YAML tenants — synthetic platform
-  // tenant so auth and settings shell never 500.
+  // Platform entry (bevel.is) ALWAYS wins over YAML host aliases so a customer
+  // tenant can never paint 2x4m (or any org) chrome on the apex login.
   if (isPlatformEntryHost(normalized) || isPlatformHost(normalized)) {
     return platformEntryTenant(normalized)
   }
-  return null
+  return lookupTenantByHost(normalized)
 }
 
 export async function requireTenantFromRequest(): Promise<Tenant> {

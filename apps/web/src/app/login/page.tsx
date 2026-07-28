@@ -14,6 +14,8 @@ import {
   isOtpAuthEnabled,
 } from '@bevel/auth'
 import { auth } from '@/auth'
+import { BevelCutMark } from '@/components/BevelCutMark'
+import { BevelMark } from '@/components/BevelMark'
 import { GitHubSignInButton, GoogleSignInButton } from './GoogleSignInButton'
 import { OtpSignIn } from './OtpSignIn'
 
@@ -117,11 +119,10 @@ export default async function LoginPage({
       ? tenant.auth.allowedEmails
       : []
 
-  const logoSrc =
-    !isPlatform && tenant.theme.logoUrl
-      ? tenant.theme.logoUrl
-      : '/icons/icon-192.png'
-  const logoAlt = isPlatform ? 'BEVEL' : workspaceLabel
+  // Platform: BEVEL cut-mark + wordmark (marketing brand). Never customer logos.
+  // Org host: that workspace mark only, fixed square box so SVG never skews.
+  const tenantLogo =
+    !isPlatform && tenant.theme.logoUrl ? tenant.theme.logoUrl : null
 
   const title = isPlatform
     ? 'Find your workspace'
@@ -133,15 +134,30 @@ export default async function LoginPage({
 
   return (
     <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm sm:p-10">
-      <div className="mb-6 flex justify-center">
-        <Image
-          src={logoSrc}
-          alt={logoAlt}
-          width={48}
-          height={48}
-          className="h-10 w-auto"
-          priority
-        />
+      <div className="mb-6 flex flex-col items-center gap-3">
+        {isPlatform ? (
+          <>
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 text-gray-900">
+              <BevelCutMark className="h-7 w-7 text-gray-900" />
+            </span>
+            <BevelMark size="lg" className="text-gray-900" />
+          </>
+        ) : tenantLogo ? (
+          <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <Image
+              src={tenantLogo}
+              alt={workspaceLabel}
+              width={56}
+              height={56}
+              className="size-10 object-contain"
+              priority
+            />
+          </span>
+        ) : (
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 text-gray-900">
+            <BevelCutMark className="h-7 w-7 text-gray-900" />
+          </span>
+        )}
       </div>
 
       <h1 className="text-center font-display text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">
