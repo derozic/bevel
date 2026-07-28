@@ -40,6 +40,132 @@ const PUBLIC_PATHS = [
   '/favicon.ico',
 ]
 
+function isLoopbackHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().split(':')[0] || ''
+  return (
+    h === 'localhost' ||
+    h === '127.0.0.1' ||
+    h === '0.0.0.0' ||
+    h === '::1' ||
+    h.endsWith('.localhost')
+  )
+}
+
+/**
+ * Public origin for browser redirects.
+ *
+ * Behind Caddy, Next listens on http://127.0.0.1:41009. `request.nextUrl` can
+ * become `https://localhost:41009` (X-Forwarded-Proto + bind host), which must
+ * never appear in Location headers or browsers leave bevel.is.
+ */
+function publicOrigin(request: NextRequest): string {
+  const xfHost = (
+    request.headers.get('x-forwarded-host') ??
+    request.headers.get('host') ??
+    ''
+  )
+    .split(',')[0]
+    ?.trim()
+    .toLowerCase()
+  const envPublic =
+    process.env.BEVEL_PUBLIC_URL ||
+    process.env.AUTH_URL ||
+    process.env.NEXTAUTH_URL ||
+    ''
+
+  let host = xfHost && !isLoopbackHost(xfHost) ? xfHost.split(':')[0]! : ''
+  if (!host && envPublic) {
+    try {
+      const u = new URL(envPublic)
+      if (!isLoopbackHost(u.hostname)) host = u.hostname
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!host) {
+    const fallback = request.nextUrl.hostname
+    host = isLoopbackHost(fallback) ? 'bevel.is' : fallback
+  }
+
+  const xfProto = (
+    request.headers.get('x-forwarded-proto') ??
+    (request.nextUrl.protocol === 'https:' ? 'https' : 'http')
+  )
+    .split(',')[0]
+    ?.trim()
+    .toLowerCase()
+  const proto =
+    xfProto === 'http' || xfProto === 'https'
+      ? xfProto
+      : envPublic.startsWith('https')
+        ? 'https'
+        : 'https'
+
+  return `${proto}://${host}`
+}
+
+/** Absolute public URL for 3xx Location headers. */
+function publicUrl(request: NextRequest, pathname: string): URL {
+  const path = pathname.startsWith('/') ? pathname : `/${pathname}`
+  return new URL(`${path}${request.nextUrl.search}`, publicOrigin(request))
+}
+
+/**
+ * Internal rewrite target. Must keep the *same origin as request.url*
+ * (http://127.0.0.1:41009) so Next treats it as an in-process rewrite.
+ *
+ * Using nextUrl (https://localhost:41009/...) makes Next attempt an external
+ * HTTPS proxy to itself → EPROTO "wrong version number" → 500 Internal Server Error.
+ */
+function internalRewriteUrl(request: NextRequest, pathname: string): URL {
+  const url = new URL(request.url)
+  url.pathname = pathname
+  url.search = request.nextUrl.search
+  return url
+}
+
+function requestHost(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-host') ??
+    request.headers.get('host') ??
+    request.nextUrl.host
+  )
+    .toLowerCase()
+    .split(',')[0]!
+    .trim()
+    .split(':')[0]!
+}
+
+/**
+ * Expire Domain-scoped OAuth check cookies left by older deploys.
+ * Host-only + Domain=.bevel.is cookies share a name; browsers may send both and
+ * Auth.js can parse the stale Domain one → InvalidCheck pkceCodeVerifier.
+ */
+function expireStaleDomainOAuthCookies(response: NextResponse): void {
+  const domain =
+    process.env.AUTH_COOKIE_DOMAIN || process.env.NEXTAUTH_COOKIE_DOMAIN
+  if (!domain) return
+  const names = [
+    '__Secure-authjs.pkce.code_verifier',
+    '__Secure-authjs.state',
+    '__Secure-authjs.nonce',
+    'authjs.pkce.code_verifier',
+    'authjs.state',
+    'authjs.nonce',
+  ]
+  for (const name of names) {
+    response.cookies.set(name, '', {
+      path: '/',
+      maxAge: 0,
+      expires: new Date(0),
+      httpOnly: true,
+      secure: name.startsWith('__Secure-') || name.startsWith('__Host-'),
+      sameSite: 'lax',
+      domain,
+    })
+  }
+}
+
 /**
  * Public short paths:
  *   /^general          → rewrite → /bevel/general
@@ -52,37 +178,43 @@ const PUBLIC_PATHS = [
  *   /bevel/session/*   → 308 → /session/*
  */
 export function middleware(request: NextRequest) {
-  const { pathname, search } = request.nextUrl
+  const { pathname } = request.nextUrl
+
+  // Drop stale Domain-scoped PKCE/state cookies on every auth touch.
+  if (pathname.startsWith('/api/auth')) {
+    const res = NextResponse.next()
+    expireStaleDomainOAuthCookies(res)
+    return res
+  }
 
   // ── Canonicalize legacy /bevel/* → short public URLs ─────────────────
   if (pathname === '/bevel' || pathname === '/bevel/') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/^general'
-    return NextResponse.redirect(url, 308)
+    return NextResponse.redirect(publicUrl(request, '/^general'), 308)
   }
 
   if (pathname.startsWith('/bevel/')) {
     const rest = pathname.slice('/bevel/'.length)
-    const url = request.nextUrl.clone()
 
     if (rest.startsWith('talk/')) {
-      url.pathname = `/${rest}`
-      return NextResponse.redirect(url, 308)
+      return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
     }
     if (rest.startsWith('session/')) {
-      url.pathname = `/${rest}`
-      return NextResponse.redirect(url, 308)
+      return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
     }
     if (rest.startsWith('c/')) {
       const slug = rest.slice(2).split('/')[0] || 'general'
-      url.pathname = `/^${slug.toLowerCase()}`
-      return NextResponse.redirect(url, 308)
+      return NextResponse.redirect(
+        publicUrl(request, `/^${slug.toLowerCase()}`),
+        308,
+      )
     }
     // /bevel/general → /^general
     const slug = rest.split('/')[0]
     if (slug && !slug.includes('.')) {
-      url.pathname = `/^${slug.toLowerCase()}`
-      return NextResponse.redirect(url, 308)
+      return NextResponse.redirect(
+        publicUrl(request, `/^${slug.toLowerCase()}`),
+        308,
+      )
     }
   }
 
@@ -119,23 +251,10 @@ export function middleware(request: NextRequest) {
   }
 
   if (rewritePath) {
-    const url = request.nextUrl.clone()
-    url.pathname = rewritePath
-    // Preserve query (msg, q, agents)
-    const rewrite = NextResponse.rewrite(url)
-    // Still stamp tenant host for the rewritten request
-    const host = (
-      request.headers.get('x-forwarded-host') ??
-      request.headers.get('host') ??
-      request.nextUrl.host
-    )
-      .toLowerCase()
-      .split(':')[0]
-    rewrite.headers.set('x-bevel-host', host)
-    // Copy cookies etc. — withTenantResolution for non-rewrite path below
+    const host = requestHost(request)
     const headers = new Headers(request.headers)
     headers.set('x-bevel-host', host)
-    return NextResponse.rewrite(url, {
+    return NextResponse.rewrite(internalRewriteUrl(request, rewritePath), {
       request: { headers },
     })
   }

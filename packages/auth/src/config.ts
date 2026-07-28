@@ -175,17 +175,16 @@ function isAllowedCrossHostRedirect(hostname: string): boolean {
 /**
  * Auth.js cookies for multi-host OAuth.
  *
- * Local multi-tenant flow pins OAuth callbacks to AUTH_URL (platform host) while
- * users often start sign-in on an org host (e.g. bevel.2x4m.lvh.me).
- *
  * Split strategy (important):
  * - **CSRF is host-only** (`__Host-` when secure). Auth.js only validates CSRF on
  *   the sign-in POST (same host as the form). Putting Domain=.lvh.me on CSRF caused
- *   MissingCSRF in browsers (cookie not paired with the form body) and showed up as
- *   a generic "Sign-in failed" on /login?error=MissingCSRF.
- * - **PKCE / state / session / callback-url share AUTH_COOKIE_DOMAIN** so the Google
- *   callback on the platform host can complete the dance started on an org host, and
- *   the session can hop to the org host after /welcome.
+ *   MissingCSRF in browsers (cookie not paired with the form body).
+ * - **PKCE / state / nonce are host-only**. They must be set and read on the same
+ *   host as AUTH_URL (Google callback). Sharing Domain=.bevel.is caused dual cookies
+ *   (host-only + domain) after cookie-option churn → InvalidCheck: pkceCodeVerifier
+ *   value could not be parsed. OAuth must start on the callback host (platform).
+ * - **session / callback-url share AUTH_COOKIE_DOMAIN** so the session can hop to
+ *   org hosts under the same parent after /welcome when domains match.
  */
 function buildAuthCookies(secure: boolean, domain?: string): NextAuthConfig['cookies'] {
   const hostOnly = {
@@ -198,7 +197,8 @@ function buildAuthCookies(secure: boolean, domain?: string): NextAuthConfig['coo
     ...hostOnly,
     ...(domain ? { domain } : {}),
   }
-  const shortLived = { ...shared, maxAge: 60 * 15 }
+  // Short-lived OAuth checks: always host-only (never Domain).
+  const shortLivedHostOnly = { ...hostOnly, maxAge: 60 * 15 }
   const securePrefix = secure ? '__Secure-' : ''
   // CSRF stays host-only — use Auth.js default __Host- name when secure.
   const csrfName = `${secure ? '__Host-' : ''}authjs.csrf-token`
@@ -218,15 +218,15 @@ function buildAuthCookies(secure: boolean, domain?: string): NextAuthConfig['coo
     },
     pkceCodeVerifier: {
       name: `${securePrefix}authjs.pkce.code_verifier`,
-      options: shortLived,
+      options: shortLivedHostOnly,
     },
     state: {
       name: `${securePrefix}authjs.state`,
-      options: shortLived,
+      options: shortLivedHostOnly,
     },
     nonce: {
       name: `${securePrefix}authjs.nonce`,
-      options: shared,
+      options: shortLivedHostOnly,
     },
   }
 }
