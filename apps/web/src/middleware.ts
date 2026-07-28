@@ -111,17 +111,24 @@ function publicUrl(request: NextRequest, pathname: string): URL {
 }
 
 /**
- * Internal rewrite target. Must keep the *same origin as request.url*
- * (http://127.0.0.1:41009) so Next treats it as an in-process rewrite.
+ * Internal rewrite target for the plain-HTTP Node listener.
  *
- * Using nextUrl (https://localhost:41009/...) makes Next attempt an external
- * HTTPS proxy to itself → EPROTO "wrong version number" → 500 Internal Server Error.
+ * Behind Caddy, `request.url` / `request.nextUrl` become
+ * `https://localhost:41009/...` (X-Forwarded-Proto + bind host). Rewriting to
+ * that URL makes Next open a TLS socket to itself → EPROTO → 500.
+ *
+ * Always target `http://127.0.0.1:$PORT` so the middleware proxy speaks HTTP
+ * to `next start` (TLS terminates at Caddy only). The second hop hits this
+ * process with Host 127.0.0.1 — see loopback skip on /bevel/* redirects.
  */
 function internalRewriteUrl(request: NextRequest, pathname: string): URL {
-  const url = new URL(request.url)
-  url.pathname = pathname
-  url.search = request.nextUrl.search
-  return url
+  const port =
+    process.env.PORT ||
+    process.env.WEB_PORT ||
+    request.nextUrl.port ||
+    '41009'
+  const path = pathname.startsWith('/') ? pathname : `/${pathname}`
+  return new URL(`${path}${request.nextUrl.search}`, `http://127.0.0.1:${port}`)
 }
 
 function requestHost(request: NextRequest): string {
@@ -134,6 +141,12 @@ function requestHost(request: NextRequest): string {
     .split(',')[0]!
     .trim()
     .split(':')[0]!
+}
+
+/** True when this request is the middleware's HTTP self-proxy hop. */
+function isInternalProxyHop(request: NextRequest): boolean {
+  const host = (request.headers.get('host') ?? '').toLowerCase().split(':')[0]!
+  return isLoopbackHost(host)
 }
 
 /**
@@ -188,33 +201,37 @@ export function middleware(request: NextRequest) {
   }
 
   // ── Canonicalize legacy /bevel/* → short public URLs ─────────────────
-  if (pathname === '/bevel' || pathname === '/bevel/') {
-    return NextResponse.redirect(publicUrl(request, '/^general'), 308)
-  }
+  // Skip when this is the middleware→Node self-proxy hop (Host 127.0.0.1);
+  // that hop must serve the real /bevel/* page, not redirect back to /^…
+  if (!isInternalProxyHop(request)) {
+    if (pathname === '/bevel' || pathname === '/bevel/') {
+      return NextResponse.redirect(publicUrl(request, '/^general'), 308)
+    }
 
-  if (pathname.startsWith('/bevel/')) {
-    const rest = pathname.slice('/bevel/'.length)
+    if (pathname.startsWith('/bevel/')) {
+      const rest = pathname.slice('/bevel/'.length)
 
-    if (rest.startsWith('talk/')) {
-      return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
-    }
-    if (rest.startsWith('session/')) {
-      return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
-    }
-    if (rest.startsWith('c/')) {
-      const slug = rest.slice(2).split('/')[0] || 'general'
-      return NextResponse.redirect(
-        publicUrl(request, `/^${slug.toLowerCase()}`),
-        308,
-      )
-    }
-    // /bevel/general → /^general
-    const slug = rest.split('/')[0]
-    if (slug && !slug.includes('.')) {
-      return NextResponse.redirect(
-        publicUrl(request, `/^${slug.toLowerCase()}`),
-        308,
-      )
+      if (rest.startsWith('talk/')) {
+        return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
+      }
+      if (rest.startsWith('session/')) {
+        return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
+      }
+      if (rest.startsWith('c/')) {
+        const slug = rest.slice(2).split('/')[0] || 'general'
+        return NextResponse.redirect(
+          publicUrl(request, `/^${slug.toLowerCase()}`),
+          308,
+        )
+      }
+      // /bevel/general → /^general
+      const slug = rest.split('/')[0]
+      if (slug && !slug.includes('.')) {
+        return NextResponse.redirect(
+          publicUrl(request, `/^${slug.toLowerCase()}`),
+          308,
+        )
+      }
     }
   }
 
