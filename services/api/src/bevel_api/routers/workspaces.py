@@ -96,4 +96,17 @@ async def post_workspace_message(
         )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
+    # Best-effort Matrix dual-write (no-op when MATRIX_ENABLED off)
+    try:
+        from bevel_api.lib.matrix_dual_write import publish_message_to_matrix
+
+        await publish_message_to_matrix(
+            session,
+            tenant_id=tenant.id,
+            tenant_slug=tenant.slug,
+            channel_slug=ch.slug,
+            message=messages_repo.to_api_dict(record),
+        )
+    except Exception:
+        pass
     return {"ok": True, "upserted": True, "message": messages_repo.to_api_dict(record)}

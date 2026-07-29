@@ -1,6 +1,7 @@
 from bevel_api.db.models.announcement import Announcement
 from bevel_api.db.models.channel import Channel
 from bevel_api.db.models.handoff import AuthHandoffCode
+from bevel_api.db.models.matrix import MatrixEventMap, MatrixRoomMap, MatrixUserMap
 from bevel_api.db.models.message import Message
 from bevel_api.db.models.push_token import PushToken
 from bevel_api.db.models.tenant import Tenant
@@ -14,4 +15,7 @@ __all__ = [
     "AuthHandoffCode",
     "Announcement",
     "PushToken",
+    "MatrixRoomMap",
+    "MatrixEventMap",
+    "MatrixUserMap",
 ]
