@@ -30,11 +30,15 @@ const nextConfig: NextConfig = {
   ],
   /**
    * Short public paths → real /bevel/* app routes.
-   * Channels use hash fragments (`/#general`) — not path rewrites.
-   * Talk + session stay as path routes rewritten here (no self-proxy in middleware).
+   * Channels: `/~general` (tilde is RFC unreserved — never encoded).
+   * Talk + session stay as path routes. All rewrites stay in-process (no middleware proxy).
    */
   async rewrites() {
     return [
+      {
+        source: '/~:slug',
+        destination: '/bevel/:slug',
+      },
       {
         source: '/talk',
         destination: '/bevel/talk',

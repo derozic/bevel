@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   }
 
   const redirectPath =
-    vote === 'open' ? `/#${recorded?.channelSlug || 'general'}` : null
+    vote === 'open' ? `/~${recorded?.channelSlug || 'general'}` : null
 
   if (redirectPath) {
     // Soft page then client redirect so SMS browsers always show confirmation

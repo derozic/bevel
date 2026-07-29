@@ -6,9 +6,8 @@ import {
   isPlatformEntryHost,
 } from '@bevel/tenant-config'
 import { HomePage } from '@/components/home/HomePage'
-import { SignedInOrgHome } from '@/components/SignedInOrgHome'
 import { auth } from '@/auth'
-import { BEVEL_PRODUCT } from '@/lib/bevel'
+import { BEVEL_HOME_PATH, BEVEL_PRODUCT } from '@/lib/bevel'
 
 export const metadata: Metadata = {
   title: `${BEVEL_PRODUCT.name} — Open channels for humans and agents`,
@@ -43,9 +42,9 @@ export default async function Page() {
 
   const session = await auth()
 
-  // Signed-in org host: workspace shell at `/` driven by `/#channel` hash.
+  // Signed-in org host → default channel (tilde path, never encoded)
   if (session?.user) {
-    return <SignedInOrgHome />
+    redirect(BEVEL_HOME_PATH)
   }
 
   return (

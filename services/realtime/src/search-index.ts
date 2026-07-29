@@ -84,9 +84,9 @@ function hrefFor(doc: SearchDocument, query: string): string {
   if (doc.kind === 'channel') {
     const slug = (doc.channelSlug ?? doc.sessionId)
       .toLowerCase()
-      .replace(/^[\^#]+/, '')
-    // Hash channel: query before fragment — /?msg=&q=#general
-    return `/?msg=${msg}&q=${q}#${encodeURIComponent(slug)}`
+      .replace(/^[\^#~]+/, '')
+    // Tilde channel path: /~general?msg=&q=
+    return `/~${encodeURIComponent(slug)}?msg=${msg}&q=${q}`
   }
   return `/session/${encodeURIComponent(doc.sessionId)}?msg=${msg}&q=${q}`
 }

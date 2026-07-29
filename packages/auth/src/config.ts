@@ -635,7 +635,7 @@ export function createTenantAuthConfig(
         } catch {
           /* ignore */
         }
-        return `${publicBase}/#general`
+        return `${publicBase}/~general`
       },
     },
     pages: {
@@ -649,7 +649,7 @@ export function createTenantAuthConfig(
 export function homePathForTenant(tenant: Tenant, platformHost?: string): string {
   const entry = platformHost && isPlatformEntryHost(platformHost)
   if (entry && tenant.host !== platformHost?.toLowerCase().split(':')[0]) {
-    return publicTenantUrl(tenant, '/#general')
+    return publicTenantUrl(tenant, '/~general')
   }
-  return '/#general'
+  return '/~general'
 }

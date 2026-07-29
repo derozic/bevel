@@ -103,13 +103,13 @@ function publicOrigin(request: NextRequest): string {
 }
 
 /**
- * Redirect to public channel hash URL: https://host/#general
- * Preserves query string (msg, q, agents) before the fragment.
+ * Redirect to public channel path: https://host/~general
+ * Preserves query string (msg, q, agents).
  */
-function channelHashRedirect(request: NextRequest, slug: string): NextResponse {
+function channelTildeRedirect(request: NextRequest, slug: string): NextResponse {
   const clean = slug.trim().toLowerCase() || 'general'
-  const qs = request.nextUrl.search // includes leading ?
-  const target = `${publicOrigin(request)}/${qs}#${clean}`
+  const qs = request.nextUrl.search
+  const target = `${publicOrigin(request)}/~${clean}${qs}`
   return NextResponse.redirect(target, 308)
 }
 
@@ -144,7 +144,7 @@ function expireStaleDomainOAuthCookies(response: NextResponse): void {
 /**
  * Middleware:
  * - Expire stale Domain-scoped PKCE cookies on /api/auth/*
- * - Canonicalize legacy channel paths → /#slug (hash, never encoded)
+ * - Canonicalize legacy channel paths → /~slug (tilde, never encoded)
  * - Keep /talk and /session as path routes (next.config rewrites)
  * - Stamp tenant host
  */
@@ -157,15 +157,21 @@ export function middleware(request: NextRequest) {
     return res
   }
 
-  // Legacy caret paths: /^general or /%5Egeneral → /#general
+  // Legacy caret paths: /^general or /%5Egeneral → /~general
   const caretMatch = pathname.match(/^\/(?:\^|%5[eE])([a-z0-9][a-z0-9-]*)$/i)
   if (caretMatch) {
-    return channelHashRedirect(request, caretMatch[1]!)
+    return channelTildeRedirect(request, caretMatch[1]!)
   }
 
-  // /bevel → /#general
+  // Encoded tilde (rare): /%7Egeneral → /~general
+  const encodedTilde = pathname.match(/^\/%7[eE]([a-z0-9][a-z0-9-]*)$/i)
+  if (encodedTilde) {
+    return channelTildeRedirect(request, encodedTilde[1]!)
+  }
+
+  // /bevel → /~general
   if (pathname === '/bevel' || pathname === '/bevel/') {
-    return channelHashRedirect(request, 'general')
+    return channelTildeRedirect(request, 'general')
   }
 
   if (pathname.startsWith('/bevel/')) {
@@ -173,8 +179,6 @@ export function middleware(request: NextRequest) {
 
     // Keep talk + session as real path routes (not channels)
     if (rest.startsWith('talk/') || rest === 'talk') {
-      // next.config rewrites /talk → /bevel/talk; no redirect needed when already /bevel/talk
-      // If someone hits /bevel/talk/*, leave it (or optionally redirect to /talk/*)
       if (rest.startsWith('talk/')) {
         const url = new URL(
           `/${rest}${request.nextUrl.search}`,
@@ -194,12 +198,12 @@ export function middleware(request: NextRequest) {
     }
     if (rest.startsWith('c/')) {
       const slug = rest.slice(2).split('/')[0] || 'general'
-      return channelHashRedirect(request, slug)
+      return channelTildeRedirect(request, slug)
     }
-    // /bevel/general → /#general
+    // /bevel/general → /~general
     const slug = rest.split('/')[0]
     if (slug && !slug.includes('.')) {
-      return channelHashRedirect(request, slug)
+      return channelTildeRedirect(request, slug)
     }
   }
 

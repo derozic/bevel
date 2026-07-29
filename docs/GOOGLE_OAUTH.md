@@ -140,7 +140,7 @@ curl -sS https://bevel.is/api/auth/providers | jq 'keys'
 ./scripts/fix-google-oauth-prod.sh
 ```
 
-Manual: open https://bevel.is/login → Continue with Google → consent shows **BEVEL** → land on org `/#general`.
+Manual: open https://bevel.is/login → Continue with Google → consent shows **BEVEL** → land on org `/~general`.
 
 | Error | Meaning |
 |-------|---------|
