@@ -714,6 +714,8 @@ export function ProfileSection() {
     key: '',
     value: '',
   })
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
 
   // Seed empty profile once from session
   useEffect(() => {
@@ -736,6 +738,54 @@ export function ProfileSection() {
     value: string | boolean | string[] | ProfileAttribute[],
   ) => {
     updatePrefs({ profile: { [key]: value } as Partial<typeof p> })
+  }
+
+  const uploadAvatar = async (file: File) => {
+    setAvatarError(null)
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError('Image must be 5 MB or smaller.')
+      return
+    }
+    setAvatarUploading(true)
+    try {
+      const body = new FormData()
+      body.set('file', file)
+      const res = await fetch('/api/me/avatar', {
+        method: 'POST',
+        body,
+        credentials: 'same-origin',
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string
+        photoUrl?: string
+      }
+      if (!res.ok || !data.photoUrl) {
+        setAvatarError(data.error || 'Upload failed.')
+        return
+      }
+      setField('photoUrl', data.photoUrl)
+    } catch {
+      setAvatarError('Upload failed. Check your connection and try again.')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
+  const removeAvatar = async () => {
+    setAvatarError(null)
+    setAvatarUploading(true)
+    try {
+      await fetch('/api/me/avatar', {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      })
+      // Fall back to Google image if present, else empty initials
+      setField('photoUrl', user?.image ?? '')
+    } catch {
+      setAvatarError('Could not remove photo.')
+    } finally {
+      setAvatarUploading(false)
+    }
   }
 
   const tags = p.tags ?? []
@@ -810,7 +860,23 @@ export function ProfileSection() {
         tags={tags}
         attributes={attributes}
         socials={p.socials}
+        editable
+        uploading={avatarUploading}
+        onPickFile={(file) => void uploadAvatar(file)}
+        onRemovePhoto={() => void removeAvatar()}
       />
+      {avatarError ? (
+        <p className="text-sm text-danger" role="alert">
+          {avatarError}
+        </p>
+      ) : null}
+      <div aria-live="polite" className="sr-only">
+        {avatarUploading
+          ? 'Uploading photo'
+          : avatarError
+            ? avatarError
+            : ''}
+      </div>
 
       <PrefGroup title="Identity">
         <label className="block space-y-1 text-sm">

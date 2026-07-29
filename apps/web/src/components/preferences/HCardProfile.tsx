@@ -1,5 +1,7 @@
 'use client'
 
+import { useRef } from 'react'
+import { CameraIcon } from '@heroicons/react/24/outline'
 import {
   SOCIAL_NETWORKS,
   validateHttpUrl,
@@ -7,13 +9,17 @@ import {
   type SocialNetworkId,
 } from '@bevel/schema'
 
+function isUsablePhotoUrl(url: string | undefined): url is string {
+  if (!url?.trim()) return false
+  const u = url.trim()
+  // Same-origin avatar API or absolute https
+  if (u.startsWith('/api/me/avatar')) return true
+  return validateHttpUrl(u, 'Photo').ok
+}
+
 /**
  * Visible h-card (microformats2) + schema.org Person for the member profile.
- * Socials use rel=me (IndieWeb). Default networks: X, Instagram, TikTok, YouTube.
- * Tags / attributes surface agent-facing capability context in the card preview.
- * Only valid endpoints are rendered (invalid drafts stay out of rel=me).
- * @see https://microformats.org/wiki/h-card
- * @see https://indieweb.org/rel-me
+ * When `editable`, the avatar is a control that opens a local file picker.
  */
 export function HCardProfile({
   displayName,
@@ -35,6 +41,10 @@ export function HCardProfile({
   tags = [],
   attributes = [],
   socials,
+  editable = false,
+  uploading = false,
+  onPickFile,
+  onRemovePhoto,
 }: {
   displayName: string
   givenName?: string
@@ -60,7 +70,13 @@ export function HCardProfile({
     tiktok: string
     youtube: string
   }
+  /** Tap avatar to upload a local image. */
+  editable?: boolean
+  uploading?: boolean
+  onPickFile?: (file: File) => void
+  onRemovePhoto?: () => void
 }) {
+  const fileRef = useRef<HTMLInputElement>(null)
   const name = displayName || nickname || handle || 'Member'
   const socialLinks = SOCIAL_NETWORKS.map((id: SocialNetworkId) => {
     const result = validateSocialUrl(id, socials[id] ?? '')
@@ -86,12 +102,28 @@ export function HCardProfile({
       network: 'web',
     },
   ].filter((l) => l.href && l.href.trim().length > 0)
-  const safePhoto =
-    photoUrl && validateHttpUrl(photoUrl, 'Photo').ok ? photoUrl : undefined
+  const safePhoto = isUsablePhotoUrl(photoUrl) ? photoUrl : undefined
 
   const cleanTags = tags.map((t) => t.trim()).filter(Boolean)
   const cleanAttrs = attributes.filter(
     (a) => a.key?.trim() && a.value?.trim(),
+  )
+
+  const avatarInner = safePhoto ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      className="u-photo photo size-full rounded-full object-cover"
+      src={safePhoto}
+      alt=""
+      itemProp="image"
+    />
+  ) : (
+    <span
+      className="flex size-full items-center justify-center rounded-full bg-accent/15 text-xl font-semibold text-accent"
+      aria-hidden
+    >
+      {name.slice(0, 1).toUpperCase()}
+    </span>
   )
 
   return (
@@ -102,22 +134,48 @@ export function HCardProfile({
       data-microformats="h-card"
     >
       <div className="flex items-start gap-4">
-        {safePhoto ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            className="u-photo photo size-16 rounded-full border border-border object-cover"
-            src={safePhoto}
-            alt=""
-            itemProp="image"
-          />
-        ) : (
-          <div
-            className="flex size-16 items-center justify-center rounded-full bg-accent/15 text-xl font-semibold text-accent"
-            aria-hidden
-          >
-            {name.slice(0, 1).toUpperCase()}
-          </div>
-        )}
+        <div className="relative shrink-0">
+          {editable ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  e.target.value = ''
+                  if (f && onPickFile) onPickFile(f)
+                }}
+              />
+              <button
+                type="button"
+                disabled={uploading || !onPickFile}
+                onClick={() => fileRef.current?.click()}
+                className="group relative size-16 overflow-hidden rounded-full border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-70"
+                aria-label="Change profile photo"
+              >
+                {avatarInner}
+                <span
+                  className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                  aria-hidden
+                >
+                  {uploading ? (
+                    <span className="text-[10px] font-semibold text-white">
+                      …
+                    </span>
+                  ) : (
+                    <CameraIcon className="size-5 text-white" />
+                  )}
+                </span>
+              </button>
+            </>
+          ) : (
+            <div className="size-16 overflow-hidden rounded-full border border-border">
+              {avatarInner}
+            </div>
+          )}
+        </div>
         <div className="min-w-0 flex-1 space-y-1">
           <p
             className="p-name fn text-base font-semibold text-foreground"
@@ -142,10 +200,7 @@ export function HCardProfile({
           )}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
             {handle ? (
-              <span
-                className="p-nickname nickname"
-                itemProp="alternateName"
-              >
+              <span className="p-nickname nickname" itemProp="alternateName">
                 @{handle.replace(/^@/, '')}
               </span>
             ) : null}
@@ -182,6 +237,24 @@ export function HCardProfile({
               ) : null}
               {location && timezone ? ' · ' : null}
               {timezone ? <span>{timezone}</span> : null}
+            </p>
+          ) : null}
+          {editable ? (
+            <p className="pt-1 text-[11px] leading-snug text-muted">
+              Tap photo to upload (JPEG, PNG, WebP, GIF · max 5 MB)
+              {safePhoto && onRemovePhoto ? (
+                <>
+                  {' · '}
+                  <button
+                    type="button"
+                    className="font-medium text-accent underline-offset-2 hover:underline"
+                    onClick={onRemovePhoto}
+                    disabled={uploading}
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : null}
             </p>
           ) : null}
         </div>
