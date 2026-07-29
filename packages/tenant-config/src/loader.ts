@@ -187,6 +187,11 @@ export function compileTenant(
     ['agent_memory', 'agentMemory'],
     ['voice_rooms', 'voiceRooms'],
     ['multi_region', 'multiRegion'],
+    ['matrix', 'matrix'],
+    ['matrix_federation', 'matrixFederation'],
+    ['matrix_e2ee', 'matrixE2ee'],
+    ['matrix_voip', 'matrixVoip'],
+    ['matrix_external_clients', 'matrixExternalClients'],
   ]
   for (const [yamlKey, flagId] of map) {
     const v = f[yamlKey]
@@ -231,6 +236,11 @@ export function compileTenant(
       agentMemory: featureSet.agentMemory,
       voiceRooms: featureSet.voiceRooms,
       multiRegion: featureSet.multiRegion,
+      matrix: featureSet.matrix,
+      matrixFederation: featureSet.matrixFederation,
+      matrixE2ee: featureSet.matrixE2ee,
+      matrixVoip: featureSet.matrixVoip,
+      matrixExternalClients: featureSet.matrixExternalClients,
     },
     featureSet,
     theme: {

@@ -36,6 +36,12 @@ features:
   work_mode: true
   custom_branding: true
   sms: true
+  # Matrix fabric (requires feature_access: beta — already set above)
+  matrix: true
+  matrix_federation: false
+  matrix_e2ee: false
+  matrix_voip: false
+  matrix_external_clients: false
 
 auth:
   mode: google

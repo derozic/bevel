@@ -46,6 +46,9 @@ This is **orthogonal to plan**. Examples:
 | `auditLog`, `dedicatedSupport` | enterprise | stable |
 | `agentMemory` | pro | **beta** |
 | `voiceRooms` | team | **beta** |
+| `matrix` | pro | **beta** |
+| `matrixFederation` / `matrixE2ee` / `matrixVoip` | team | **beta** |
+| `matrixExternalClients` | enterprise | **beta** |
 | `multiRegion` | enterprise | **upcoming** |
 
 ## Declare on a tenant
