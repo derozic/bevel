@@ -115,9 +115,10 @@ PY
 fi
 
 # ── log config ───────────────────────────────────────────────────────────────
-if [[ -f "$REPO_ROOT/services/matrix/log.config" ]]; then
-  cp "$REPO_ROOT/services/matrix/log.config" "$MATRIX_ROOT/log.config"
-else
+SRC_LOG="$REPO_ROOT/services/matrix/log.config"
+if [[ -f "$SRC_LOG" && "$(realpath "$SRC_LOG" 2>/dev/null || echo "$SRC_LOG")" != "$(realpath "$MATRIX_ROOT/log.config" 2>/dev/null || echo "$MATRIX_ROOT/log.config")" ]]; then
+  cp "$SRC_LOG" "$MATRIX_ROOT/log.config"
+elif [[ ! -f "$MATRIX_ROOT/log.config" ]]; then
   cat >"$MATRIX_ROOT/log.config" <<'LOG'
 version: 1
 formatters:
