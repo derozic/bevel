@@ -11,9 +11,9 @@ on:
 
 jobs:
   learn:
-    uses: derozic/agents/.github/workflows/continuous-engineering.reusable.yml@v0.1.1
+    uses: derozic/agents/.github/workflows/continuous-engineering.reusable.yml@v0.1.2
     with:
-      ref: v0.1.1
+      ref: v0.1.2
       agents: "continuous northstar loom"
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
