@@ -36,11 +36,13 @@ chown -R deploy:deploy "$MATRIX_ROOT" 2>/dev/null || chown -R deploy:deploy "$MA
 # ── Postgres DB ──────────────────────────────────────────────────────────────
 echo "==> ensure database $DB_NAME"
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
-  sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
-  echo "    created $DB_NAME"
+  # Synapse requires C locale (not C.UTF-8) unless allow_unsafe_locale
+  sudo -u postgres createdb -O "$DB_USER" -E UTF8 --locale=C -T template0 "$DB_NAME"
+  echo "    created $DB_NAME (locale C)"
 else
   echo "    $DB_NAME exists"
 fi
+sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL ON SCHEMA public TO ${DB_USER};" >/dev/null 2>&1 || true
 
 # Prefer password from existing bevel DATABASE_URL if available
 DB_PASS=""
@@ -93,7 +95,10 @@ if [[ ! -d "$MATRIX_ROOT/.venv" ]]; then
 fi
 # Pin a known-good Synapse; keep install lean
 sudo -u deploy "$MATRIX_ROOT/.venv/bin/pip" install -q --upgrade pip wheel
+# setuptools<81 for pkg_resources; pin prometheus_client for MRO with synapse 1.121
 sudo -u deploy "$MATRIX_ROOT/.venv/bin/pip" install -q \
+  'setuptools>=69,<81' \
+  'prometheus_client>=0.17,<0.21' \
   'matrix-synapse[postgres]==1.121.1' \
   'psycopg2-binary>=2.9'
 
@@ -164,6 +169,7 @@ database:
     host: 127.0.0.1
     cp_min: 1
     cp_max: 5
+  allow_unsafe_locale: true
 
 log_config: "${MATRIX_ROOT}/log.config"
 media_store_path: ${MATRIX_ROOT}/data/media
@@ -173,6 +179,8 @@ max_image_pixels: "16M"
 
 enable_registration: false
 registration_shared_secret: "${MATRIX_REGISTRATION_SHARED_SECRET}"
+macaroon_secret_key: "${MATRIX_REGISTRATION_SHARED_SECRET}"
+form_secret: "${MATRIX_AS_TOKEN}"
 
 report_stats: false
 serve_server_wellknown: true
@@ -198,6 +206,7 @@ chmod 0640 "$MATRIX_ROOT/homeserver.yaml"
 
 # ── appservice registration ──────────────────────────────────────────────────
 echo "==> appservice-bevel.yaml"
+# Single-quoted regexes — double-quoted \. breaks PyYAML
 cat >"$MATRIX_ROOT/appservice-bevel.yaml" <<YAML
 id: bevel
 url: ${AS_URL}
@@ -207,12 +216,12 @@ sender_localpart: bevel_bridge
 namespaces:
   users:
     - exclusive: true
-      regex: "@agent_.*:${SERVER_NAME//./\\.}"
+      regex: '@agent_.*'
     - exclusive: false
-      regex: "@bevel_.*:${SERVER_NAME//./\\.}"
+      regex: '@bevel_.*'
   aliases:
     - exclusive: true
-      regex: "#.*_.*:${SERVER_NAME//./\\.}"
+      regex: '#.*_.*'
   rooms: []
 rate_limited: false
 protocols:
@@ -341,6 +350,11 @@ CADDY
 else
   echo "    matrix.bevel.is already present"
 fi
+
+# Ensure Caddy can write its log (reload fails with permission denied otherwise)
+touch /var/log/caddy/matrix_bevel_is.log
+chown caddy:caddy /var/log/caddy/matrix_bevel_is.log 2>/dev/null || true
+chmod 644 /var/log/caddy/matrix_bevel_is.log
 
 if command -v caddy >/dev/null; then
   caddy validate --config "$CADDYFILE" --adapter caddyfile
