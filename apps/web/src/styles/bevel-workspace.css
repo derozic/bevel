@@ -269,6 +269,9 @@ html[data-bevel-simplified='true'] .bevel-workspace {
 
 .bevel-rail-channel-slug {
   line-height: 1.3;
+  /* Explicit mono so ~channel reads clearly (not mistaken for caret). */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-ligatures: none;
 }
 
 .bevel-rail-channel-name {

@@ -2337,7 +2337,7 @@ export function IntegrationsSection() {
                   href="/~product"
                   className="font-medium text-accent underline-offset-2 hover:underline"
                 >
-                  ^product
+                  ~product
                 </a>
                 , Actions, and accountability logs.
               </p>

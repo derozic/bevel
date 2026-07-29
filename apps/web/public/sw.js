@@ -1,5 +1,5 @@
 /* BEVEL service worker — install shell + show agent program notifications */
-const CACHE = 'bevel-shell-v3'
+const CACHE = 'bevel-shell-v4'
 const PRECACHE = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png']
 
 self.addEventListener('install', (event) => {
