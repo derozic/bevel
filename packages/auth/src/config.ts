@@ -63,15 +63,13 @@ export function phoneOtpAllowedOnTenant(tenant: Tenant): boolean {
   return !tenantHasClosedMembership(tenant)
 }
 
-/** Platform login: allow if any org tenant accepts this Workspace email. */
-function emailAllowedOnPlatform(email: string): boolean {
-  const { tenants } = resolveWorkspacesForEmail(email)
-  if (tenants.length > 0) return true
-  // Exact email allowlist on any tenant
-  const normalized = email.toLowerCase()
-  return listTenants().some((t) =>
-    t.auth.allowedEmails?.some((e) => e.toLowerCase() === normalized),
-  )
+/**
+ * Platform login (bevel.is): allow any signed-in Google/OTP identity.
+ * Users with no org yet go to /claim via /welcome; allowlisted users hop home.
+ * Org hosts still enforce tenant allowlists in signIn below.
+ */
+function emailAllowedOnPlatform(_email: string): boolean {
+  return true
 }
 
 function useSecureCookies(): boolean {
@@ -206,10 +204,12 @@ function buildAuthCookies(secure: boolean, domain?: string): NextAuthConfig['coo
   // CSRF stays host-only — use Auth.js default __Host- name when secure.
   const csrfName = `${secure ? '__Host-' : ''}authjs.csrf-token`
 
+  // Persist session for the full JWT lifetime (not a browser-session cookie).
+  const sessionMaxAge = 30 * 24 * 60 * 60
   return {
     sessionToken: {
       name: `${securePrefix}authjs.session-token`,
-      options: shared,
+      options: { ...shared, maxAge: sessionMaxAge },
     },
     callbackUrl: {
       name: `${securePrefix}authjs.callback-url`,

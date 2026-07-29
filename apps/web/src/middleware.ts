@@ -115,8 +115,8 @@ function channelTildeRedirect(request: NextRequest, slug: string): NextResponse 
 
 /**
  * Expire Domain-scoped OAuth check cookies left by older deploys.
- * Includes legacy names and .v2 host-only names (never use Domain on v2;
- * expire Domain variants anyway if a bad deploy set them).
+ * Only legacy (pre-.v2) names — never Set-Cookie the active .v2 names here,
+ * or browsers can dual-store Domain + host-only and break PKCE parse.
  */
 function expireStaleDomainOAuthCookies(response: NextResponse): void {
   const domain =
@@ -124,17 +124,11 @@ function expireStaleDomainOAuthCookies(response: NextResponse): void {
   if (!domain) return
   const names = [
     '__Secure-authjs.pkce.code_verifier',
-    '__Secure-authjs.pkce.code_verifier.v2',
     '__Secure-authjs.state',
-    '__Secure-authjs.state.v2',
     '__Secure-authjs.nonce',
-    '__Secure-authjs.nonce.v2',
     'authjs.pkce.code_verifier',
-    'authjs.pkce.code_verifier.v2',
     'authjs.state',
-    'authjs.state.v2',
     'authjs.nonce',
-    'authjs.nonce.v2',
   ]
   for (const name of names) {
     response.cookies.set(name, '', {
@@ -150,8 +144,44 @@ function expireStaleDomainOAuthCookies(response: NextResponse): void {
 }
 
 /**
+ * When AUTH_URL pins OAuth to one host, never start Google/GitHub sign-in on
+ * another host (PKCE cookie would not be sent to the callback host).
+ */
+function redirectOAuthStartToPinnedHost(
+  request: NextRequest,
+): NextResponse | null {
+  const match = request.nextUrl.pathname.match(
+    /^\/api\/auth\/signin\/(google|github)\/?$/,
+  )
+  if (!match) return null
+  const raw = process.env.AUTH_URL || process.env.NEXTAUTH_URL
+  if (!raw) return null
+  let pinned: URL
+  try {
+    pinned = new URL(raw)
+  } catch {
+    return null
+  }
+  const reqHost = (
+    request.headers.get('x-forwarded-host') ||
+    request.headers.get('host') ||
+    ''
+  )
+    .toLowerCase()
+    .split(':')[0]
+  if (!reqHost || reqHost === pinned.hostname.toLowerCase()) return null
+  // Full navigation to platform login — do not 307 a POST (body/CSRF lost).
+  const login = new URL('/login', pinned.origin)
+  const cb = request.nextUrl.searchParams.get('callbackUrl')
+  if (cb) login.searchParams.set('callbackUrl', cb)
+  else login.searchParams.set('callbackUrl', '/welcome')
+  return NextResponse.redirect(login, 303)
+}
+
+/**
  * Middleware:
- * - Expire stale Domain-scoped PKCE cookies on /api/auth/*
+ * - Force OAuth start onto AUTH_URL host when pinned
+ * - Expire legacy Domain-scoped PKCE cookies on /api/auth/*
  * - Canonicalize legacy channel paths → /~slug (tilde, never encoded)
  * - Keep /talk and /session as path routes (next.config rewrites)
  * - Stamp tenant host
@@ -160,6 +190,8 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (pathname.startsWith('/api/auth')) {
+    const oauthHop = redirectOAuthStartToPinnedHost(request)
+    if (oauthHop) return oauthHop
     const res = NextResponse.next()
     expireStaleDomainOAuthCookies(res)
     return res

@@ -94,6 +94,9 @@ export default async function LoginPage({
 
   const callbackUrl = sanitizeLoginCallbackUrl(params.callbackUrl)
   const oauthOrigin = resolveOAuthSignInOrigin()
+  // Canonical request origin so the Google button can hop off org hosts
+  // before any client useEffect (avoids same-host form race → Configuration).
+  const pageOrigin = host ? `https://${host}` : undefined
 
   // Honor callbackUrl when already signed in (e.g. /login?callbackUrl=/claim).
   if (session?.user) {
@@ -197,6 +200,7 @@ export default async function LoginPage({
             callbackUrl={callbackUrl}
             label="Continue with Google"
             oauthOrigin={oauthOrigin}
+            pageOrigin={pageOrigin}
           />
         ) : (
           <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
@@ -208,6 +212,7 @@ export default async function LoginPage({
           <GitHubSignInButton
             callbackUrl={callbackUrl}
             oauthOrigin={oauthOrigin}
+            pageOrigin={pageOrigin}
           />
         ) : null}
 

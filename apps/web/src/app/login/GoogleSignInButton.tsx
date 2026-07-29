@@ -7,26 +7,27 @@ import { getCsrfToken, signIn } from 'next-auth/react'
  * Google / GitHub sign-in.
  *
  * Primary path: native form POST to Auth.js (no Next server actions).
- * That avoids "Failed to fetch" / fetchServerAction failures when the
- * RSC action hash goes stale under HMR or host rewrites.
  *
  * When AUTH_URL pins a platform origin (e.g. https://bevel.is), OAuth PKCE
  * cookies are host-only on that host and Google's redirect_uri matches it.
  * Starting sign-in on a different host (e.g. bevel.2x4m.cc) leaves the PKCE
- * cookie there → InvalidCheck / Configuration on callback. In that case we
- * full-navigate to platform /login first (same-site form POST after hop).
+ * cookie there → InvalidCheck / Configuration on callback.
  *
- * Fallback: client signIn() if CSRF is unavailable (same-origin only).
+ * The server passes `pageOrigin` so the hop is decided on first paint (no
+ * useEffect race that briefly renders a same-host form on org hosts).
  */
 export function GoogleSignInButton({
   callbackUrl = '/welcome',
   label = 'Continue with Google Workspace',
   oauthOrigin,
+  pageOrigin: pageOriginProp,
 }: {
   callbackUrl?: string
   label?: string
   /** AUTH_URL origin when pinned; omit for same-host AUTH_TRUST_HOST OAuth. */
   oauthOrigin?: string
+  /** Request origin from the server (https://host). Avoids client hop race. */
+  pageOrigin?: string
 }) {
   return (
     <OAuthSignInButton
@@ -35,6 +36,7 @@ export function GoogleSignInButton({
       label={label}
       variant="primary"
       oauthOrigin={oauthOrigin}
+      pageOriginProp={pageOriginProp}
     />
   )
 }
@@ -43,10 +45,12 @@ export function GitHubSignInButton({
   callbackUrl = '/welcome',
   label = 'Continue with GitHub',
   oauthOrigin,
+  pageOrigin: pageOriginProp,
 }: {
   callbackUrl?: string
   label?: string
   oauthOrigin?: string
+  pageOrigin?: string
 }) {
   return (
     <OAuthSignInButton
@@ -55,6 +59,7 @@ export function GitHubSignInButton({
       label={label}
       variant="outline"
       oauthOrigin={oauthOrigin}
+      pageOriginProp={pageOriginProp}
     />
   )
 }
@@ -64,11 +69,8 @@ function platformLoginHref(
   callbackUrl: string,
   pageOrigin: string,
 ): string {
-  // Preserve absolute return when leaving an org host; relative stays relative
-  // so platform login lands on platform /welcome by default.
   let returnTo = callbackUrl
   if (callbackUrl.startsWith('/') && !callbackUrl.startsWith('//')) {
-    // Org host → platform: absolute callback so handoff can return after OAuth.
     try {
       if (new URL(oauthOrigin).origin !== pageOrigin) {
         returnTo = new URL(callbackUrl, pageOrigin).href
@@ -82,44 +84,63 @@ function platformLoginHref(
   return u.toString()
 }
 
+function normalizeOrigin(raw: string | undefined | null): string | null {
+  if (!raw) return null
+  try {
+    return new URL(raw).origin
+  } catch {
+    try {
+      return new URL(`https://${raw}`).origin
+    } catch {
+      return null
+    }
+  }
+}
+
 function OAuthSignInButton({
   provider,
   callbackUrl,
   label,
   variant,
   oauthOrigin,
+  pageOriginProp,
 }: {
   provider: 'google' | 'github'
   callbackUrl: string
   label: string
   variant: 'primary' | 'outline'
   oauthOrigin?: string
+  pageOriginProp?: string
 }) {
   const [csrfToken, setCsrfToken] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [pageOrigin, setPageOrigin] = useState<string | null>(null)
   const [detectedOrigin, setDetectedOrigin] = useState<string | null>(null)
-
-  const pinnedOrigin = useMemo(() => {
-    const raw = oauthOrigin || detectedOrigin
-    if (!raw) return null
-    try {
-      return new URL(raw).origin
-    } catch {
-      return null
-    }
-  }, [oauthOrigin, detectedOrigin])
-
-  const mustHopToPlatform =
-    Boolean(pinnedOrigin && pageOrigin && pinnedOrigin !== pageOrigin)
+  // Prefer server-provided page origin; fall back to window only for client pages.
+  const [clientOrigin, setClientOrigin] = useState<string | null>(() =>
+    typeof window !== 'undefined' ? window.location.origin : null,
+  )
 
   useEffect(() => {
-    setPageOrigin(window.location.origin)
+    setClientOrigin(window.location.origin)
   }, [])
 
-  // Discover AUTH_URL pin from provider callback URLs when prop is omitted
-  // (client pages like /claim cannot read server-only AUTH_URL).
+  const pinnedOrigin = useMemo(
+    () => normalizeOrigin(oauthOrigin || detectedOrigin),
+    [oauthOrigin, detectedOrigin],
+  )
+
+  const pageOrigin = useMemo(
+    () => normalizeOrigin(pageOriginProp) || clientOrigin,
+    [pageOriginProp, clientOrigin],
+  )
+
+  // Hop when AUTH_URL (or provider callback) is a different host than this page.
+  const mustHopToPlatform = Boolean(
+    pinnedOrigin && pageOrigin && pinnedOrigin !== pageOrigin,
+  )
+
+  // Discover AUTH_URL pin from provider callbacks when prop is omitted (/claim).
   useEffect(() => {
     if (oauthOrigin) return
     let cancelled = false
@@ -132,11 +153,7 @@ function OAuthSignInButton({
           data.google?.callbackUrl ||
           data.github?.callbackUrl
         if (!cb) return
-        try {
-          setDetectedOrigin(new URL(cb).origin)
-        } catch {
-          /* ignore */
-        }
+        setDetectedOrigin(normalizeOrigin(cb))
       })
       .catch(() => {
         /* same-host OAuth fallback */
@@ -148,6 +165,8 @@ function OAuthSignInButton({
 
   useEffect(() => {
     if (mustHopToPlatform) return
+    // Still waiting to learn whether we must hop (claim page, no oauthOrigin yet).
+    if (!oauthOrigin && !detectedOrigin && !pageOriginProp) return
     let cancelled = false
     void getCsrfToken()
       .then((token) => {
@@ -159,9 +178,8 @@ function OAuthSignInButton({
     return () => {
       cancelled = true
     }
-  }, [mustHopToPlatform])
+  }, [mustHopToPlatform, oauthOrigin, detectedOrigin, pageOriginProp])
 
-  // Full-width pill CTA (platform + workspace login)
   const baseClass =
     'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60'
   const variantClass =
@@ -169,7 +187,7 @@ function OAuthSignInButton({
       ? 'border-2 border-gray-900 bg-gray-900 text-white hover:bg-white hover:text-gray-900'
       : 'border-2 border-gray-300 bg-white text-gray-900 hover:border-gray-900'
 
-  // AUTH_URL pin: leave org host → platform login (PKCE + callback host match).
+  // AUTH_URL pin on a different host: never render a same-host form (PKCE would break).
   if (mustHopToPlatform && pinnedOrigin && pageOrigin) {
     const href = platformLoginHref(pinnedOrigin, callbackUrl, pageOrigin)
     return (
@@ -180,8 +198,16 @@ function OAuthSignInButton({
     )
   }
 
-  // Preferred: plain form POST (full navigation → Google). Refresh CSRF on submit
-  // so a long-open tab cannot post a stale token after a cookie rotate.
+  // Waiting for origin detection on client-only pages — avoid wrong-host form.
+  if (oauthOrigin === undefined && !detectedOrigin && !pageOriginProp) {
+    return (
+      <button type="button" disabled className={`${baseClass} ${variantClass}`}>
+        {provider === 'google' ? <GoogleGlyph /> : null}
+        Preparing sign-in…
+      </button>
+    )
+  }
+
   if (csrfToken) {
     return (
       <div className="space-y-2">
@@ -195,10 +221,10 @@ function OAuthSignInButton({
             }
             setPending(true)
             setError(null)
-            // Re-fetch CSRF immediately before navigate when possible.
-            // If the form already has a valid token+cookie pair, submit proceeds.
             const form = event.currentTarget
-            const input = form.elements.namedItem('csrfToken') as HTMLInputElement | null
+            const input = form.elements.namedItem(
+              'csrfToken',
+            ) as HTMLInputElement | null
             event.preventDefault()
             void getCsrfToken()
               .then((token) => {
@@ -237,7 +263,6 @@ function OAuthSignInButton({
     )
   }
 
-  // CSRF still loading or failed — JS fallback (same-origin only)
   return (
     <div className="space-y-2">
       <button
@@ -249,7 +274,9 @@ function OAuthSignInButton({
           void signIn(provider, { callbackUrl }).catch((e) => {
             setPending(false)
             setError(
-              e instanceof Error ? e.message : 'Could not start sign-in. Reload and try again.',
+              e instanceof Error
+                ? e.message
+                : 'Could not start sign-in. Reload and try again.',
             )
           })
         }}
