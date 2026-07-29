@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { signIn, useSession } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { FleetChat, FleetProvider, type FleetWorkRepo } from '@bevel/realtime-client'
 import { agents } from '@/lib/agent-catalog'
 import { BEVEL_ARCHIVE_PATH, BEVEL_COPY, bevelTalkPath } from '@/lib/bevel'
@@ -11,6 +11,7 @@ import {
   ensureNotificationPermission,
   showBevelNotification,
 } from '@/lib/bevel-notify'
+import { linkGitHubForWork } from '@/lib/github-link'
 
 const WORK_REPO_STORAGE_KEY = 'bevel.workRepo'
 
@@ -196,11 +197,9 @@ export function ChannelChatShell({
       githubAuthEnabled={workMeta?.githubEnabled ?? false}
       githubLinked={workMeta?.linked ?? Boolean(session?.githubLogin)}
       githubLogin={workMeta?.login ?? session?.githubLogin ?? null}
-      onLinkGitHub={() =>
-        signIn('github', {
-          callbackUrl: `/~product?github=linked&from=${encodeURIComponent(channelSlug)}`,
-        })
-      }
+      onLinkGitHub={() => {
+        void linkGitHubForWork({ from: channelSlug })
+      }}
       authError={
         status !== 'loading' && !session?.realtimeToken
           ? BEVEL_COPY.auth.missingRealtimeToken

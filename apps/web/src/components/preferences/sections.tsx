@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { signIn, signOut, useSession } from 'next-auth/react'
+import {
+  isGitHubProviderAvailable,
+  linkGitHubForWork,
+} from '@/lib/github-link'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import {
   AI_PROVIDER_IDS,
@@ -2250,6 +2254,18 @@ export function IntegrationsSection() {
   const { data: session } = useSession()
   const { prefs, updatePrefs } = usePreferences()
   const integ = prefs.integrations
+  const [githubProviderOk, setGithubProviderOk] = useState<boolean | null>(null)
+  const [githubLinkBusy, setGithubLinkBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void isGitHubProviderAvailable().then((ok) => {
+      if (!cancelled) setGithubProviderOk(ok)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const connectIntegration = (
     id: 'clickup' | 'attio',
@@ -2347,29 +2363,41 @@ export function IntegrationsSection() {
                 <PrefChip state="granted" label="Linked" />
                 <button
                   type="button"
-                  className="text-[11px] text-muted hover:text-foreground"
-                  onClick={() =>
-                    void signIn('github', {
-                      callbackUrl: window.location.href,
-                    })
-                  }
+                  disabled={githubLinkBusy || githubProviderOk === false}
+                  className="text-[11px] text-muted hover:text-foreground disabled:opacity-50"
+                  onClick={() => {
+                    setGithubLinkBusy(true)
+                    void linkGitHubForWork().finally(() =>
+                      setGithubLinkBusy(false),
+                    )
+                  }}
                 >
                   Re-link scopes
                 </button>
               </div>
             ) : (
-              <Button
-                type="button"
-                size="sm"
-                className="shrink-0 rounded-full bg-orange-500 px-4 text-white hover:bg-orange-600"
-                onClick={() =>
-                  void signIn('github', {
-                    callbackUrl: `${window.location.origin}/~product?github=linked`,
-                  })
-                }
-              >
-                Link GitHub
-              </Button>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={githubLinkBusy || githubProviderOk === false}
+                  className="shrink-0 rounded-full bg-orange-500 px-4 text-white hover:bg-orange-600 disabled:opacity-50"
+                  onClick={() => {
+                    setGithubLinkBusy(true)
+                    void linkGitHubForWork().finally(() =>
+                      setGithubLinkBusy(false),
+                    )
+                  }}
+                >
+                  {githubLinkBusy ? 'Redirecting…' : 'Link GitHub'}
+                </Button>
+                {githubProviderOk === false ? (
+                  <p className="max-w-[11rem] text-right text-[10px] leading-snug text-danger">
+                    GitHub OAuth not configured (AUTH_GITHUB_ID / SECRET on
+                    server).
+                  </p>
+                ) : null}
+              </div>
             )}
           </div>
         </div>

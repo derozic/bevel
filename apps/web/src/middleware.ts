@@ -145,7 +145,11 @@ function expireStaleDomainOAuthCookies(response: NextResponse): void {
 
 /**
  * When AUTH_URL pins OAuth to one host, never start Google/GitHub sign-in on
- * another host (PKCE cookie would not be sent to the callback host).
+ * another host (PKCE / CSRF cookies must be set on the callback host).
+ *
+ * - Google (primary login): hop to platform /login so the form can re-POST.
+ * - GitHub (work-mode link while already signed in): hop to the same sign-in
+ *   path on the pin host with callback preserved (default ~product).
  */
 function redirectOAuthStartToPinnedHost(
   request: NextRequest,
@@ -154,6 +158,7 @@ function redirectOAuthStartToPinnedHost(
     /^\/api\/auth\/signin\/(google|github)\/?$/,
   )
   if (!match) return null
+  const provider = match[1]!
   const raw = process.env.AUTH_URL || process.env.NEXTAUTH_URL
   if (!raw) return null
   let pinned: URL
@@ -170,11 +175,21 @@ function redirectOAuthStartToPinnedHost(
     .toLowerCase()
     .split(':')[0]
   if (!reqHost || reqHost === pinned.hostname.toLowerCase()) return null
-  // Full navigation to platform login — do not 307 a POST (body/CSRF lost).
+
+  const cb =
+    request.nextUrl.searchParams.get('callbackUrl') ||
+    (provider === 'github' ? '/~product?github=linked' : '/welcome')
+
+  if (provider === 'github') {
+    // Account-link: land on pin host sign-in (GET) so cookies match callback host.
+    const target = new URL(`/api/auth/signin/github`, pinned.origin)
+    target.searchParams.set('callbackUrl', cb)
+    return NextResponse.redirect(target, 303)
+  }
+
+  // Google primary: full page login on pin host (form POST after hop).
   const login = new URL('/login', pinned.origin)
-  const cb = request.nextUrl.searchParams.get('callbackUrl')
-  if (cb) login.searchParams.set('callbackUrl', cb)
-  else login.searchParams.set('callbackUrl', '/welcome')
+  login.searchParams.set('callbackUrl', cb)
   return NextResponse.redirect(login, 303)
 }
 
