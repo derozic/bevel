@@ -1,0 +1,21 @@
+# Continuous Engineering — default-on for major Derozic projects
+# Primary assistant: Continuous (@continuous)
+# Partners: Northstar (evaluate), Loom (optimize)
+# Learnings persist to this repo's agent-memory branch.
+name: Continuous Engineering
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  learn:
+    uses: derozic/agents/.github/workflows/continuous-engineering.reusable.yml@v0.1.1
+    with:
+      ref: v0.1.1
+      agents: "continuous northstar loom"
+    secrets:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      AGENTS_TOKEN: ${{ secrets.AGENTS_TOKEN }}
+
