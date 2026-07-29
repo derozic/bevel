@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
     '@bevel/schema',
     '@bevel/analytics',
     '@bevel/async-stream',
+    '@bevel/matrix',
   ],
   /**
    * Short public paths → real /bevel/* app routes.

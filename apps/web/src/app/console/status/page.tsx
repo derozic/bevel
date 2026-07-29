@@ -44,6 +44,11 @@ export default function ConsoleStatusPage() {
         ok: (s, b) => s === 200 && b.includes('ok'),
       },
       {
+        name: 'Matrix fabric status',
+        url: `${bevelUrls.api()}/api/v1/matrix/status`,
+        ok: (s, b) => s === 200 && b.includes('phases'),
+      },
+      {
         name: 'API docs (OpenAPI UI)',
         url: bevelUrls.docs(),
         ok: (s) => s === 200,

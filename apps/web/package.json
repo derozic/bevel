@@ -14,6 +14,7 @@
     "@bevel/async-stream": "workspace:*",
     "@bevel/auth": "workspace:*",
     "@bevel/design-system": "workspace:*",
+    "@bevel/matrix": "workspace:*",
     "@bevel/realtime-client": "workspace:*",
     "@bevel/schema": "workspace:*",
     "@bevel/tenant-config": "workspace:*",
