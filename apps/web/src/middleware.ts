@@ -115,6 +115,8 @@ function channelTildeRedirect(request: NextRequest, slug: string): NextResponse 
 
 /**
  * Expire Domain-scoped OAuth check cookies left by older deploys.
+ * Includes legacy names and .v2 host-only names (never use Domain on v2;
+ * expire Domain variants anyway if a bad deploy set them).
  */
 function expireStaleDomainOAuthCookies(response: NextResponse): void {
   const domain =
@@ -122,11 +124,17 @@ function expireStaleDomainOAuthCookies(response: NextResponse): void {
   if (!domain) return
   const names = [
     '__Secure-authjs.pkce.code_verifier',
+    '__Secure-authjs.pkce.code_verifier.v2',
     '__Secure-authjs.state',
+    '__Secure-authjs.state.v2',
     '__Secure-authjs.nonce',
+    '__Secure-authjs.nonce.v2',
     'authjs.pkce.code_verifier',
+    'authjs.pkce.code_verifier.v2',
     'authjs.state',
+    'authjs.state.v2',
     'authjs.nonce',
+    'authjs.nonce.v2',
   ]
   for (const name of names) {
     response.cookies.set(name, '', {

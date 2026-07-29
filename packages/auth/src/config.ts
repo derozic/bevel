@@ -183,6 +183,9 @@ function isAllowedCrossHostRedirect(hostname: string): boolean {
  *   host as AUTH_URL (Google callback). Sharing Domain=.bevel.is caused dual cookies
  *   (host-only + domain) after cookie-option churn → InvalidCheck: pkceCodeVerifier
  *   value could not be parsed. OAuth must start on the callback host (platform).
+ * - Cookie names use a `.v2` suffix so browsers that still hold poisoned Domain-scoped
+ *   `authjs.pkce.code_verifier` / `state` / `nonce` cookies cannot collide with the
+ *   host-only values Auth.js reads on callback.
  * - **session / callback-url share AUTH_COOKIE_DOMAIN** so the session can hop to
  *   org hosts under the same parent after /welcome when domains match.
  */
@@ -217,18 +220,41 @@ function buildAuthCookies(secure: boolean, domain?: string): NextAuthConfig['coo
       options: hostOnly,
     },
     pkceCodeVerifier: {
-      name: `${securePrefix}authjs.pkce.code_verifier`,
+      // .v2: ignore legacy Domain-scoped cookies that broke parse on callback
+      name: `${securePrefix}authjs.pkce.code_verifier.v2`,
       options: shortLivedHostOnly,
     },
     state: {
-      name: `${securePrefix}authjs.state`,
+      name: `${securePrefix}authjs.state.v2`,
       options: shortLivedHostOnly,
     },
     nonce: {
-      name: `${securePrefix}authjs.nonce`,
+      name: `${securePrefix}authjs.nonce.v2`,
       options: shortLivedHostOnly,
     },
   }
+}
+
+/**
+ * When AUTH_URL / NEXTAUTH_URL pin a public origin, OAuth sign-in and PKCE cookies
+ * must start on that host (Google redirect_uri is built from AUTH_URL).
+ * Returns undefined when unset so multi-host AUTH_TRUST_HOST can use the request host.
+ */
+export function resolveOAuthSignInOrigin(): string | undefined {
+  const raw = process.env.AUTH_URL || process.env.NEXTAUTH_URL
+  if (!raw) return undefined
+  try {
+    const u = new URL(raw)
+    if (isLoopbackHostname(u.hostname)) return undefined
+    return u.origin
+  } catch {
+    return undefined
+  }
+}
+
+/** True when post-login redirects may leave the current host for a known BEVEL surface. */
+export function isAllowedAuthRedirectHostname(hostname: string): boolean {
+  return isAllowedCrossHostRedirect(hostname)
 }
 
 export function isGoogleAuthConfigured(): boolean {

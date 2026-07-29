@@ -1,10 +1,12 @@
 export {
   createTenantAuthConfig,
   homePathForTenant,
+  isAllowedAuthRedirectHostname,
   isGoogleAuthConfigured,
   isGitHubAuthConfigured,
   isOtpAuthEnabled,
   phoneOtpAllowedOnTenant,
+  resolveOAuthSignInOrigin,
   tenantHasClosedMembership,
   type CreateTenantAuthConfigOptions,
 } from './config'

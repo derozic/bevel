@@ -9,9 +9,11 @@ import {
   platformEntryTenant,
 } from '@bevel/tenant-config'
 import {
+  isAllowedAuthRedirectHostname,
   isGitHubAuthConfigured,
   isGoogleAuthConfigured,
   isOtpAuthEnabled,
+  resolveOAuthSignInOrigin,
 } from '@bevel/auth'
 import { auth } from '@/auth'
 import { BevelCutMark } from '@/components/BevelCutMark'
@@ -21,13 +23,13 @@ import { OtpSignIn } from './OtpSignIn'
 
 const ERROR_COPY: Record<string, string> = {
   Configuration:
-    'Sign-in hit a server configuration error. Confirm Google OAuth redirect URIs include this host’s /api/auth/callback/google, then hard-refresh.',
+    'Sign-in could not verify the Google handoff (stale OAuth cookies or host mismatch). Hard-refresh this page (or clear site data for bevel.is), then try Continue with Google again from https://bevel.is/login.',
   AccessDenied:
     'Access denied. Use an email domain authorized for this workspace, or claim a new workspace for your organization.',
   OAuthAccountNotLinked:
     'This email is already linked to another sign-in method. Try the original provider.',
   OAuthCallback:
-    'Google returned an error. Confirm the OAuth redirect URI matches this host’s /api/auth/callback/google.',
+    'Google returned an error. Confirm the OAuth redirect URI matches https://bevel.is/api/auth/callback/google, then hard-refresh.',
   OAuthSignin: 'Could not start Google sign-in. Try again in a moment.',
   MissingCSRF:
     'Sign-in form expired. Hard-refresh this page, then try Continue with Google again.',
@@ -43,6 +45,19 @@ const ERROR_COPY: Record<string, string> = {
   HandoffMissing: 'Session handoff code was missing. Sign in again from this host.',
   HandoffFailed:
     'Could not complete cross-host sign-in. Sign in directly on this workspace host, or try again.',
+}
+
+/** Relative path, or absolute URL on an allowed BEVEL host (cross-host return). */
+function sanitizeLoginCallbackUrl(raw: string | undefined): string {
+  if (!raw) return '/welcome'
+  if (raw.startsWith('/') && !raw.startsWith('//')) return raw
+  try {
+    const u = new URL(raw)
+    if (isAllowedAuthRedirectHostname(u.hostname)) return u.href
+  } catch {
+    /* fall through */
+  }
+  return '/welcome'
 }
 
 export default async function LoginPage({
@@ -77,12 +92,8 @@ export default async function LoginPage({
   const isPlatformTenant = isPlatformEntryTenantSlug(tenant.slug)
   const isPlatform = platformEntry || isPlatformTenant
 
-  const callbackUrl =
-    params.callbackUrl &&
-    params.callbackUrl.startsWith('/') &&
-    !params.callbackUrl.startsWith('//')
-      ? params.callbackUrl
-      : '/welcome'
+  const callbackUrl = sanitizeLoginCallbackUrl(params.callbackUrl)
+  const oauthOrigin = resolveOAuthSignInOrigin()
 
   // Honor callbackUrl when already signed in (e.g. /login?callbackUrl=/claim).
   if (session?.user) {
@@ -185,6 +196,7 @@ export default async function LoginPage({
           <GoogleSignInButton
             callbackUrl={callbackUrl}
             label="Continue with Google"
+            oauthOrigin={oauthOrigin}
           />
         ) : (
           <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
@@ -192,7 +204,12 @@ export default async function LoginPage({
           </div>
         )}
 
-        {githubOk ? <GitHubSignInButton callbackUrl={callbackUrl} /> : null}
+        {githubOk ? (
+          <GitHubSignInButton
+            callbackUrl={callbackUrl}
+            oauthOrigin={oauthOrigin}
+          />
+        ) : null}
 
         {otpOk ? (
           <>
