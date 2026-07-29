@@ -93,6 +93,11 @@ Federation: well-known + :8448 per Synapse docs (`services/matrix/`).
 
 See [MATRIX_PR_PLAN.md](./MATRIX_PR_PLAN.md).
 
+## EC2 cutover (cheap same-box)
+
+See **[MATRIX_EC2.md](./MATRIX_EC2.md)** — ~$0 extra on bevel-prod, MemoryMax 512M,
+federation off. Install: `sudo bash scripts/install-matrix-synapse.sh`.
+
 ## Verify
 
 ```bash

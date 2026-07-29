@@ -1,9 +1,10 @@
-# Synapse homeserver template for BEVEL
-# Copy to homeserver.yaml and adjust paths/secrets.
+# Cheap same-box Synapse for BEVEL (matrix.bevel.is → 127.0.0.1:8008)
+# Federation OFF by default. Memory-conscious.
 
 server_name: "matrix.bevel.is"
-pid_file: /opt/bevel/services/matrix/homeserver.pid
+pid_file: /opt/bevel/services/matrix/data/homeserver.pid
 public_baseurl: "https://matrix.bevel.is/"
+soft_file_limit: 8192
 
 listeners:
   - port: 8008
@@ -12,7 +13,7 @@ listeners:
     x_forwarded: true
     bind_addresses: ["127.0.0.1"]
     resources:
-      - names: [client, federation]
+      - names: [client]
         compress: false
 
 database:
@@ -22,23 +23,39 @@ database:
     password: "CHANGE_ME"
     database: bevel_matrix
     host: 127.0.0.1
-    cp_min: 2
-    cp_max: 10
+    cp_min: 1
+    cp_max: 5
+    keepalives_idle: 30
 
 log_config: "/opt/bevel/services/matrix/log.config"
-media_store_path: /opt/bevel/services/matrix/media
-uploads_path: /opt/bevel/services/matrix/uploads
-max_upload_size: 50M
+media_store_path: /opt/bevel/services/matrix/data/media
+uploads_path: /opt/bevel/services/matrix/data/uploads
+max_upload_size: 10M
+# Cap media growth on a small root volume
+max_image_pixels: "16M"
 
-# Registration only via AS / OIDC — disable open reg
 enable_registration: false
-registration_shared_secret: "CHANGE_ME_REG_SECRET"
+# registration_shared_secret set by install script
 
 report_stats: false
+serve_server_wellknown: true
 
-# App service
+# No open federation on the cheap shared host
+federation_domain_whitelist: []
+allow_public_rooms_over_federation: false
+allow_public_rooms_without_auth: false
+
+# Limit background work
+presence:
+  enabled: false
+caches:
+  global_factor: 0.25
+
 app_service_config_files:
   - /opt/bevel/services/matrix/appservice-bevel.yaml
 
-# Federation off by default; enable per enterprise policy
-federation_domain_whitelist: []
+# Signing key path filled by install
+signing_key_path: "/opt/bevel/services/matrix/data/matrix.bevel.is.signing.key"
+
+trusted_key_servers: []
+suppress_key_server_warning: true

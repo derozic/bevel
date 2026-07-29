@@ -1,0 +1,32 @@
+[Unit]
+Description=BEVEL Matrix Synapse (cheap same-box)
+After=network-online.target postgresql.service bevel-api.service
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/bevel/services/matrix
+Environment=SYNAPSE_CACHE_FACTOR=0.25
+# Keep under ~512MB on the shared 3.7Gi host
+MemoryHigh=384M
+MemoryMax=512M
+TasksMax=512
+LimitNOFILE=8192
+OOMScoreAdjust=300
+ExecStart=/opt/bevel/services/matrix/.venv/bin/python -m synapse.app.homeserver \
+  --config-path=/opt/bevel/services/matrix/homeserver.yaml
+Restart=always
+RestartSec=8
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/opt/bevel/services/matrix /opt/bevel
+
+[Install]
+WantedBy=multi-user.target
