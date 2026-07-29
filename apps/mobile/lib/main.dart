@@ -152,7 +152,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
         });
         // Prefer short public channel path for focus.
         final path = channel != null && channel.isNotEmpty
-            ? '/^${channel.toLowerCase()}'
+            ? '/~${channel.toLowerCase()}'
             : (action.route != null && action.route != '/native-hub'
                 ? action.route!
                 : '/');

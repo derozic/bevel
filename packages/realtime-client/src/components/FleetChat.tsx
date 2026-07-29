@@ -948,7 +948,7 @@ export function FleetChat({
 
   const sessionsPath = fleet.sessionsPath
   const headerLabel = isChannel
-    ? `^${channelSlug}`
+    ? `~${channelSlug}`
     : sessionTitle ?? (sessionId ? `Session ${sessionId.slice(0, 8)}…` : BEVEL_COPY.connectingSession)
 
   const visible = visibleMessages(messages)

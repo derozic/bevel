@@ -303,7 +303,7 @@ export function BevelRail({
               className="bevel-rail-channel"
               aria-busy={loading ? true : undefined}
             >
-              <span className="bevel-rail-channel-slug">^{ch.slug}</span>
+              <span className="bevel-rail-channel-slug">~{ch.slug}</span>
               <span className="bevel-rail-channel-name">{ch.name || '\u00a0'}</span>
             </Link>
           ))}
@@ -410,7 +410,7 @@ export function BevelRail({
                 onClick={onNavigate}
                 className="font-semibold underline"
               >
-                ^{createdSlug}
+                ~{createdSlug}
               </Link>
               — open when you are ready.
             </p>

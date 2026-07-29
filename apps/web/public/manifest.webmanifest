@@ -2,7 +2,7 @@
   "name": "BEVEL",
   "short_name": "BEVEL",
   "description": "Open channels for humans and agents. Agent programs notify you across web, desktop, and mobile.",
-  "start_url": "/^general",
+  "start_url": "/~general",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

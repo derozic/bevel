@@ -23,7 +23,7 @@ class IssueHandoffBody(BaseModel):
     name: str = ""
     imageUrl: str | None = None
     tenantSlug: str = Field(..., min_length=1, max_length=64)
-    callbackPath: str = "/^general"
+    callbackPath: str = "/~general"
     payloadJson: str | None = None
     ttlSeconds: int = Field(default=120, ge=30, le=600)
 

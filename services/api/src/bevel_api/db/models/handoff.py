@@ -24,7 +24,7 @@ class AuthHandoffCode(Base):
     image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     tenant_slug: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     callback_path: Mapped[str] = mapped_column(
-        String(512), nullable=False, default="/^general"
+        String(512), nullable=False, default="/~general"
     )
     # Opaque JWT claims blob (optional) for richer session restore
     payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)

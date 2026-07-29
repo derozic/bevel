@@ -22,7 +22,7 @@ function formatWhen(ts: number): string {
 }
 
 function roomLabel(hit: SearchHitDto): string {
-  if (hit.kind === 'channel') return `^${hit.channelSlug ?? hit.sessionId}`
+  if (hit.kind === 'channel') return `~${hit.channelSlug ?? hit.sessionId}`
   return hit.sessionId.startsWith('dm-') ? 'Direct' : `Session ${hit.sessionId.slice(0, 8)}…`
 }
 

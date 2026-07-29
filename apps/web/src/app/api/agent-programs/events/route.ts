@@ -202,7 +202,7 @@ export async function POST(request: Request) {
     agentId: formatted.agentId,
     programId: raw.programId || 'program',
     severity: raw.severity || 'info',
-    url: `/^${channelSlug}`,
+    url: `/~${channelSlug}`,
     tag: `program-${formatted.agentId}-${msgId}`,
   }
 

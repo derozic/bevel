@@ -128,7 +128,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       projectPath: null, // resolved by bridge from env / ~/dev
       prompt:
           'Continue work from BEVEL workspace: ${uri.toString()}'
-          '${channel != null ? ' (channel ^$channel)' : ''}'
+          '${channel != null ? ' (channel ~$channel)' : ''}'
           '${tenant != null ? ' tenant=$tenant' : ''}. '
           'Use skill bevel-workspace. When done: open returnUrl '
           '(bevel://hermes/return) with a short status summary.',
@@ -143,7 +143,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     );
   }
 
-  /// Support /bevel/{slug}, /^{slug}, and /bevel/c/{slug}.
+  /// Support /bevel/{slug}, /~{slug}, legacy /^{slug}, and /bevel/c/{slug}.
   static String? _channelFromUri(Uri uri) {
     final path = uri.path;
     if (path.startsWith('/bevel/c/')) {
@@ -157,14 +157,15 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       if (slug.isEmpty || slug == 'talk' || slug == 'session') return null;
       return slug;
     }
-    // Public short path: /^general
+    // Public short path: /~general (also accept legacy /^general)
     final segs = path.split('/').where((s) => s.isNotEmpty).toList();
-    if (segs.isNotEmpty && segs.first.startsWith('^')) {
+    if (segs.isNotEmpty &&
+        (segs.first.startsWith('~') || segs.first.startsWith('^'))) {
       final slug = segs.first.substring(1);
       return slug.isEmpty ? null : slug;
     }
     // Fragment sometimes used
-    if (uri.fragment.startsWith('^')) {
+    if (uri.fragment.startsWith('~') || uri.fragment.startsWith('^')) {
       return uri.fragment.substring(1);
     }
     return null;

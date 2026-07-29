@@ -35,7 +35,7 @@ async def issue(
     name: str = "",
     image_url: str | None = None,
     tenant_slug: str,
-    callback_path: str = "/^general",
+    callback_path: str = "/~general",
     payload_json: str | None = None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
 ) -> tuple[str, AuthHandoffCode]:
@@ -48,7 +48,7 @@ async def issue(
         name=name or "",
         image_url=image_url,
         tenant_slug=tenant_slug,
-        callback_path=callback_path or "/^general",
+        callback_path=callback_path or "/~general",
         payload_json=payload_json,
         expires_at=_utcnow() + timedelta(seconds=ttl_seconds),
         used_at=None,

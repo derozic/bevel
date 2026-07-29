@@ -419,7 +419,7 @@ class HermesBridge {
           'Return to BEVEL with a short status summary via returnUrl',
       prompt: prompt ??
           'Continue from BEVEL workspace: $workspaceUrl'
-              '${channel != null ? ' (channel ^$channel)' : ''}'
+              '${channel != null ? ' (channel ~$channel)' : ''}'
               '${tenant != null ? ' tenant=$tenant' : ''}'
               '${projectPath != null ? '\nProject path: $projectPath' : ''}'
               '\n\nClipboard has BEVEL_HERMES_HANDOFF JSON. '

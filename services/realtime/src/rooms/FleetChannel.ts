@@ -61,10 +61,10 @@ function uid(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-/** Parse in-message tags. Prefer `^tag`; still accept legacy `#tag`. */
+/** Parse in-message tags. Prefer `~tag`; still accept legacy `^tag` / `#tag`. */
 function parseMessageTags(text: string): string[] {
   const tags = new Set<string>()
-  for (const m of text.matchAll(/[#^]([a-z0-9][a-z0-9_-]*)\b/gi)) {
+  for (const m of text.matchAll(/[~#^]([a-z0-9][a-z0-9_-]*)\b/gi)) {
     tags.add(m[1].toLowerCase())
   }
   return [...tags]
@@ -100,7 +100,7 @@ export class FleetChannel extends Room {
         : channel?.defaultAgentIds ?? ['hermes', 'johnny']
     ).map((id) => id.toLowerCase())
 
-    this.state.title = channel?.name ?? `^${this.channelSlug}`
+    this.state.title = channel?.name ?? `~${this.channelSlug}`
     for (const tag of channel?.tags ?? []) {
       this.state.tags.push(tag)
     }

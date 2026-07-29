@@ -233,7 +233,7 @@ export function ChannelChatShell({
               body,
               agentId: event.agentId,
               tag: `msg-${event.id}`,
-              url: `/^${channelSlug}`,
+              url: `/~${channelSlug}`,
               icon: '/icons/icon-192.png',
             })
           })()
