@@ -96,7 +96,9 @@ async def post_workspace_message(
         )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
-    # Best-effort Matrix dual-write (no-op when MATRIX_ENABLED off)
+    # Best-effort Matrix dual-write (no-op when MATRIX_ENABLED off).
+    # publish_message_to_matrix isolates DB work in a nested transaction so
+    # failures never roll back the primary message append.
     try:
         from bevel_api.lib.matrix_dual_write import publish_message_to_matrix
 

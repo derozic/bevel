@@ -154,12 +154,21 @@ class MatrixClient:
         invite: list[str] | None = None,
         is_direct: bool = False,
     ) -> str | None:
+        # Always private: channel aliases are guessable (#tenant_channel:server).
+        # public_chat would let any HS-local user join other tenants' rooms.
         body: dict[str, Any] = {
             "name": name,
             "topic": topic or name,
-            "preset": "private_chat" if is_direct else "public_chat",
+            "preset": "private_chat",
+            "is_direct": is_direct,
             "room_alias_name": alias_localpart,
             "creation_content": {"m.federate": False},
+            "initial_state": [
+                {
+                    "type": "m.room.history_visibility",
+                    "content": {"history_visibility": "shared"},
+                }
+            ],
         }
         if invite:
             body["invite"] = invite

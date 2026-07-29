@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bevel_api.lib.matrix_agents import federation_allowed
 from bevel_api.lib.matrix_client import (
     agent_mxid,
     channel_alias,
@@ -49,3 +50,32 @@ def test_status_payload(monkeypatch) -> None:
     assert "phases" in p
     assert p["phases"]["dualWrite"] is True
     assert p["phases"]["appservice"] is True
+
+
+def test_federation_allowed_fail_closed(monkeypatch) -> None:
+    monkeypatch.setenv("MATRIX_SERVER_NAME", "matrix.bevel.is")
+    assert federation_allowed(matrix_federation=False, remote_server="a.example") is False
+    assert (
+        federation_allowed(
+            matrix_federation=True,
+            remote_server="matrix.bevel.is",
+        )
+        is True
+    )
+    # Empty allowlist must NOT open federation to the world
+    assert (
+        federation_allowed(
+            matrix_federation=True,
+            remote_server="evil.example",
+            allowlist=None,
+        )
+        is False
+    )
+    assert (
+        federation_allowed(
+            matrix_federation=True,
+            remote_server="partner.example",
+            allowlist=["partner.example"],
+        )
+        is True
+    )

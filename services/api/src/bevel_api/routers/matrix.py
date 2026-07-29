@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bevel_api.deps import get_session
+from bevel_api.lib.internal_auth import require_internal
 from bevel_api.lib.matrix_client import hs_token, matrix_enabled, server_name
 from bevel_api.lib.matrix_agents import agent_identity_payload, ensure_agent_mxid
 from bevel_api.lib.matrix_bridges import bridge_registry_status
@@ -29,18 +31,36 @@ router = APIRouter(prefix="/v1/matrix", tags=["matrix"])
 as_router = APIRouter(tags=["matrix-appservice"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+InternalAuth = Annotated[None, Depends(require_internal)]
 
 
-def _check_hs_token(authorization: str | None = Header(default=None)) -> None:
+def _extract_hs_token(
+    authorization: str | None,
+    access_token: str | None,
+) -> str | None:
+    """Accept Bearer header (spec) or access_token query (legacy AS clients)."""
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip() or None
+    if access_token and access_token.strip():
+        return access_token.strip()
+    return None
+
+
+def _check_hs_token(
+    authorization: str | None = None,
+    access_token: str | None = None,
+) -> None:
+    """Fail closed: appservice traffic requires a configured, matching HS token."""
     expected = hs_token()
     if not expected:
-        if not matrix_enabled():
-            return
         raise HTTPException(status_code=503, detail="MATRIX_HS_TOKEN not configured")
-    token = None
-    if authorization and authorization.lower().startswith("bearer "):
-        token = authorization[7:].strip()
-    if token != expected:
+    token = _extract_hs_token(authorization, access_token)
+    # compare_digest requires equal length; mismatched length is always invalid
+    if (
+        not token
+        or len(token) != len(expected)
+        or not hmac.compare_digest(token, expected)
+    ):
         raise HTTPException(status_code=401, detail="Invalid HS token")
 
 
@@ -65,6 +85,7 @@ async def matrix_status() -> dict[str, Any]:
 async def ensure_room(
     body: EnsureRoomBody,
     session: SessionDep,
+    _auth: InternalAuth,
 ) -> dict[str, Any]:
     if not matrix_enabled():
         raise HTTPException(status_code=503, detail="Matrix disabled")
@@ -90,6 +111,7 @@ async def ensure_room(
 async def publish(
     body: PublishBody,
     session: SessionDep,
+    _auth: InternalAuth,
 ) -> dict[str, Any]:
     if not matrix_enabled():
         raise HTTPException(status_code=503, detail="Matrix disabled")
@@ -111,6 +133,7 @@ async def get_room_map(
     tenant_slug: str,
     channel_slug: str,
     session: SessionDep,
+    _auth: InternalAuth,
 ) -> dict[str, Any]:
     tenant = await tenants_repo.get_by_slug(session, tenant_slug.lower().strip())
     if not tenant:
@@ -124,13 +147,14 @@ async def get_room_map(
 
 
 @router.get("/bridges")
-async def list_bridges() -> dict[str, Any]:
+async def list_bridges(_auth: InternalAuth) -> dict[str, Any]:
     return {"bridges": bridge_registry_status()}
 
 
 @router.get("/agents/{tenant_slug}")
 async def list_agent_mxids(
     tenant_slug: str,
+    _auth: InternalAuth,
     agents: str = "",
 ) -> dict[str, Any]:
     """Return Matrix ids for comma-separated agent ids (Phase 4)."""
@@ -151,6 +175,7 @@ class EnsureAgentBody(BaseModel):
 async def ensure_agent(
     body: EnsureAgentBody,
     session: SessionDep,
+    _auth: InternalAuth,
 ) -> dict[str, Any]:
     tenant = await tenants_repo.get_by_slug(session, body.tenant_slug.lower().strip())
     if not tenant:
@@ -174,9 +199,10 @@ async def as_transaction(
     request: Request,
     session: SessionDep,
     authorization: str | None = Header(default=None),
+    access_token: str | None = Query(default=None),
 ) -> dict[str, Any]:
     """Receive events from the homeserver (appservice push)."""
-    _check_hs_token(authorization)
+    _check_hs_token(authorization, access_token)
     try:
         payload = await request.json()
     except Exception as exc:
@@ -184,6 +210,7 @@ async def as_transaction(
 
     events = payload.get("events") or []
     ingested = 0
+    failures = 0
     for ev in events:
         if not isinstance(ev, dict):
             continue
@@ -202,11 +229,10 @@ async def as_transaction(
         content = ev.get("content") or {}
         body = str(content.get("body") or "")
         sender = str(ev.get("sender") or "matrix")
-        ch = await channels_repo.ensure_channel(
-            session, room.tenant_id, room.channel_slug
-        )
+        # Stable deterministic id from full event_id (avoid truncation collisions)
+        safe_ev = event_id.replace("$", "").replace(":", "_")
         msg = {
-            "id": f"msg_mx_{event_id[-16:].replace('$', '')}",
+            "id": f"msg_mx_{safe_ev}"[:64],
             "body": body,
             "speakerId": sender,
             "speakerName": sender.split(":")[0].lstrip("@"),
@@ -217,24 +243,36 @@ async def as_transaction(
             "matrixEventId": event_id,
         }
         try:
-            record = await messages_repo.append(
-                session,
-                tenant_id=room.tenant_id,
-                channel_id=ch.id,
-                channel_slug=ch.slug,
-                msg=msg,
-            )
-            await matrix_repo.record_event(
-                session,
-                tenant_id=room.tenant_id,
-                message_id=record.id,
-                event_id=event_id,
-                room_id=room_id,
-                direction="in",
-            )
+            async with session.begin_nested():
+                ch = await channels_repo.ensure_channel(
+                    session, room.tenant_id, room.channel_slug
+                )
+                record = await messages_repo.append(
+                    session,
+                    tenant_id=room.tenant_id,
+                    channel_id=ch.id,
+                    channel_slug=ch.slug,
+                    msg=msg,
+                )
+                await matrix_repo.record_event(
+                    session,
+                    tenant_id=room.tenant_id,
+                    message_id=record.id,
+                    event_id=event_id,
+                    room_id=room_id,
+                    direction="in",
+                )
             ingested += 1
         except Exception:
+            failures += 1
             log.exception("failed to ingest matrix event %s", event_id)
+
+    # Non-zero failures → 5xx so Synapse retries the transaction
+    if failures:
+        raise HTTPException(
+            status_code=500,
+            detail=f"failed to ingest {failures} event(s) in txn {txn_id}",
+        )
 
     return {"ok": True, "txnId": txn_id, "ingested": ingested}
 
@@ -243,8 +281,9 @@ async def as_transaction(
 async def as_query_user(
     user_id: str,
     authorization: str | None = Header(default=None),
+    access_token: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    _check_hs_token(authorization)
+    _check_hs_token(authorization, access_token)
     return {}
 
 
@@ -252,16 +291,18 @@ async def as_query_user(
 async def as_query_room(
     room_alias: str,
     authorization: str | None = Header(default=None),
+    access_token: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    _check_hs_token(authorization)
+    _check_hs_token(authorization, access_token)
     return {}
 
 
 @as_router.get("/thirdparty/protocol/bevel")
 async def as_protocol(
     authorization: str | None = Header(default=None),
+    access_token: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    _check_hs_token(authorization)
+    _check_hs_token(authorization, access_token)
     return {
         "user_fields": ["bevel_id"],
         "location_fields": ["channel"],

@@ -78,8 +78,17 @@ async def publish_message_to_matrix(
     channel_slug: str,
     message: dict[str, Any],
 ) -> str | None:
-    """Send a BEVEL message into its Matrix room. Returns event_id or None."""
+    """Send a BEVEL message into its Matrix room. Returns event_id or None.
+
+    Best-effort: DB side-effects run in a nested transaction so IntegrityError
+    / flush failures cannot poison the caller's session (message append SoT).
+    """
     if not matrix_enabled():
+        return None
+
+    # Never re-publish messages that originated from Matrix (echo loop guard)
+    source = str(message.get("source") or "").lower()
+    if source == "matrix" or message.get("matrixEventId"):
         return None
 
     status = (message.get("status") or "final").lower()
@@ -98,60 +107,68 @@ async def publish_message_to_matrix(
     if await matrix_repo.get_event_by_message(session, message_id):
         return None  # already published
 
-    room = await ensure_channel_room(
-        session,
-        tenant_id=tenant_id,
-        tenant_slug=tenant_slug,
-        channel_slug=channel_slug,
-    )
-    if not room:
+    try:
+        async with session.begin_nested():
+            room = await ensure_channel_room(
+                session,
+                tenant_id=tenant_id,
+                tenant_slug=tenant_slug,
+                channel_slug=channel_slug,
+            )
+            if not room:
+                return None
+
+            speaker_id = str(
+                message.get("speakerId") or message.get("speaker_id") or "unknown"
+            )
+            speaker_type = (
+                message.get("speakerType")
+                or message.get("speaker_type")
+                or (message.get("metadata") or {}).get("speakerType")
+                or "human"
+            )
+            if speaker_type == "agent" or speaker_id.startswith("agent:"):
+                agent = speaker_id.replace("agent:", "")
+                sender = agent_mxid(tenant_slug, agent)
+                kind = "agent"
+            else:
+                # Scope human MXIDs by tenant to avoid cross-tenant unique collisions
+                sender = user_mxid(f"{tenant_slug}_{speaker_id}")
+                kind = "user"
+
+            await matrix_repo.upsert_user_map(
+                session,
+                tenant_id=tenant_id,
+                local_id=speaker_id,
+                mxid=sender,
+                kind=kind,
+                display_name=str(
+                    message.get("speakerName")
+                    or message.get("speaker_name")
+                    or speaker_id
+                ),
+            )
+
+            client = MatrixClient()
+            txn = f"bevel_{message_id}_{uuid.uuid4().hex[:8]}"
+            event_id = await client.send_text(
+                room.room_id, body, txn_id=txn, sender=sender
+            )
+            if not event_id:
+                return None
+
+            await matrix_repo.record_event(
+                session,
+                tenant_id=tenant_id,
+                message_id=message_id,
+                event_id=event_id,
+                room_id=room.room_id,
+                direction="out",
+            )
+            return event_id
+    except Exception:
+        log.exception("matrix dual-write failed for message %s", message_id)
         return None
-
-    speaker_id = str(
-        message.get("speakerId") or message.get("speaker_id") or "unknown"
-    )
-    speaker_type = (
-        message.get("speakerType")
-        or message.get("speaker_type")
-        or (message.get("metadata") or {}).get("speakerType")
-        or "human"
-    )
-    if speaker_type == "agent" or speaker_id.startswith("agent:"):
-        agent = speaker_id.replace("agent:", "")
-        sender = agent_mxid(tenant_slug, agent)
-        kind = "agent"
-    else:
-        sender = user_mxid(speaker_id)
-        kind = "user"
-
-    await matrix_repo.upsert_user_map(
-        session,
-        tenant_id=tenant_id,
-        local_id=speaker_id,
-        mxid=sender,
-        kind=kind,
-        display_name=str(
-            message.get("speakerName") or message.get("speaker_name") or speaker_id
-        ),
-    )
-
-    client = MatrixClient()
-    txn = f"bevel_{message_id}_{uuid.uuid4().hex[:8]}"
-    event_id = await client.send_text(
-        room.room_id, body, txn_id=txn, sender=sender
-    )
-    if not event_id:
-        return None
-
-    await matrix_repo.record_event(
-        session,
-        tenant_id=tenant_id,
-        message_id=message_id,
-        event_id=event_id,
-        room_id=room.room_id,
-        direction="out",
-    )
-    return event_id
 
 
 def matrix_status_payload() -> dict[str, Any]:

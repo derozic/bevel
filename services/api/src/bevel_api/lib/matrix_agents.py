@@ -43,15 +43,21 @@ def federation_allowed(
     remote_server: str,
     allowlist: list[str] | None = None,
 ) -> bool:
-    """Enterprise federation gate — empty allowlist means any when flag on."""
+    """Enterprise federation gate.
+
+    Fail closed: when the flag is on, an explicit allowlist is required for
+    remote servers. Empty/None allowlist only permits the local server_name.
+    """
     if not matrix_federation:
         return False
     remote = remote_server.lower().strip()
+    if not remote:
+        return False
     if remote == server_name().lower():
         return True
     if not allowlist:
-        return True
-    return remote in {a.lower().strip() for a in allowlist}
+        return False
+    return remote in {a.lower().strip() for a in allowlist if a.strip()}
 
 
 def agent_identity_payload(
