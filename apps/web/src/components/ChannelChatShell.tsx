@@ -198,7 +198,7 @@ export function ChannelChatShell({
       githubLogin={workMeta?.login ?? session?.githubLogin ?? null}
       onLinkGitHub={() =>
         signIn('github', {
-          callbackUrl: `/^product?github=linked&from=${encodeURIComponent(channelSlug)}`,
+          callbackUrl: `/~product?github=linked&from=${encodeURIComponent(channelSlug)}`,
         })
       }
       authError={

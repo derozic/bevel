@@ -45,8 +45,8 @@ function tokenize(text: string): string[] {
 }
 
 function channelHref(slug: string, messageId: string, query: string): string {
-  const s = slug.replace(/^[\^#]+/, '').toLowerCase()
-  return `/^${s}?msg=${encodeURIComponent(messageId)}&q=${encodeURIComponent(query)}`
+  const s = slug.replace(/^[\^#~]+/, '').toLowerCase()
+  return `/~${s}?msg=${encodeURIComponent(messageId)}&q=${encodeURIComponent(query)}`
 }
 
 function sessionHref(sessionId: string, messageId: string, query: string): string {

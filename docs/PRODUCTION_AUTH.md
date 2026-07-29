@@ -5,10 +5,10 @@
 After Google sign-in, the browser lands on:
 
 ```
-https://localhost:41009/#general
+https://localhost:41009/~general
 ```
 
-Workspace home is the hash channel `/#general` (fragment is not sent to the server).
+Workspace home is the tilde path `/~general` (RFC unreserved — never percent-encoded).
 `41009` is the **systemd bind port** for BEVEL on the 2x4m EC2 host
 (`next start --port 41009 --hostname 127.0.0.1`).
 
@@ -17,7 +17,7 @@ Workspace home is the hash channel `/#general` (fragment is not sent to the serv
 1. Ansible unit for `bevel` sets `skip_shared_env: true` (correct — separate app from 2x4m monorepo env).
 2. Older `service.j2` only injected `AUTH_URL` / `NEXTAUTH_URL` when **not** `skip_shared_env`.
 3. Auth.js therefore built post-login redirects from the **request / bind base** → `http://localhost:41009`.
-4. Relative callback `/#general` became `https://localhost:41009/#general` when bind host leaked.
+4. Relative callback `/~general` became `https://localhost:41009/~general` when bind host leaked.
 
 ### Fix
 
@@ -46,7 +46,7 @@ https://bevel.2x4m.cc/api/auth/callback/google
    is on `bevel.2x4m.cc`:
    - `/welcome` issues a short-lived code via FastAPI `POST /api/v1/auth/handoff`
      (Postgres table `auth_handoff_codes`, internal key required)
-   - Redirect to `https://bevel.2x4m.cc/api/auth/handoff?code=…&callbackUrl=/#general`
+   - Redirect to `https://bevel.2x4m.cc/api/auth/handoff?code=…&callbackUrl=/~general`
    - Org host redeems code → Auth.js credentials provider `handoff` → host-local session
 
 Cookie domain: `AUTH_COOKIE_DOMAIN=.bevel.is` applies only when the request host is under
@@ -102,4 +102,4 @@ curl -s https://bevel.2x4m.cc/api/auth/providers | jq .
 # callbackUrl should be https://bevel.2x4m.cc/...
 ```
 
-Sign in → land on `https://bevel.2x4m.cc/#general` **on that host**.
+Sign in → land on `https://bevel.2x4m.cc/~general` **on that host**.

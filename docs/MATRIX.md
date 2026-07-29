@@ -9,7 +9,7 @@ Sync, native group VoIP, simplified crypto, faster join.
 ## Architecture
 
 ```
-BEVEL UI (/#channel) ──► Colyseus (presence / agent loops)
+BEVEL UI (/~channel) ──► Colyseus (presence / agent loops)
          │
          └── dual-write ──► Message Plane (Postgres)
                                   │

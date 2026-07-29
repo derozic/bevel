@@ -1,14 +1,17 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { requireTenantFromRequest } from '@bevel/tenant-config'
+import { auth } from '@/auth'
+import { BevelChatPane } from '@/components/BevelChatPane'
 import {
   BEVEL_ARCHIVE_PATH,
   BEVEL_TAGLINE,
   BEVEL_TALK_PATH,
-  bevelChannelHref,
+  bevelChannelPath,
   bevelPageTitle,
   normalizeBevelChannelSlug,
 } from '@/lib/bevel'
+import { resolveChatAgents } from '@/lib/chat-agents'
 
 export async function generateMetadata({
   params,
@@ -25,8 +28,8 @@ export async function generateMetadata({
 }
 
 /**
- * Legacy path `/bevel/:slug` → canonical hash URL `/#slug`.
- * Middleware also 308s here; this covers direct server navigations.
+ * Channel page — public URL is `/~:slug` (next.config rewrite).
+ * Direct `/bevel/:slug` is redirected to `/~:slug` by middleware.
  */
 export default async function BevelChannelPage({
   params,
@@ -35,6 +38,7 @@ export default async function BevelChannelPage({
   params: Promise<{ slug: string }>
   searchParams: Promise<{ agents?: string; msg?: string; q?: string }>
 }) {
+  const session = await auth()
   const { slug } = await params
   const { agents: agentsParam, msg, q } = await searchParams
 
@@ -45,15 +49,21 @@ export default async function BevelChannelPage({
     redirect(BEVEL_ARCHIVE_PATH)
   }
 
+  const initialAgents = resolveChatAgents(agentsParam)
   const channelSlug = normalizeBevelChannelSlug(slug)
-  const paramsQs = new URLSearchParams()
-  if (agentsParam?.trim()) paramsQs.set('agents', agentsParam.trim())
-  if (msg?.trim()) paramsQs.set('msg', msg.trim())
-  if (q?.trim()) paramsQs.set('q', q.trim())
-  const qs = paramsQs.toString()
-  // Prefer bevelChannelHref when only agents; full query support here.
-  if (qs && (msg || q)) {
-    redirect(qs ? `/?${qs}#${channelSlug}` : `/#${channelSlug}`)
+
+  if (!session?.user) {
+    redirect(
+      `/login?callbackUrl=${encodeURIComponent(bevelChannelPath(channelSlug))}`,
+    )
   }
-  redirect(bevelChannelHref(channelSlug, agentsParam))
+
+  return (
+    <BevelChatPane
+      channelSlug={channelSlug}
+      initialAgents={initialAgents}
+      focusMessageId={msg}
+      highlightQuery={q}
+    />
+  )
 }

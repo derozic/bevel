@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const callbackUrl =
     request.nextUrl.searchParams.get('callbackUrl') ||
     request.nextUrl.searchParams.get('callback') ||
-    '/#general'
+    '/~general'
 
   if (!code) {
     return NextResponse.redirect(
@@ -21,11 +21,10 @@ export async function GET(request: NextRequest) {
   }
 
   // Relative callback only — never open-redirect off-host.
-  // Hash form `/#general` is allowed (fragment after path).
   const safeCallback =
     callbackUrl.startsWith('/') && !callbackUrl.startsWith('//')
       ? callbackUrl
-      : '/#general'
+      : '/~general'
 
   try {
     // Auth.js will redirect on success; on failure throws / returns error page.

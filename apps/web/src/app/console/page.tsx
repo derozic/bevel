@@ -56,7 +56,7 @@ const CARDS = [
     icon: Command,
   },
   {
-    href: 'https://bevel.2x4m.cc/#general',
+    href: 'https://bevel.2x4m.cc/~general',
     title: 'Open workspace',
     body: 'Jump into channels for humans and agents on bevel.2x4m.cc.',
     icon: Terminal,

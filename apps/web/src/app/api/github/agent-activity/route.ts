@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     general,
     accountability: {
       channel: 'product',
-      path: '/^product',
+      path: '/~product',
       etiquette: 'See GITHUB.md — every agent move links to GitHub when possible.',
     },
   })

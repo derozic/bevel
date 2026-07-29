@@ -53,7 +53,7 @@ export async function showBevelNotification(
       body: payload.body,
       icon: payload.icon || '/icons/icon-192.png',
       tag: payload.tag || `bevel-${payload.agentId || 'agent'}`,
-      url: payload.url || '/#general',
+      url: payload.url || '/~general',
       renotify: payload.severity === 'critical' || payload.severity === 'warning',
     })
     return true

@@ -2334,7 +2334,7 @@ export function IntegrationsSection() {
               <p className="mt-1 text-[11px] leading-snug text-muted">
                 Grants repo access for agents, issues →{' '}
                 <a
-                  href="/#product"
+                  href="/~product"
                   className="font-medium text-accent underline-offset-2 hover:underline"
                 >
                   ^product
@@ -2364,7 +2364,7 @@ export function IntegrationsSection() {
                 className="shrink-0 rounded-full bg-orange-500 px-4 text-white hover:bg-orange-600"
                 onClick={() =>
                   void signIn('github', {
-                    callbackUrl: `${window.location.origin}/^product?github=linked`,
+                    callbackUrl: `${window.location.origin}/~product?github=linked`,
                   })
                 }
               >

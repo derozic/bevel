@@ -38,7 +38,7 @@ export async function issueAuthHandoffCode(
         name: input.name || '',
         imageUrl: input.imageUrl || null,
         tenantSlug: input.tenantSlug,
-        callbackPath: input.callbackPath || '/#general',
+        callbackPath: input.callbackPath || '/~general',
       }),
       cache: 'no-store',
     })
