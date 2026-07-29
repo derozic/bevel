@@ -42,15 +42,8 @@ import { CreateChannelModal } from './CreateChannelModal'
 import { DaypartControl } from './DaypartControl'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 
-function BevelRailFooter({
-  plan,
-  featureAccess,
-  featureSet,
-}: {
-  plan?: TenantPlan | string
-  featureAccess?: FeatureAccess | string
-  featureSet?: ResolvedFeatureSet | null
-}) {
+/** Pinned rail footer — day-part + prefs only (no nested scroll, always tappable). */
+function BevelRailFooter() {
   const prefs = usePreferencesOptional()
   return (
     <div className="flex flex-col gap-1.5">
@@ -75,15 +68,6 @@ function BevelRailFooter({
         <ArrowLeftIcon className="h-3.5 w-3.5" />
         Home
       </Link>
-      {plan || featureAccess || featureSet ? (
-        <FeatureFlagsBar
-          compact
-          plan={plan}
-          featureAccess={featureAccess}
-          featureSet={featureSet}
-          className="mt-1 border-t border-border/60 pt-2"
-        />
-      ) : null}
     </div>
   )
 }
@@ -401,45 +385,52 @@ export function BevelRail({
             </button>
           ) : null}
         </div>
-      </div>
 
-      <div className="bevel-rail-notices" aria-live="polite">
-        {createdSlug ? (
-          <div className="bevel-rail-notice bevel-rail-notice--success">
-            <p className="font-medium">
-              Created{' '}
-              <Link
-                href={bevelChannelPath(createdSlug)}
-                onClick={onNavigate}
-                className="font-semibold underline"
+        {/* Flags live in the scroll region so the pinned footer stays short. */}
+        {plan || featureAccess || featureSet ? (
+          <FeatureFlagsBar
+            compact
+            plan={plan}
+            featureAccess={featureAccess}
+            featureSet={featureSet}
+            className="mt-3 border-t border-border/60 px-1 pt-2"
+          />
+        ) : null}
+
+        <div className="bevel-rail-notices" aria-live="polite">
+          {createdSlug ? (
+            <div className="bevel-rail-notice bevel-rail-notice--success">
+              <p className="font-medium">
+                Created{' '}
+                <Link
+                  href={bevelChannelPath(createdSlug)}
+                  onClick={onNavigate}
+                  className="font-semibold underline"
+                >
+                  {channelTag(createdSlug)}
+                </Link>
+                — open when you are ready.
+              </p>
+            </div>
+          ) : error ? (
+            <div className="bevel-rail-notice bevel-rail-notice--error">
+              <p className="font-medium">{error}</p>
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="mt-1 font-semibold underline"
               >
-                {channelTag(createdSlug)}
-              </Link>
-              — open when you are ready.
-            </p>
-          </div>
-        ) : error ? (
-          <div className="bevel-rail-notice bevel-rail-notice--error">
-            <p className="font-medium">{error}</p>
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="mt-1 font-semibold underline"
-            >
-              Retry
-            </button>
-          </div>
-        ) : (
-          <span className="bevel-rail-notices-placeholder" aria-hidden />
-        )}
+                Retry
+              </button>
+            </div>
+          ) : (
+            <span className="bevel-rail-notices-placeholder" aria-hidden />
+          )}
+        </div>
       </div>
 
       <div className="bevel-rail-footer">
-        <BevelRailFooter
-          plan={plan}
-          featureAccess={featureAccess}
-          featureSet={featureSet}
-        />
+        <BevelRailFooter />
       </div>
 
       <CreateChannelModal
