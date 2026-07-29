@@ -2,6 +2,8 @@
 # Primary assistant: Continuous (@continuous)
 # Partners: Northstar (evaluate), Loom (optimize)
 # Learnings persist to this repo's agent-memory branch.
+# Installs @derozic/agents@v0.1.3 (private) via AGENTS_TOKEN.
+# Self-contained (no private reusable workflow call).
 name: Continuous Engineering
 
 on:
@@ -9,13 +11,69 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   learn:
-    uses: derozic/agents/.github/workflows/continuous-engineering.reusable.yml@v0.1.2
-    with:
-      ref: v0.1.2
-      agents: "continuous northstar loom"
-    secrets:
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      AGENTS_TOKEN: ${{ secrets.AGENTS_TOKEN }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Authenticate to private agents repo
+        run: |
+          git config --global \
+            url."https://x-access-token:${{ secrets.AGENTS_TOKEN }}@github.com/".insteadOf \
+            "https://github.com/"
+
+      - name: Install agents CLI
+        run: pnpm add -g "github:derozic/agents#v0.1.3"
+
+      - name: Restore agent memory (agent-memory branch -> ./memory)
+        run: |
+          git config user.name  "derozic-agents[bot]"
+          git config user.email "agents@derozic.dev"
+          if git ls-remote --exit-code --heads origin agent-memory >/dev/null 2>&1; then
+            git fetch origin agent-memory:agent-memory
+            git worktree add memstore agent-memory
+          else
+            git worktree add --detach memstore
+            ( cd memstore && git checkout --orphan agent-memory && git reset --hard && git clean -fdx )
+          fi
+          mkdir -p memstore/memory
+          ln -sfn "$GITHUB_WORKSPACE/memstore/memory" memory
+
+      - name: Run continuous-engineering agents
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          AGENT_LOG_PATH: ./logs/agents
+        run: |
+          for a in continuous northstar loom; do
+            echo "::group::$a"
+            agents run "$a" --learn --dry || echo "$a failed (non-fatal)"
+            echo "::endgroup::"
+          done
+
+      - name: Persist memory to agent-memory branch
+        run: |
+          cd memstore
+          git add -A memory
+          if git diff --cached --quiet; then
+            echo "No memory changes to persist."
+          else
+            git commit -m "chore(agents): update memory [skip ci]"
+            git push origin agent-memory
+          fi
