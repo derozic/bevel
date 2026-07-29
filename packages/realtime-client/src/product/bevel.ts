@@ -15,12 +15,13 @@ export const BEVEL_POWERED_BY_LABEL = `Powered by ${BEVEL_NAME}` as const
 export const BEVEL_TRADEMARK_NOTICE = `${BEVEL_NAME} · Trademark by use` as const
 
 /**
- * Channel / tag sigil in the product surface.
- * BEVEL uses `^` so channels read as workspace tags.
+ * Channel / tag sigil in the product surface and public URLs.
+ * Uses `#` (hash fragment) so links stay unencoded: https://host/#general
+ * (Fragment is client-only — never sent to the HTTP server.)
  */
-export const CHANNEL_TAG_PREFIX = '^' as const
+export const CHANNEL_TAG_PREFIX = '#' as const
 
-/** Format a channel slug for display: `^general` */
+/** Format a channel slug for display: `#general` */
 export function channelTag(slug: string): string {
   const cleaned = slug.trim().replace(/^[#^]+/, '')
   return `${CHANNEL_TAG_PREFIX}${cleaned}`

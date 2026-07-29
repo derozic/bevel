@@ -85,8 +85,8 @@ function hrefFor(doc: SearchDocument, query: string): string {
     const slug = (doc.channelSlug ?? doc.sessionId)
       .toLowerCase()
       .replace(/^[\^#]+/, '')
-    // Public short path: /^general?msg=&q= (middleware rewrites to /bevel/*)
-    return `/^${encodeURIComponent(slug)}?msg=${msg}&q=${q}`
+    // Hash channel: query before fragment — /?msg=&q=#general
+    return `/?msg=${msg}&q=${q}#${encodeURIComponent(slug)}`
   }
   return `/session/${encodeURIComponent(doc.sessionId)}?msg=${msg}&q=${q}`
 }

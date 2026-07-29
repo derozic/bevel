@@ -67,7 +67,7 @@ References:
 
 | Direction | Behavior |
 |-----------|----------|
-| Slack → BEVEL | Slash `/bevel status`, `/bevel open ^general` |
+| Slack → BEVEL | Slash `/bevel status`, `/bevel open #general` |
 | Mentions | `@BEVEL` bot → fleet/agent handoff |
 | Optional mirror | Selected Slack channel ↔ BEVEL channel (not full history dump) |
 

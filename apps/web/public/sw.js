@@ -58,7 +58,7 @@ self.addEventListener('message', (event) => {
     icon: data.icon || '/icons/icon-192.png',
     badge: data.badge || '/icons/icon-192.png',
     tag: data.tag || 'bevel-agent',
-    data: { url: data.url || '/^general' },
+    data: { url: data.url || '/#general' },
     renotify: Boolean(data.renotify),
   }
   event.waitUntil(self.registration.showNotification(title, options))
@@ -66,7 +66,7 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = (event.notification.data && event.notification.data.url) || '/^general'
+  const target = (event.notification.data && event.notification.data.url) || '/#general'
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const client of list) {

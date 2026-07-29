@@ -53,10 +53,8 @@ function isLoopbackHost(hostname: string): boolean {
 
 /**
  * Public origin for browser redirects.
- *
- * Behind Caddy, Next listens on http://127.0.0.1:41009. `request.nextUrl` can
- * become `https://localhost:41009` (X-Forwarded-Proto + bind host), which must
- * never appear in Location headers.
+ * Behind Caddy, nextUrl can become https://localhost:PORT — never use that
+ * in Location headers.
  */
 function publicOrigin(request: NextRequest): string {
   const xfHost = (
@@ -104,16 +102,19 @@ function publicOrigin(request: NextRequest): string {
   return `${proto}://${host}`
 }
 
-/** Absolute public URL for 3xx Location headers. */
-function publicUrl(request: NextRequest, pathname: string): URL {
-  const path = pathname.startsWith('/') ? pathname : `/${pathname}`
-  return new URL(`${path}${request.nextUrl.search}`, publicOrigin(request))
+/**
+ * Redirect to public channel hash URL: https://host/#general
+ * Preserves query string (msg, q, agents) before the fragment.
+ */
+function channelHashRedirect(request: NextRequest, slug: string): NextResponse {
+  const clean = slug.trim().toLowerCase() || 'general'
+  const qs = request.nextUrl.search // includes leading ?
+  const target = `${publicOrigin(request)}/${qs}#${clean}`
+  return NextResponse.redirect(target, 308)
 }
 
 /**
  * Expire Domain-scoped OAuth check cookies left by older deploys.
- * Host-only + Domain=.bevel.is cookies share a name; browsers may send both and
- * Auth.js can parse the stale Domain one → InvalidCheck pkceCodeVerifier.
  */
 function expireStaleDomainOAuthCookies(response: NextResponse): void {
   const domain =
@@ -141,63 +142,65 @@ function expireStaleDomainOAuthCookies(response: NextResponse): void {
 }
 
 /**
- * Middleware responsibilities:
+ * Middleware:
  * - Expire stale Domain-scoped PKCE cookies on /api/auth/*
- * - Canonicalize legacy /bevel/* → short public URLs (redirect only)
- * - Normalize rare decoded `/^slug` → encoded `/%5Eslug` so next.config rewrites hit
- * - Stamp tenant host for non-public paths
- *
- * Short-path → /bevel/* **rewrites live in next.config.ts** (no self-proxy).
+ * - Canonicalize legacy channel paths → /#slug (hash, never encoded)
+ * - Keep /talk and /session as path routes (next.config rewrites)
+ * - Stamp tenant host
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Drop stale Domain-scoped PKCE/state cookies on every auth touch.
   if (pathname.startsWith('/api/auth')) {
     const res = NextResponse.next()
     expireStaleDomainOAuthCookies(res)
     return res
   }
 
-  // ── Canonicalize legacy /bevel/* → short public URLs ─────────────────
+  // Legacy caret paths: /^general or /%5Egeneral → /#general
+  const caretMatch = pathname.match(/^\/(?:\^|%5[eE])([a-z0-9][a-z0-9-]*)$/i)
+  if (caretMatch) {
+    return channelHashRedirect(request, caretMatch[1]!)
+  }
+
+  // /bevel → /#general
   if (pathname === '/bevel' || pathname === '/bevel/') {
-    return NextResponse.redirect(publicUrl(request, '/%5Egeneral'), 308)
+    return channelHashRedirect(request, 'general')
   }
 
   if (pathname.startsWith('/bevel/')) {
     const rest = pathname.slice('/bevel/'.length)
 
-    if (rest.startsWith('talk/')) {
-      return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
+    // Keep talk + session as real path routes (not channels)
+    if (rest.startsWith('talk/') || rest === 'talk') {
+      // next.config rewrites /talk → /bevel/talk; no redirect needed when already /bevel/talk
+      // If someone hits /bevel/talk/*, leave it (or optionally redirect to /talk/*)
+      if (rest.startsWith('talk/')) {
+        const url = new URL(
+          `/${rest}${request.nextUrl.search}`,
+          publicOrigin(request),
+        )
+        return NextResponse.redirect(url, 308)
+      }
+      const url = new URL(`/talk${request.nextUrl.search}`, publicOrigin(request))
+      return NextResponse.redirect(url, 308)
     }
     if (rest.startsWith('session/')) {
-      return NextResponse.redirect(publicUrl(request, `/${rest}`), 308)
+      const url = new URL(
+        `/${rest}${request.nextUrl.search}`,
+        publicOrigin(request),
+      )
+      return NextResponse.redirect(url, 308)
     }
     if (rest.startsWith('c/')) {
       const slug = rest.slice(2).split('/')[0] || 'general'
-      return NextResponse.redirect(
-        publicUrl(request, `/%5E${slug.toLowerCase()}`),
-        308,
-      )
+      return channelHashRedirect(request, slug)
     }
-    // /bevel/general → /%5Egeneral (encoded so next.config rewrite matches)
+    // /bevel/general → /#general
     const slug = rest.split('/')[0]
     if (slug && !slug.includes('.')) {
-      return NextResponse.redirect(
-        publicUrl(request, `/%5E${slug.toLowerCase()}`),
-        308,
-      )
+      return channelHashRedirect(request, slug)
     }
-  }
-
-  // Rare: browser sends decoded caret path. Normalize to %5E so next.config
-  // rewrite applies (path-to-regexp sources use the encoded form).
-  const decodedCaret = pathname.match(/^\/\^([a-z0-9][a-z0-9-]*)$/i)
-  if (decodedCaret) {
-    return NextResponse.redirect(
-      publicUrl(request, `/%5E${decodedCaret[1]!.toLowerCase()}`),
-      308,
-    )
   }
 
   return withTenantResolution(request, {

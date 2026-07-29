@@ -32,11 +32,14 @@ export function useBevelChatPane() {
   return ctx
 }
 
-function activeRouteFromPath(pathname: string): {
+function activeRouteFromPath(
+  pathname: string,
+  hash = '',
+): {
   activeSlug?: string
   activeSessionId?: string
 } {
-  // Public short paths + legacy /bevel/*
+  // Path routes: talk + session
   const sessionMatch = pathname.match(
     /(?:^\/session\/|^\/bevel\/session\/)([^/]+)/,
   )
@@ -48,7 +51,12 @@ function activeRouteFromPath(pathname: string): {
     const agentId = decodeURIComponent(talkMatch[1]!).toLowerCase()
     return { activeSessionId: `talk:${agentId}` }
   }
-  // /^general or /%5Egeneral or /bevel/general
+  // Canonical: /#general (hash fragment)
+  const fromHash = hash.replace(/^#/, '').toLowerCase()
+  if (fromHash && /^[a-z0-9][a-z0-9-]*$/.test(fromHash)) {
+    return { activeSlug: fromHash }
+  }
+  // Legacy caret / path channels (middleware redirects these to hash)
   const caretMatch = pathname.match(/^\/(?:\^|%5[eE])([a-z0-9][a-z0-9-]*)/i)
   if (caretMatch) {
     return { activeSlug: caretMatch[1]!.toLowerCase() }
@@ -59,6 +67,10 @@ function activeRouteFromPath(pathname: string): {
     if (slug !== 'session' && slug !== 'talk' && slug !== 'c') {
       return { activeSlug: slug }
     }
+  }
+  // Signed-in org home at `/` defaults to general until hash settles
+  if (pathname === '/' || pathname === '') {
+    return { activeSlug: 'general' }
   }
   return {}
 }
@@ -87,15 +99,27 @@ export function BevelShell({
   featureSet?: ResolvedFeatureSet | null
 }) {
   const pathname = usePathname()
-  const { activeSlug, activeSessionId } = activeRouteFromPath(pathname ?? '')
+  const [hash, setHash] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  useEffect(() => {
+    const sync = () => setHash(window.location.hash || '')
+    sync()
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [])
+
+  const { activeSlug, activeSessionId } = activeRouteFromPath(
+    pathname ?? '',
+    hash,
+  )
 
   const openSidebar = useCallback(() => setSidebarOpen(true), [])
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])
 
   useEffect(() => {
     closeSidebar()
-  }, [pathname, closeSidebar])
+  }, [pathname, hash, closeSidebar])
 
   useEffect(() => {
     if (!sidebarOpen) return

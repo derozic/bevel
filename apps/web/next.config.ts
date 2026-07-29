@@ -29,11 +29,8 @@ const nextConfig: NextConfig = {
   ],
   /**
    * Short public paths → real /bevel/* app routes.
-   * Handled here (not middleware rewrite) so Next never HTTP-proxies itself.
-   * Middleware rewrite used https://localhost:41009 behind Caddy → EPROTO 500.
-   *
-   * Encoded caret (%5E) is what most clients send for `/^general`.
-   * Middleware still covers the rare decoded `/^slug` form via redirect to %5E.
+   * Channels use hash fragments (`/#general`) — not path rewrites.
+   * Talk + session stay as path routes rewritten here (no self-proxy in middleware).
    */
   async rewrites() {
     return [
@@ -48,14 +45,6 @@ const nextConfig: NextConfig = {
       {
         source: '/session/:id',
         destination: '/bevel/session/:id',
-      },
-      {
-        source: '/%5E:slug',
-        destination: '/bevel/:slug',
-      },
-      {
-        source: '/%5e:slug',
-        destination: '/bevel/:slug',
       },
     ]
   },
