@@ -165,7 +165,7 @@ export function HomePage({
               </Button>
               {signedIn ? (
                 <Button asChild variant="secondary" size="lg">
-                  <Link href={BEVEL_HOME_PATH}>Go to ^general</Link>
+                  <Link href={BEVEL_HOME_PATH}>Go to #general</Link>
                 </Button>
               ) : (
                 <Button asChild variant="secondary" size="lg">

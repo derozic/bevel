@@ -38,6 +38,11 @@ export const PLATFORM_ENTRY_TENANT: Tenant = {
     agentMemory: false,
     voiceRooms: false,
     multiRegion: false,
+    matrix: false,
+    matrixFederation: false,
+    matrixE2ee: false,
+    matrixVoip: false,
+    matrixExternalClients: false,
   },
   theme: {
     accent: '#7c5cff',

@@ -27,8 +27,8 @@ export {
 export const BEVEL_TAGLINE = BEVEL_PRODUCT.tagline
 export const BEVEL_SHORT = BEVEL_PRODUCT.short
 
-/** Workspace home → default channel (public URL, no /bevel/ prefix). */
-export const BEVEL_HOME_PATH = '/^general'
+/** Workspace home → default channel (public URL uses hash fragment). */
+export const BEVEL_HOME_PATH = '/#general'
 export const BEVEL_DEFAULT_CHANNEL = 'general'
 export const BEVEL_ARCHIVE_PATH = '/sessions'
 /** Direct agent threads: /talk/brain */
@@ -38,12 +38,16 @@ export const BEVEL_SESSION_PATH = '/session'
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/
 
 /**
- * Canonical channel URL: `/^general` (browsers may show %5E; both work).
- * Internal Next routes remain under /bevel/* via middleware rewrite.
+ * Canonical channel URL: `/#general` (hash fragment — never percent-encoded).
+ *
+ * Note: the fragment is not sent to the HTTP server. Org hosts serve the
+ * workspace shell at `/` and the client reads `location.hash` for the slug.
+ * Internal Next routes under /bevel/* still exist for talk/session and as a
+ * server fallback (middleware redirects channel paths to the hash form).
  */
 export function bevelChannelPath(slug: string): string {
-  const normalized = slug.trim().toLowerCase().replace(/^[\^#]+/, '')
-  return `/^${normalized || BEVEL_DEFAULT_CHANNEL}`
+  const normalized = normalizeBevelChannelSlug(slug)
+  return `/#${normalized}`
 }
 
 /** Legacy /bevel/c/:slug — still accepted via redirects. */
@@ -60,17 +64,22 @@ export function normalizeBevelChannelSlug(slug: string): string {
     .trim()
     .toLowerCase()
     .replace(/^%5e/i, '')
-    .replace(/^[\^#]+/, '')
+    .replace(/^%23/i, '')
+    .replace(/^[#^]+/, '')
   if (!SLUG_RE.test(normalized)) {
     return BEVEL_DEFAULT_CHANNEL
   }
   return normalized
 }
 
+/**
+ * Channel link with optional agents query.
+ * Query must precede the fragment: `/?agents=brain#general`
+ */
 export function bevelChannelHref(slug: string, agents?: string): string {
-  const base = bevelChannelPath(slug)
-  if (!agents?.trim()) return base
-  return `${base}?agents=${encodeURIComponent(agents)}`
+  const hash = `#${normalizeBevelChannelSlug(slug)}`
+  if (!agents?.trim()) return `/${hash}`
+  return `/?agents=${encodeURIComponent(agents)}${hash}`
 }
 
 /**
@@ -83,7 +92,7 @@ export function bevelPageTitle(
 ): string {
   const brand = (workspaceLabel || '').trim() || BEVEL_NAME
   const clean = brand.replace(/\s+Agents$/i, '').trim() || brand
-  if (channelSlug) return `${clean} · ^${channelSlug}`
+  if (channelSlug) return `${clean} · #${channelSlug}`
   return clean
 }
 
@@ -125,7 +134,10 @@ export function bevelConversationTitle(agentNames: string[]): string {
   return `${agentNames[0]} +${agentNames.length - 1}`
 }
 
-/** Deep-link into a message with highlight query. */
+/**
+ * Deep-link into a message with highlight query.
+ * Query string before hash: `/?msg=…&q=…#general`
+ */
 export function bevelMessageHref(opts: {
   kind: 'channel' | 'session'
   channelSlug?: string
@@ -133,13 +145,17 @@ export function bevelMessageHref(opts: {
   messageId: string
   query?: string
 }): string {
-  const msg = encodeURIComponent(opts.messageId)
-  const q = opts.query?.trim()
-    ? `&q=${encodeURIComponent(opts.query.trim())}`
-    : ''
+  const params = new URLSearchParams()
+  params.set('msg', opts.messageId)
+  if (opts.query?.trim()) params.set('q', opts.query.trim())
+  const qs = params.toString()
+
   if (opts.kind === 'channel') {
-    const slug = opts.channelSlug || opts.sessionId || BEVEL_DEFAULT_CHANNEL
-    return `${bevelChannelPath(slug)}?msg=${msg}${q}`
+    const slug = normalizeBevelChannelSlug(
+      opts.channelSlug || opts.sessionId || BEVEL_DEFAULT_CHANNEL,
+    )
+    return qs ? `/?${qs}#${slug}` : `/#${slug}`
   }
-  return `${bevelSessionPath(opts.sessionId || 'unknown')}?msg=${msg}${q}`
+  const base = bevelSessionPath(opts.sessionId || 'unknown')
+  return qs ? `${base}?${qs}` : base
 }

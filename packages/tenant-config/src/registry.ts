@@ -106,6 +106,7 @@ export function lookupTenantsByEmailDomain(domain: string): Tenant[] {
 
 /**
  * Resolve home workspace(s) for a Google Workspace email.
+ * - exact allowed_emails match → those tenant(s) (gmail allowlists, etc.)
  * - unique domain match → that tenant
  * - multi match with default_for_domains → preferred tenant first
  * - multi match otherwise → all candidates (caller shows picker)
@@ -119,16 +120,21 @@ export function resolveWorkspacesForEmail(email: string): {
   const domain = normalized.split('@')[1] ?? ''
   if (!domain) return { domain: '', tenants: [], preferred: null }
 
-  const tenants = lookupTenantsByEmailDomain(domain)
-  if (tenants.length === 0) return { domain, tenants: [], preferred: null }
-
-  // Exact email allowlist wins over domain
+  // Exact email allowlist first — must run even when the domain is not on any
+  // tenant (e.g. sderozic@gmail.com on 2x4m allowed_emails). Previously we
+  // returned empty on domain miss and sent signed-in users to /claim.
   const emailExact = listTenants().filter((t) =>
     t.auth.allowedEmails?.some((e) => e.toLowerCase() === normalized),
   )
   if (emailExact.length === 1) {
     return { domain, tenants: emailExact, preferred: emailExact[0]! }
   }
+  if (emailExact.length > 1) {
+    return { domain, tenants: emailExact, preferred: null }
+  }
+
+  const tenants = lookupTenantsByEmailDomain(domain)
+  if (tenants.length === 0) return { domain, tenants: [], preferred: null }
 
   const preferred =
     tenants.find((t) =>

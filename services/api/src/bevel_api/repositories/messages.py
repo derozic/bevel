@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bevel_api.db.models.message import Message
@@ -102,6 +102,63 @@ async def list_for_channel_slug(
     return rows
 
 
+async def get_by_id(session: AsyncSession, message_id: str) -> Message | None:
+    result = await session.execute(
+        select(Message).where(Message.id == message_id)
+    )
+    return result.scalar_one_or_none()
+
+
+def _build_metadata(msg: dict[str, Any], *, existing: dict[str, Any] | None = None) -> dict[str, Any]:
+    metadata = dict(existing or {})
+    metadata["speakerType"] = (
+        msg.get("speakerType")
+        or msg.get("speaker_type")
+        or metadata.get("speakerType")
+        or "agent"
+    )
+    metadata["agentId"] = (
+        msg.get("agentId")
+        or msg.get("agent_id")
+        or metadata.get("agentId")
+        or ""
+    )
+    if "status" in msg:
+        metadata["status"] = msg.get("status") or "final"
+    elif "status" not in metadata:
+        metadata["status"] = "final"
+    if "tags" in msg:
+        metadata["tags"] = list(msg.get("tags") or [])
+    elif "tags" not in metadata:
+        metadata["tags"] = []
+    # Preserve extra keys under metadata (in-progress client fields, etc.)
+    reserved = {
+        "id",
+        "body",
+        "speakerId",
+        "speaker_id",
+        "speakerName",
+        "speaker_name",
+        "speakerAvatar",
+        "speaker_avatar",
+        "createdAt",
+        "created_at",
+        "speakerType",
+        "speaker_type",
+        "agentId",
+        "agent_id",
+        "status",
+        "tags",
+        "kind",
+    }
+    for key, val in msg.items():
+        if key in reserved:
+            continue
+        if key not in metadata or msg.get(key) is not None:
+            metadata[key] = val
+    return metadata
+
+
 async def append(
     session: AsyncSession,
     *,
@@ -110,7 +167,44 @@ async def append(
     channel_slug: str,
     msg: dict[str, Any],
 ) -> Message:
+    """Insert or update a message by id (idempotent for retries + streaming).
+
+    In-progress conversations re-post the same ``id`` with updated ``body`` /
+    ``status`` (``pending`` | ``streaming`` | ``final`` | ``error``). Without
+    upsert, retries would either fail on PK or leave partial rows stuck.
+    """
     body = str(msg.get("body") or "")
+    message_id = str(msg.get("id") or "").strip() or _id()
+    existing = await get_by_id(session, message_id)
+
+    if existing is not None:
+        # Tenant/channel safety: never reassign a message across tenants
+        if existing.tenant_id != tenant_id:
+            raise ValueError("message id already belongs to another tenant")
+        if "body" in msg:
+            existing.body = body
+            existing.mentioned_agent_ids = extract_mentioned_agent_ids(body)
+        if msg.get("speakerId") or msg.get("speaker_id"):
+            existing.speaker_id = str(
+                msg.get("speakerId") or msg.get("speaker_id")
+            )
+        if msg.get("speakerName") or msg.get("speaker_name"):
+            existing.speaker_name = str(
+                msg.get("speakerName") or msg.get("speaker_name")
+            )
+        if msg.get("speakerAvatar") is not None or msg.get("speaker_avatar") is not None:
+            existing.speaker_avatar = str(
+                msg.get("speakerAvatar") or msg.get("speaker_avatar") or ""
+            )
+        if msg.get("kind"):
+            existing.kind = str(msg.get("kind"))
+        existing.metadata_ = _build_metadata(msg, existing=dict(existing.metadata_ or {}))
+        # Keep channel slug aligned if room moved (same tenant)
+        existing.channel_id = channel_id
+        existing.channel_slug = channel_slug.lower().strip()
+        await session.flush()
+        return existing
+
     created_raw = msg.get("createdAt") or msg.get("created_at")
     if isinstance(created_raw, datetime):
         created_at = created_raw
@@ -122,38 +216,10 @@ async def append(
     else:
         created_at = _utcnow()
 
-    metadata = {
-        "speakerType": msg.get("speakerType") or msg.get("speaker_type") or "agent",
-        "agentId": msg.get("agentId") or msg.get("agent_id") or "",
-        "status": msg.get("status") or "final",
-        "tags": list(msg.get("tags") or []),
-    }
-    # Preserve any extra keys under metadata
-    for key, val in msg.items():
-        if key in {
-            "id",
-            "body",
-            "speakerId",
-            "speaker_id",
-            "speakerName",
-            "speaker_name",
-            "speakerAvatar",
-            "speaker_avatar",
-            "createdAt",
-            "created_at",
-            "speakerType",
-            "speaker_type",
-            "agentId",
-            "agent_id",
-            "status",
-            "tags",
-        }:
-            continue
-        if key not in metadata:
-            metadata[key] = val
+    metadata = _build_metadata(msg)
 
     row = Message(
-        id=str(msg.get("id") or _id()),
+        id=message_id,
         tenant_id=tenant_id,
         channel_id=channel_id,
         channel_slug=channel_slug.lower().strip(),
@@ -175,3 +241,30 @@ async def append(
     session.add(row)
     await session.flush()
     return row
+
+
+async def list_in_progress(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    channel_id: str | None = None,
+    limit: int = 50,
+) -> list[Message]:
+    """Messages still pending/streaming (for recovery after reconnect)."""
+    lim = max(1, min(limit, 200))
+    q = select(Message).where(Message.tenant_id == tenant_id)
+    if channel_id:
+        q = q.where(Message.channel_id == channel_id)
+    # status lives in JSONB metadata — contains() is portable for asyncpg
+    q = q.where(
+        or_(
+            Message.metadata_.contains({"status": "pending"}),
+            Message.metadata_.contains({"status": "streaming"}),
+            Message.metadata_.contains({"status": "partial"}),
+        )
+    )
+    q = q.order_by(Message.created_at.desc()).limit(lim)
+    result = await session.execute(q)
+    rows = list(result.scalars().all())
+    rows.reverse()
+    return rows

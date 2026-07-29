@@ -151,6 +151,9 @@ importers:
       '@bevel/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
+      '@bevel/matrix':
+        specifier: workspace:*
+        version: link:../../packages/matrix
       '@bevel/realtime-client':
         specifier: workspace:*
         version: link:../../packages/realtime-client
@@ -303,6 +306,12 @@ importers:
     devDependencies:
       typescript:
         specifier: ^5.8.3
+        version: 5.9.3
+
+  packages/matrix:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
         version: 5.9.3
 
   packages/realtime-client:

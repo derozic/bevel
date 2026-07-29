@@ -79,16 +79,36 @@ async def post_workspace_message(
         raise HTTPException(400, "Invalid JSON") from exc
     if not isinstance(body, dict):
         raise HTTPException(400, "JSON object required")
-    if not (body.get("body") or "").strip():
-        raise HTTPException(400, "body required")
+    has_id = bool(str(body.get("id") or "").strip())
+    has_body = bool(str(body.get("body") or "").strip())
+    if not has_body and not has_id:
+        raise HTTPException(400, "body required (or id for status update)")
 
     tenant = await _tenant_or_404(session, slug)
     ch = await channels_repo.ensure_channel(session, tenant.id, channel)
-    record = await messages_repo.append(
-        session,
-        tenant_id=tenant.id,
-        channel_id=ch.id,
-        channel_slug=ch.slug,
-        msg=body,
-    )
-    return {"ok": True, "message": messages_repo.to_api_dict(record)}
+    try:
+        record = await messages_repo.append(
+            session,
+            tenant_id=tenant.id,
+            channel_id=ch.id,
+            channel_slug=ch.slug,
+            msg=body,
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    # Best-effort Matrix dual-write (no-op when MATRIX_ENABLED off).
+    # publish_message_to_matrix isolates DB work in a nested transaction so
+    # failures never roll back the primary message append.
+    try:
+        from bevel_api.lib.matrix_dual_write import publish_message_to_matrix
+
+        await publish_message_to_matrix(
+            session,
+            tenant_id=tenant.id,
+            tenant_slug=tenant.slug,
+            channel_slug=ch.slug,
+            message=messages_repo.to_api_dict(record),
+        )
+    except Exception:
+        pass
+    return {"ok": True, "upserted": True, "message": messages_repo.to_api_dict(record)}

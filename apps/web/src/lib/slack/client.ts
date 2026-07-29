@@ -3,6 +3,7 @@
  * Outbound chat.postMessage + auth.test.
  */
 
+import { slackFetch } from './http'
 import type { WorkspaceSlackConfig } from './workspace-config'
 
 const SLACK_API = 'https://slack.com/api'
@@ -19,7 +20,7 @@ async function slackApi<T = unknown>(
   body?: Record<string, unknown>,
 ): Promise<SlackApiResult<T>> {
   try {
-    const res = await fetch(`${SLACK_API}/${method}`, {
+    const res = await slackFetch(`${SLACK_API}/${method}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,

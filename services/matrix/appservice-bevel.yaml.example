@@ -1,0 +1,21 @@
+# Application Service registration for BEVEL dual-write bridge.
+# Tokens MUST match API env MATRIX_AS_TOKEN / MATRIX_HS_TOKEN.
+
+id: bevel
+url: http://127.0.0.1:43203
+as_token: "CHANGE_ME_AS_TOKEN"
+hs_token: "CHANGE_ME_HS_TOKEN"
+sender_localpart: bevel_bridge
+namespaces:
+  users:
+    - exclusive: true
+      regex: "@agent_.*:matrix\\.bevel\\.is"
+    - exclusive: false
+      regex: "@bevel_.*:matrix\\.bevel\\.is"
+  aliases:
+    - exclusive: true
+      regex: "#.*_.*:matrix\\.bevel\\.is"
+  rooms: []
+rate_limited: false
+protocols:
+  - bevel

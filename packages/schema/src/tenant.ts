@@ -75,6 +75,11 @@ export const TenantFeaturesSchema = z.object({
   agentMemory: z.boolean().default(false),
   voiceRooms: z.boolean().default(false),
   multiRegion: z.boolean().default(false),
+  matrix: z.boolean().default(false),
+  matrixFederation: z.boolean().default(false),
+  matrixE2ee: z.boolean().default(false),
+  matrixVoip: z.boolean().default(false),
+  matrixExternalClients: z.boolean().default(false),
 })
 
 const logoPathSchema = z
@@ -197,6 +202,11 @@ export function withResolvedFeatures(tenant: Tenant): Tenant {
       agentMemory: featureSet.agentMemory,
       voiceRooms: featureSet.voiceRooms,
       multiRegion: featureSet.multiRegion,
+      matrix: featureSet.matrix,
+      matrixFederation: featureSet.matrixFederation,
+      matrixE2ee: featureSet.matrixE2ee,
+      matrixVoip: featureSet.matrixVoip,
+      matrixExternalClients: featureSet.matrixExternalClients,
     },
     featureSet,
   }

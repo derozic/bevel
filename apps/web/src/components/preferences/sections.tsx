@@ -2334,7 +2334,7 @@ export function IntegrationsSection() {
               <p className="mt-1 text-[11px] leading-snug text-muted">
                 Grants repo access for agents, issues →{' '}
                 <a
-                  href="/^product"
+                  href="/#product"
                   className="font-medium text-accent underline-offset-2 hover:underline"
                 >
                   ^product

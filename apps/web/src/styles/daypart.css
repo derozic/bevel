@@ -217,8 +217,13 @@ html[data-bevel-contrast='high'] {
   --color-surface-raised: var(--bevel-surface-raised);
   --color-border: var(--bevel-border);
   --color-foreground: var(--bevel-text);
+  --color-text: var(--bevel-text);
+  --color-text-muted: var(--bevel-text-muted);
   --color-muted: var(--bevel-text-muted);
   --color-accent: var(--bevel-accent);
+  --color-primary-500: var(--bevel-accent);
+  --color-cta: var(--ink, var(--bevel-text));
+  --color-cta-fg: var(--cream, var(--bevel-bg));
 }
 
 /* Night + high contrast: max legibility on dark */
@@ -246,8 +251,13 @@ html[data-bevel-contrast='high'][data-daypart='night'] {
   --color-surface-raised: var(--bevel-surface-raised);
   --color-border: var(--bevel-border);
   --color-foreground: var(--bevel-text);
+  --color-text: var(--bevel-text);
+  --color-text-muted: var(--bevel-text-muted);
   --color-muted: var(--bevel-text-muted);
   --color-accent: var(--bevel-accent);
+  --color-primary-500: var(--bevel-accent);
+  --color-cta: var(--ink, var(--bevel-text));
+  --color-cta-fg: var(--cream, var(--bevel-bg));
 }
 
 /* Chrome + chat: thicker edges, no soft wash */

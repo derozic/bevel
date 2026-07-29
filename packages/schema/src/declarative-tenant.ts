@@ -61,6 +61,11 @@ export const DeclarativeFeaturesSchema = z.object({
   agent_memory: z.boolean().optional(),
   voice_rooms: z.boolean().optional(),
   multi_region: z.boolean().optional(),
+  matrix: z.boolean().optional(),
+  matrix_federation: z.boolean().optional(),
+  matrix_e2ee: z.boolean().optional(),
+  matrix_voip: z.boolean().optional(),
+  matrix_external_clients: z.boolean().optional(),
 })
 
 export const DeclarativeRealtimeSchema = z.object({

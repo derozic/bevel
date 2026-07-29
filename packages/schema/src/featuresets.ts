@@ -125,6 +125,12 @@ export const FEATURE_FLAG_IDS = [
   'agentMemory',
   'voiceRooms',
   'multiRegion',
+  // Matrix fabric (beta → team+ for federation / VoIP)
+  'matrix',
+  'matrixFederation',
+  'matrixE2ee',
+  'matrixVoip',
+  'matrixExternalClients',
 ] as const
 
 export type FeatureFlagId = (typeof FEATURE_FLAG_IDS)[number]
@@ -287,6 +293,48 @@ export const FEATURE_CATALOG: Record<FeatureFlagId, FeatureFlagDefinition> = {
     release: 'upcoming',
     paidOnly: true,
   }),
+  // ── Matrix fabric (beta) ────────────────────────────────────────────────
+  matrix: def({
+    id: 'matrix',
+    label: 'Matrix (beta)',
+    description:
+      'Homeserver-backed rooms dual-written with BEVEL channels (Matrix 2.0 path)',
+    minPlan: 'pro',
+    release: 'beta',
+    paidOnly: true,
+  }),
+  matrixFederation: def({
+    id: 'matrixFederation',
+    label: 'Matrix federation (beta)',
+    description: 'Federate workspace rooms with external Matrix servers',
+    minPlan: 'team',
+    release: 'beta',
+    paidOnly: true,
+  }),
+  matrixE2ee: def({
+    id: 'matrixE2ee',
+    label: 'Matrix E2EE (beta)',
+    description: 'End-to-end encryption for DMs and optional channels',
+    minPlan: 'team',
+    release: 'beta',
+    paidOnly: true,
+  }),
+  matrixVoip: def({
+    id: 'matrixVoip',
+    label: 'Matrix VoIP (beta)',
+    description: 'Native group voice/video via MatrixRTC / Element Call',
+    minPlan: 'team',
+    release: 'beta',
+    paidOnly: true,
+  }),
+  matrixExternalClients: def({
+    id: 'matrixExternalClients',
+    label: 'External Matrix clients (beta)',
+    description: 'Allow Element and other CS API clients against the workspace HS',
+    minPlan: 'enterprise',
+    release: 'beta',
+    paidOnly: true,
+  }),
 }
 
 // ── Resolution ──────────────────────────────────────────────────────────────
@@ -389,6 +437,14 @@ export function resolveFeatureSet(opts: {
     base.sms = true
   }
 
+  // Matrix children require parent matrix flag
+  if (!base.matrix) {
+    base.matrixFederation = false
+    base.matrixE2ee = false
+    base.matrixVoip = false
+    base.matrixExternalClients = false
+  }
+
   const resolvedPlan = plan in PLAN_RANK ? plan : 'free'
   const resolvedAccess =
     featureAccess in FEATURE_ACCESS_RANK ? featureAccess : 'stable'
@@ -487,6 +543,11 @@ export function toLegacyFeaturesObject(
   agentMemory: boolean
   voiceRooms: boolean
   multiRegion: boolean
+  matrix: boolean
+  matrixFederation: boolean
+  matrixE2ee: boolean
+  matrixVoip: boolean
+  matrixExternalClients: boolean
 } {
   return {
     channels: set.channels,
@@ -504,6 +565,11 @@ export function toLegacyFeaturesObject(
     agentMemory: set.agentMemory,
     voiceRooms: set.voiceRooms,
     multiRegion: set.multiRegion,
+    matrix: set.matrix,
+    matrixFederation: set.matrixFederation,
+    matrixE2ee: set.matrixE2ee,
+    matrixVoip: set.matrixVoip,
+    matrixExternalClients: set.matrixExternalClients,
   }
 }
 

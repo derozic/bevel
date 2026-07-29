@@ -17,6 +17,19 @@ Domain data lives in **PostgreSQL only** (no SQLite, no file JSON, no in-memory 
 YAML under `tenants/*` is **seed/GitOps input only** (upserted on boot). Legacy
 JSONL under `data/fleet/` is a **one-time import** when a tenant has zero messages.
 
+### Conversation durability (in-progress + final)
+
+Postgres `messages` is the source of truth. Realtime (Colyseus) is the live fan-out layer.
+
+| Concern | Behavior |
+|---------|----------|
+| Write path | `POST /api/v1/fleet/channels/{slug}/messages` **upserts by `id`** |
+| Retries | Same message id re-POST is safe (no duplicate rows) |
+| Streaming | Clients may re-POST `status: pending\|streaming\|final` with the same id |
+| Recovery | `GET /api/v1/fleet/channels/{slug}/messages/in-progress` |
+| Pool | `pool_pre_ping`, recycle, configurable `DB_POOL_*` env vars |
+| Realtime client | Retries persist up to 3× with timeout (see `fleet-channel-api.ts`) |
+
 ## Ports / hosts
 
 | Surface | Local | Public |

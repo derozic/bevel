@@ -6,6 +6,7 @@ import {
   isPlatformEntryHost,
 } from '@bevel/tenant-config'
 import { HomePage } from '@/components/home/HomePage'
+import { SignedInOrgHome } from '@/components/SignedInOrgHome'
 import { auth } from '@/auth'
 import { BEVEL_PRODUCT } from '@/lib/bevel'
 
@@ -42,6 +43,11 @@ export default async function Page() {
 
   const session = await auth()
 
+  // Signed-in org host: workspace shell at `/` driven by `/#channel` hash.
+  if (session?.user) {
+    return <SignedInOrgHome />
+  }
+
   return (
     <HomePage
       tenantName={tenant.theme.productName ?? tenant.name}
@@ -51,8 +57,8 @@ export default async function Page() {
       plan={tenant.plan}
       featureAccess={tenant.featureAccess}
       featureSet={tenant.featureSet}
-      signedIn={Boolean(session?.user)}
-      userName={session?.user?.name ?? session?.user?.email ?? null}
+      signedIn={false}
+      userName={null}
     />
   )
 }

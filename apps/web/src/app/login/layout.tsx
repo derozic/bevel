@@ -8,11 +8,15 @@ import {
   isPlatformEntryTenantSlug,
   platformEntryTenant,
 } from '@bevel/tenant-config'
+import { BevelCutMark } from '@/components/BevelCutMark'
+import { BevelMark } from '@/components/BevelMark'
 
 /**
  * Login shell:
- * - bevel.is (platform entry) → BEVEL-only chrome (no customer brands)
- * - org hosts (e.g. bevel.2x4m.cc) → that tenant's name/logo only
+ * - bevel.is (platform entry) → BEVEL cut-mark + wordmark only (never customer brands)
+ * - org hosts (e.g. bevel.2x4m.cc) → that tenant's name/logo after host resolve
+ *
+ * Customer logos only appear on *their* host, not on the platform login.
  */
 export default async function LoginLayout({ children }: { children: ReactNode }) {
   const headerStore = await headers()
@@ -39,33 +43,50 @@ export default async function LoginLayout({ children }: { children: ReactNode })
     (isPlatform ? 'BEVEL' : 'Workspace')
   ).replace(/\s+Agents$/i, '')
 
-  const logoSrc =
-    !isPlatform && tenant?.theme.logoUrl
-      ? tenant.theme.logoUrl
-      : isPlatform
-        ? '/icons/icon-192.png'
-        : '/icons/icon-192.png'
+  // Org hosts only — never use tenant logoUrl on platform entry
+  const tenantLogo =
+    !isPlatform && tenant?.theme.logoUrl ? tenant.theme.logoUrl : null
 
-  const logoAlt = isPlatform ? 'BEVEL' : productName
-  const homeHref = isPlatform ? '/' : '/'
   const year = new Date().getFullYear()
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-gray-900">
       <header className="relative z-50 border-b border-gray-200 bg-white">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <Link href={homeHref} className="flex items-center gap-3">
-            <Image
-              src={logoSrc}
-              alt={logoAlt}
-              width={36}
-              height={36}
-              className="h-8 w-auto"
-              priority
-            />
-            <span className="font-display text-sm font-semibold tracking-tight text-gray-900">
-              {isPlatform ? 'BEVEL' : productName}
-            </span>
+          <Link
+            href="/"
+            className="flex items-center gap-3 text-gray-900 transition hover:opacity-90"
+          >
+            {isPlatform ? (
+              <>
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-900">
+                  <BevelCutMark className="text-gray-900" />
+                </span>
+                <BevelMark size="md" className="text-gray-900" />
+              </>
+            ) : (
+              <>
+                {tenantLogo ? (
+                  <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white">
+                    <Image
+                      src={tenantLogo}
+                      alt=""
+                      width={36}
+                      height={36}
+                      className="size-7 object-contain"
+                      priority
+                    />
+                  </span>
+                ) : (
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-900">
+                    <BevelCutMark className="text-gray-900" />
+                  </span>
+                )}
+                <span className="font-display text-sm font-semibold tracking-tight text-gray-900">
+                  {productName}
+                </span>
+              </>
+            )}
             {isPlatform ? (
               <span className="hidden text-sm text-gray-500 sm:inline">
                 channels for humans and agents
@@ -93,10 +114,7 @@ export default async function LoginLayout({ children }: { children: ReactNode })
                 <Link href="/" className="transition hover:text-gray-900">
                   Workspace
                 </Link>
-                <Link
-                  href="/login"
-                  className="transition hover:text-gray-900"
-                >
+                <Link href="/login" className="transition hover:text-gray-900">
                   Sign in
                 </Link>
               </>

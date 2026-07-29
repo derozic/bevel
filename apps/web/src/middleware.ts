@@ -14,9 +14,9 @@ const PUBLIC_PATHS = [
   // Twilio SMS (inbound webhook + JOHNNY-style vote links from the phone)
   '/api/twilio/webhook',
   '/api/twilio/vote',
-  // BlueBubbles iMessage probe (send still gated in route)
+  // BlueBubbles iMessage — auth enforced in route (fleet key / fail-closed prod)
   '/api/imessage',
-  // Slack OAuth callback + Events API (signature verified in route)
+  // Slack: OAuth callback (state cookie) + Events (HMAC in route)
   '/api/integrations/slack/oauth/callback',
   '/api/integrations/slack/events',
   '/brand',
@@ -40,104 +40,167 @@ const PUBLIC_PATHS = [
   '/favicon.ico',
 ]
 
+function isLoopbackHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().split(':')[0] || ''
+  return (
+    h === 'localhost' ||
+    h === '127.0.0.1' ||
+    h === '0.0.0.0' ||
+    h === '::1' ||
+    h.endsWith('.localhost')
+  )
+}
+
 /**
- * Public short paths:
- *   /^general          → rewrite → /bevel/general
- *   /talk/brain        → rewrite → /bevel/talk/brain
- *   /session/:id       → rewrite → /bevel/session/:id
- *
- * Legacy:
- *   /bevel/general     → 308 redirect → /^general
- *   /bevel/talk/*      → 308 → /talk/*
- *   /bevel/session/*   → 308 → /session/*
+ * Public origin for browser redirects.
+ * Behind Caddy, nextUrl can become https://localhost:PORT — never use that
+ * in Location headers.
+ */
+function publicOrigin(request: NextRequest): string {
+  const xfHost = (
+    request.headers.get('x-forwarded-host') ??
+    request.headers.get('host') ??
+    ''
+  )
+    .split(',')[0]
+    ?.trim()
+    .toLowerCase()
+  const envPublic =
+    process.env.BEVEL_PUBLIC_URL ||
+    process.env.AUTH_URL ||
+    process.env.NEXTAUTH_URL ||
+    ''
+
+  let host = xfHost && !isLoopbackHost(xfHost) ? xfHost.split(':')[0]! : ''
+  if (!host && envPublic) {
+    try {
+      const u = new URL(envPublic)
+      if (!isLoopbackHost(u.hostname)) host = u.hostname
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!host) {
+    const fallback = request.nextUrl.hostname
+    host = isLoopbackHost(fallback) ? 'bevel.is' : fallback
+  }
+
+  const xfProto = (
+    request.headers.get('x-forwarded-proto') ??
+    (request.nextUrl.protocol === 'https:' ? 'https' : 'http')
+  )
+    .split(',')[0]
+    ?.trim()
+    .toLowerCase()
+  const proto =
+    xfProto === 'http' || xfProto === 'https'
+      ? xfProto
+      : envPublic.startsWith('https')
+        ? 'https'
+        : 'https'
+
+  return `${proto}://${host}`
+}
+
+/**
+ * Redirect to public channel hash URL: https://host/#general
+ * Preserves query string (msg, q, agents) before the fragment.
+ */
+function channelHashRedirect(request: NextRequest, slug: string): NextResponse {
+  const clean = slug.trim().toLowerCase() || 'general'
+  const qs = request.nextUrl.search // includes leading ?
+  const target = `${publicOrigin(request)}/${qs}#${clean}`
+  return NextResponse.redirect(target, 308)
+}
+
+/**
+ * Expire Domain-scoped OAuth check cookies left by older deploys.
+ */
+function expireStaleDomainOAuthCookies(response: NextResponse): void {
+  const domain =
+    process.env.AUTH_COOKIE_DOMAIN || process.env.NEXTAUTH_COOKIE_DOMAIN
+  if (!domain) return
+  const names = [
+    '__Secure-authjs.pkce.code_verifier',
+    '__Secure-authjs.state',
+    '__Secure-authjs.nonce',
+    'authjs.pkce.code_verifier',
+    'authjs.state',
+    'authjs.nonce',
+  ]
+  for (const name of names) {
+    response.cookies.set(name, '', {
+      path: '/',
+      maxAge: 0,
+      expires: new Date(0),
+      httpOnly: true,
+      secure: name.startsWith('__Secure-') || name.startsWith('__Host-'),
+      sameSite: 'lax',
+      domain,
+    })
+  }
+}
+
+/**
+ * Middleware:
+ * - Expire stale Domain-scoped PKCE cookies on /api/auth/*
+ * - Canonicalize legacy channel paths → /#slug (hash, never encoded)
+ * - Keep /talk and /session as path routes (next.config rewrites)
+ * - Stamp tenant host
  */
 export function middleware(request: NextRequest) {
-  const { pathname, search } = request.nextUrl
+  const { pathname } = request.nextUrl
 
-  // ── Canonicalize legacy /bevel/* → short public URLs ─────────────────
+  if (pathname.startsWith('/api/auth')) {
+    const res = NextResponse.next()
+    expireStaleDomainOAuthCookies(res)
+    return res
+  }
+
+  // Legacy caret paths: /^general or /%5Egeneral → /#general
+  const caretMatch = pathname.match(/^\/(?:\^|%5[eE])([a-z0-9][a-z0-9-]*)$/i)
+  if (caretMatch) {
+    return channelHashRedirect(request, caretMatch[1]!)
+  }
+
+  // /bevel → /#general
   if (pathname === '/bevel' || pathname === '/bevel/') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/^general'
-    return NextResponse.redirect(url, 308)
+    return channelHashRedirect(request, 'general')
   }
 
   if (pathname.startsWith('/bevel/')) {
     const rest = pathname.slice('/bevel/'.length)
-    const url = request.nextUrl.clone()
 
-    if (rest.startsWith('talk/')) {
-      url.pathname = `/${rest}`
+    // Keep talk + session as real path routes (not channels)
+    if (rest.startsWith('talk/') || rest === 'talk') {
+      // next.config rewrites /talk → /bevel/talk; no redirect needed when already /bevel/talk
+      // If someone hits /bevel/talk/*, leave it (or optionally redirect to /talk/*)
+      if (rest.startsWith('talk/')) {
+        const url = new URL(
+          `/${rest}${request.nextUrl.search}`,
+          publicOrigin(request),
+        )
+        return NextResponse.redirect(url, 308)
+      }
+      const url = new URL(`/talk${request.nextUrl.search}`, publicOrigin(request))
       return NextResponse.redirect(url, 308)
     }
     if (rest.startsWith('session/')) {
-      url.pathname = `/${rest}`
+      const url = new URL(
+        `/${rest}${request.nextUrl.search}`,
+        publicOrigin(request),
+      )
       return NextResponse.redirect(url, 308)
     }
     if (rest.startsWith('c/')) {
       const slug = rest.slice(2).split('/')[0] || 'general'
-      url.pathname = `/^${slug.toLowerCase()}`
-      return NextResponse.redirect(url, 308)
+      return channelHashRedirect(request, slug)
     }
-    // /bevel/general → /^general
+    // /bevel/general → /#general
     const slug = rest.split('/')[0]
     if (slug && !slug.includes('.')) {
-      url.pathname = `/^${slug.toLowerCase()}`
-      return NextResponse.redirect(url, 308)
+      return channelHashRedirect(request, slug)
     }
-  }
-
-  // ── Rewrite short public paths → internal /bevel/* app routes ────────
-  let rewritePath: string | null = null
-
-  // /^general or /%5Egeneral
-  const caretMatch = pathname.match(/^\/(?:\^|%5[eE])([a-z0-9][a-z0-9-]*)$/i)
-  if (caretMatch) {
-    rewritePath = `/bevel/${caretMatch[1]!.toLowerCase()}`
-  }
-
-  // /talk/:agentId
-  if (!rewritePath) {
-    const talkMatch = pathname.match(/^\/talk(?:\/([^/]+))?\/?$/)
-    if (talkMatch) {
-      rewritePath = talkMatch[1]
-        ? `/bevel/talk/${talkMatch[1]}`
-        : '/bevel/talk'
-    }
-  }
-
-  // /session/:id
-  if (!rewritePath) {
-    const sessionMatch = pathname.match(/^\/session\/([^/]+)\/?$/)
-    if (sessionMatch) {
-      rewritePath = `/bevel/session/${sessionMatch[1]}`
-    }
-  }
-
-  // /sessions archive (keep as-is or map later)
-  if (!rewritePath && pathname === '/sessions') {
-    // Realtime archive lives at /sessions on web if we add a page; leave next()
-  }
-
-  if (rewritePath) {
-    const url = request.nextUrl.clone()
-    url.pathname = rewritePath
-    // Preserve query (msg, q, agents)
-    const rewrite = NextResponse.rewrite(url)
-    // Still stamp tenant host for the rewritten request
-    const host = (
-      request.headers.get('x-forwarded-host') ??
-      request.headers.get('host') ??
-      request.nextUrl.host
-    )
-      .toLowerCase()
-      .split(':')[0]
-    rewrite.headers.set('x-bevel-host', host)
-    // Copy cookies etc. — withTenantResolution for non-rewrite path below
-    const headers = new Headers(request.headers)
-    headers.set('x-bevel-host', host)
-    return NextResponse.rewrite(url, {
-      request: { headers },
-    })
   }
 
   return withTenantResolution(request, {

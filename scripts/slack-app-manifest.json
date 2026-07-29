@@ -1,0 +1,89 @@
+{
+  "display_information": {
+    "name": "BEVEL",
+    "description": "BEVEL agent + work plane bridge — complement Slack, not clone it.",
+    "background_color": "#1a1a1a"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "BEVEL",
+      "always_online": true
+    },
+    "app_home": {
+      "home_tab_enabled": false,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    },
+    "slash_commands": [
+      {
+        "command": "/bevel",
+        "url": "https://bevel.is/api/integrations/slack/events",
+        "description": "Open BEVEL deep links and status",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "redirect_urls": [
+      "https://bevel.is/api/integrations/slack/oauth/callback",
+      "https://bevel.lvh.me/api/integrations/slack/oauth/callback",
+      "https://bevel.2x4m.cc/api/integrations/slack/oauth/callback"
+    ],
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "chat:write.public",
+        "channels:read",
+        "groups:read",
+        "commands",
+        "app_mentions:read",
+        "im:write",
+        "users:read"
+      ],
+      "user": [
+        "search:read.public",
+        "search:read.private",
+        "search:read.mpim",
+        "search:read.im",
+        "search:read.files",
+        "search:read.users",
+        "chat:write",
+        "channels:history",
+        "groups:history",
+        "mpim:history",
+        "im:history",
+        "channels:write",
+        "groups:write",
+        "im:write",
+        "mpim:write",
+        "channels:read",
+        "groups:read",
+        "mpim:read",
+        "users:read",
+        "users:read.email",
+        "reactions:write",
+        "reactions:read",
+        "emoji:read",
+        "files:read",
+        "canvases:read",
+        "canvases:write"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://bevel.is/api/integrations/slack/events",
+      "bot_events": [
+        "app_mention",
+        "app_home_opened"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "https://bevel.is/api/integrations/slack/events"
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": true
+  }
+}

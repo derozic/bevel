@@ -26,7 +26,29 @@ const nextConfig: NextConfig = {
     '@bevel/schema',
     '@bevel/analytics',
     '@bevel/async-stream',
+    '@bevel/matrix',
   ],
+  /**
+   * Short public paths → real /bevel/* app routes.
+   * Channels use hash fragments (`/#general`) — not path rewrites.
+   * Talk + session stay as path routes rewritten here (no self-proxy in middleware).
+   */
+  async rewrites() {
+    return [
+      {
+        source: '/talk',
+        destination: '/bevel/talk',
+      },
+      {
+        source: '/talk/:agentId*',
+        destination: '/bevel/talk/:agentId*',
+      },
+      {
+        source: '/session/:id',
+        destination: '/bevel/session/:id',
+      },
+    ]
+  },
 }
 
 export default nextConfig

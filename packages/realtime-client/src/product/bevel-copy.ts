@@ -17,12 +17,12 @@ export const BEVEL_COPY = {
   humanDmsSoon: 'People DMs (e.g. Peter) need a new room type — not wired yet.',
   agentDirectHint: 'Message opens a private thread. Channel chips keep them in the room.',
 
-  connectingChannel: (slug: string) => `Waking up ^${slug}…`,
+  connectingChannel: (slug: string) => `Waking up #${slug}…`,
   connectingSession: 'Dialing in…',
   reconnecting: 'Back in a sec…',
 
   emptyChannel: (slug: string) =>
-    `^${slug} is listening. Drop a line—or @mention an agent and watch them light up.`,
+    `#${slug} is listening. Drop a line—or @mention an agent and watch them light up.`,
   emptySession: 'Your agents are listening. @mention one to focus, or ask the room.',
   emptyDirectSession: (agentName: string) =>
     `${agentName} is here. Say hello — your message goes straight to them.`,
@@ -35,8 +35,8 @@ export const BEVEL_COPY = {
 
   placeholderChannel: (slug: string, sampleAgent?: string) =>
     sampleAgent
-      ? `Say something in ^${slug}… or @${sampleAgent}`
-      : `Say something in ^${slug}…`,
+      ? `Say something in #${slug}… or @${sampleAgent}`
+      : `Say something in #${slug}…`,
   placeholderSession: `Talk to ${BEVEL_NAME}…`,
   placeholderDirectSession: (agentName: string) => `Message ${agentName}…`,
 

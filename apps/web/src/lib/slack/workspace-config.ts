@@ -6,7 +6,15 @@
  * @see https://docs.slack.dev/authentication/using-token-rotation/
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 
 export type WorkspaceSlackConfig = {
@@ -46,6 +54,23 @@ function secretsDir(): string {
   return fromWeb
 }
 
+/** Atomic write + restrictive mode so tokens are not world-readable. */
+function writeSecretFile(path: string, payload: string): void {
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`
+  writeFileSync(tmp, payload, { encoding: 'utf8', mode: 0o600 })
+  try {
+    chmodSync(tmp, 0o600)
+  } catch {
+    /* best-effort on platforms without chmod */
+  }
+  renameSync(tmp, path)
+  try {
+    chmodSync(path, 0o600)
+  } catch {
+    /* best-effort */
+  }
+}
+
 function configPath(tenantSlug: string): string {
   const safe = tenantSlug.replace(/[^a-z0-9-_]/gi, '_').toLowerCase()
   return join(secretsDir(), `${safe}.json`)
@@ -70,8 +95,6 @@ export function saveWorkspaceSlack(
     updatedBy?: string
   },
 ): WorkspaceSlackConfig {
-  const dir = secretsDir()
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   const existing = loadWorkspaceSlack(tenantSlug)
   const next: WorkspaceSlackConfig = {
     tenantSlug,
@@ -113,7 +136,16 @@ export function saveWorkspaceSlack(
     updatedAt: new Date().toISOString(),
     updatedBy: input.updatedBy ?? existing?.updatedBy,
   }
-  writeFileSync(configPath(tenantSlug), JSON.stringify(next, null, 2), 'utf8')
+  const dir = secretsDir()
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true, mode: 0o700 })
+    try {
+      chmodSync(dir, 0o700)
+    } catch {
+      /* best-effort */
+    }
+  }
+  writeSecretFile(configPath(tenantSlug), JSON.stringify(next, null, 2))
   return next
 }
 

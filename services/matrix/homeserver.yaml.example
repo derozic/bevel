@@ -1,0 +1,44 @@
+# Synapse homeserver template for BEVEL
+# Copy to homeserver.yaml and adjust paths/secrets.
+
+server_name: "matrix.bevel.is"
+pid_file: /opt/bevel/services/matrix/homeserver.pid
+public_baseurl: "https://matrix.bevel.is/"
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ["127.0.0.1"]
+    resources:
+      - names: [client, federation]
+        compress: false
+
+database:
+  name: psycopg2
+  args:
+    user: bevel
+    password: "CHANGE_ME"
+    database: bevel_matrix
+    host: 127.0.0.1
+    cp_min: 2
+    cp_max: 10
+
+log_config: "/opt/bevel/services/matrix/log.config"
+media_store_path: /opt/bevel/services/matrix/media
+uploads_path: /opt/bevel/services/matrix/uploads
+max_upload_size: 50M
+
+# Registration only via AS / OIDC — disable open reg
+enable_registration: false
+registration_shared_secret: "CHANGE_ME_REG_SECRET"
+
+report_stats: false
+
+# App service
+app_service_config_files:
+  - /opt/bevel/services/matrix/appservice-bevel.yaml
+
+# Federation off by default; enable per enterprise policy
+federation_domain_whitelist: []

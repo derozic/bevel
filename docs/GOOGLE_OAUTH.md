@@ -1,114 +1,173 @@
-# BEVEL Google OAuth (Cloud Console)
+# BEVEL Google OAuth (standalone GCP project)
 
-Project: **x4m-493516** (2x4m / shared Derozic GCP)  
-App name: **BEVEL**  
-Client name: **BEVEL Web**  
-Type: **Web application**
+| | |
+|--|--|
+| **Project ID** | `gen-lang-client-0768551780` (immutable ID; rename **display name** to `BEVEL`) |
+| **Project number** | `103038707422` |
+| **Credentials** | https://console.cloud.google.com/apis/credentials?project=gen-lang-client-0768551780 |
+| **Consent / branding** | https://console.cloud.google.com/auth/branding?project=gen-lang-client-0768551780 |
 
-## 1. Authorized JavaScript origins
+> **Do not use** `decli-502814` (number `99449007158`) — that is the live **decli** product
+> (`GOOGLE_CLIENT_ID` prefix `99449007158-…`).  
+> **Do not keep** BEVEL on shared `x4m-493516` (`336973686985-…`) once this project is wired —
+> that pool hit client/branding ceilings.
+
+Previously this project was a retired decli experiment; decli code/docs now point only at
+`decli-502814`. Safe to rebrand for BEVEL.
+
+---
+
+## 1. Rename project display name (optional, recommended)
+
+1. Open [IAM & Admin → Settings](https://console.cloud.google.com/iam-admin/settings?project=gen-lang-client-0768551780)
+2. **Project name** → `BEVEL` (Project **ID** stays `gen-lang-client-0768551780` — Google does not allow changing IDs)
+3. Save
+
+---
+
+## 2. OAuth consent screen (branding)
+
+1. [OAuth branding / consent](https://console.cloud.google.com/auth/branding?project=gen-lang-client-0768551780)
+2. **App name:** `BEVEL`
+3. **User support email:** your Workspace address
+4. **Audience:** **Internal** if only Workspace; **External** + Testing if personal Gmail test users
+5. **Authorized domains** (production):
+   - `bevel.is`
+   - `2x4m.cc` (if you use org hosts under that zone in consent links)
+6. **Scopes** (non-sensitive only for sign-in):
 
 ```
+openid
+https://www.googleapis.com/auth/userinfo.email
+https://www.googleapis.com/auth/userinfo.profile
+```
+
+Runtime request in code: `openid email profile` (optional `hd=derozic.com`).
+
+7. Remove any leftover **decli** branding, test users only needed for External+Testing.
+
+---
+
+## 3. Create a dedicated OAuth Web client
+
+1. [Credentials → Create credentials → OAuth client ID](https://console.cloud.google.com/apis/credentials/oauthclient?project=gen-lang-client-0768551780)
+2. Application type: **Web application**
+3. Name: `BEVEL Web`
+4. **Authorized JavaScript origins:**
+
+```
+https://bevel.is
+https://www.bevel.is
+https://bevel.2x4m.cc
 https://bevel.lvh.me
-https://demo.bevel.lvh.me
 https://bevel.2x4m.lvh.me
 ```
 
-OAuth **callback** stays on the platform entry host (`AUTH_URL` / `NEXTAUTH_URL` =
-`https://bevel.lvh.me`). Users may click “Sign in” on an org host
-(`bevel.2x4m.lvh.me`); Auth.js still sends `redirect_uri` to the platform host.
-
-That only works when **all** Auth.js cookies (session, CSRF, PKCE, state) share
-`AUTH_COOKIE_DOMAIN=.lvh.me`. Host-only `__Host-` CSRF cookies break the hop and
-surface as Auth.js `Configuration` (“Google OAuth credentials may be missing”).
-
-After login, `/welcome` hops to the org host with the shared session cookie.
-
-## 2. Authorized redirect URIs
+5. **Authorized redirect URIs** (exact match required):
 
 ```
+https://bevel.is/api/auth/callback/google
+https://www.bevel.is/api/auth/callback/google
+https://bevel.2x4m.cc/api/auth/callback/google
 https://bevel.lvh.me/api/auth/callback/google
-https://demo.bevel.lvh.me/api/auth/callback/google
+https://bevel.2x4m.lvh.me/api/auth/callback/google
 ```
 
-(Org hosts do **not** need their own Google redirect URI while `AUTH_URL` pins
-callbacks to the platform. Optional: add org-host callbacks only if you drop the
-`AUTH_URL` pin and run same-host OAuth.)
-## 3. Scopes (Data access / OAuth consent)
+6. Create → copy **Client ID** + **Client secret**  
+   - 1Password: create/update item **BEVEL Google OAuth** (dev + prod labels)  
+   - Client ID will start with **`103038707422-…`** (this project’s number)
 
-Non-sensitive scopes used by Auth.js:
+Delete or ignore any old broken OAuth clients left from the gen-lang era (unless something
+still uses them — nothing in decli or bevel should).
 
-| Scope | Purpose |
-|-------|---------|
-| `openid` | OpenID Connect |
-| `https://www.googleapis.com/auth/userinfo.email` | Email |
-| `https://www.googleapis.com/auth/userinfo.profile` | Name + avatar |
+---
 
-Runtime request (already in code): `openid email profile` with optional `hd=derozic.com`.
+## 4. Enable APIs (minimum for login)
 
-## 4. Audience / test users
+```
+oauth2.googleapis.com
+people.googleapis.com
+```
 
-- Prefer **Internal** if the GCP project is on a Workspace org.
-- Or **External** + **Testing** with test users `@derozic.com`.
+Console: https://console.cloud.google.com/apis/library?project=gen-lang-client-0768551780
 
-## 5. Branding
+---
 
-- App name: `BEVEL`
-- Support email: your Workspace address
-- Authorized domains: leave empty for pure `.lvh.me` local (Google does not verify `lvh.me`)
+## 5. Wire credentials into BEVEL
 
-## 6. Wire credentials into BEVEL
-
-After **Create**, copy Client ID + Client secret:
+### Local (repo root `.env` + `apps/web`)
 
 ```bash
-# from repo root
-# either paste into .env:
-AUTH_GOOGLE_ID=....apps.googleusercontent.com
-AUTH_GOOGLE_SECRET=GOCSPX-...
-AUTH_GOOGLE_HD=derozic.com
-AUTH_TRUST_HOST=true
+AUTH_GOOGLE_ID=103038707422-….apps.googleusercontent.com
+AUTH_GOOGLE_SECRET=GOCSPX-…
+AUTH_GOOGLE_HD=derozic.com   # optional Workspace hint
 AUTH_URL=https://bevel.lvh.me
 NEXTAUTH_URL=https://bevel.lvh.me
-# Required for org-host → platform OAuth hop (PKCE/session shared across *.lvh.me)
+AUTH_TRUST_HOST=true
 AUTH_COOKIE_DOMAIN=.lvh.me
+```
+
+### Production (EC2 `apps/web/.env.production` + systemd already sets AUTH_URL)
+
+```bash
+AUTH_GOOGLE_ID=103038707422-….apps.googleusercontent.com
+AUTH_GOOGLE_SECRET=GOCSPX-…
+AUTH_URL=https://bevel.is
+NEXTAUTH_URL=https://bevel.is
+BEVEL_PUBLIC_URL=https://bevel.is
+AUTH_TRUST_HOST=true
+AUTH_COOKIE_DOMAIN=.bevel.is
 ```
 
 Then restart web:
 
 ```bash
-# kill :43200 and
-cd apps/web && pnpm dev
+# prod
+ssh bevel-prod 'sudo systemctl restart 2x4m-bevel'
+# verify
+./scripts/fix-google-oauth-prod.sh --verify-only
 ```
 
-## 7. Native client (Flutter / macOS / iOS)
+---
 
-Do **not** complete Google OAuth inside the in-app WKWebView. Google rejects many
-embedded WebView user agents, and session cookies may not hop correctly.
-
-Native path:
-
-1. User taps **Sign in (system browser)** → opens  
-   `{BEVEL_BASE_URL}/login?native=1&return=bevel://auth/complete`
-2. Or the WebView intercepts `/api/auth/signin/*` and IdP hosts and opens the
-   system browser (`OAuthBrowser`)
-3. After Auth.js finishes on the platform host, deep link back with  
-   `bevel://auth/complete` so the shell reloads the workspace
-
-Optional: add `bevel://auth/complete` as a post-login redirect from `/welcome`
-when `native=1` is present (query flag already set by the client).
-
-Verify:
+## 6. Verify
 
 ```bash
-curl -s https://bevel.lvh.me/api/auth/providers
-# should include "google"
+# providers include google
+curl -sS https://bevel.is/api/auth/providers | jq 'keys'
+
+# sign-in must 302 to accounts.google.com with new client_id
+./scripts/fix-google-oauth-prod.sh
 ```
 
-Sign-in URL: https://bevel.lvh.me/login?callbackUrl=%2Fbevel
+Manual: open https://bevel.is/login → Continue with Google → consent shows **BEVEL** → land on org `/#general`.
 
-## Direct Console links
+| Error | Meaning |
+|-------|---------|
+| `invalid_client` | Wrong/missing ID or secret on server |
+| `redirect_uri_mismatch` | Callback URI not listed exactly on this client |
+| `access_denied` / app blocked | Consent Internal + wrong Workspace / missing test user |
 
-- Create client: https://console.cloud.google.com/auth/clients/create?project=x4m-493516  
-- Classic create: https://console.cloud.google.com/apis/credentials/oauthclient?project=x4m-493516  
-- Scopes: https://console.cloud.google.com/auth/scopes?project=x4m-493516  
-- Branding: https://console.cloud.google.com/auth/branding?project=x4m-493516  
+---
+
+## 7. Relationship to other projects
+
+| Project | Owner | Use |
+|---------|-------|-----|
+| `decli-502814` (`99449007158`) | **decli** | Live product OAuth + Drive/Docs APIs |
+| `gen-lang-client-0768551780` (`103038707422`) | **BEVEL** | Standalone BEVEL auth (this doc) |
+| `x4m-493516` (`336973686985`) | Shared 2x4m | Legacy BEVEL client; retire after cutover |
+
+---
+
+## 8. Cutover checklist
+
+- [ ] Display name → BEVEL
+- [ ] Consent branding → BEVEL
+- [ ] New `BEVEL Web` client + redirect URIs above
+- [ ] Secrets in 1Password **BEVEL Google OAuth**
+- [ ] Local `.env` updated
+- [ ] Prod `.env.production` updated + `2x4m-bevel` restarted
+- [ ] Login smoke on https://bevel.is/login
+- [ ] Confirm decli still uses only `decli-502814` (https://decli.dev login)
+- [ ] Remove BEVEL redirects from any old x4m client (optional cleanup)
