@@ -292,6 +292,36 @@ async def fan_out_from_message(
             created_at=message.created_at,
         )
         created.append(item)
+
+        email_result: dict[str, Any] | None = None
+        # Hard escalation: email via SendGrid Extension when configured
+        payload = dict(item.payload or {})
+        already_emailed = bool(payload.get("emailedAt"))
+        if not already_emailed and user.email:
+            try:
+                from bevel_api.lib import sendgrid as sg
+
+                if sg.sendgrid_configured():
+                    public_web = (
+                        __import__("os").getenv("PUBLIC_WEB_URL")
+                        or "https://bevel.2x4m.cc"
+                    ).rstrip("/")
+                    email_result = await sg.send_escalation_email(
+                        to_email=user.email,
+                        actor_label=actor_label,
+                        body_preview=body_preview,
+                        channel_slug=message.channel_slug,
+                        timeline_url=f"{public_web}/timeline",
+                        personal_agent_id=user.personal_agent_id,
+                    )
+                    if email_result.get("ok"):
+                        payload["emailedAt"] = _utcnow().isoformat()
+                        payload["emailProvider"] = "sendgrid"
+                        item.payload = payload
+                        await session.flush()
+            except Exception:
+                email_result = {"ok": False, "error": "email_failed"}
+
         notified.append(
             {
                 "handle": handle,
@@ -300,6 +330,7 @@ async def fan_out_from_message(
                 "userId": user.id,
                 "itemId": item.id,
                 "personalAgentId": user.personal_agent_id,
+                "email": email_result,
             }
         )
 

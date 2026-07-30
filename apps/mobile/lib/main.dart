@@ -15,7 +15,12 @@ import 'native/native_capabilities.dart';
 import 'native/notification_service.dart';
 import 'native/oauth_browser.dart';
 import 'native/sharing_service.dart';
+import 'ui/escalation/escalation_inbox.dart';
+import 'ui/layout/adaptive_scaffold.dart';
+import 'ui/layout/bevel_breakpoints.dart';
 import 'ui/native_hub_page.dart';
+import 'ui/onboarding/onboarding_state.dart';
+import 'ui/settings/notification_settings_page.dart';
 import 'ui/workspace_shell.dart';
 
 Future<void> main() async {
@@ -81,6 +86,8 @@ class _BevelHomePageState extends State<BevelHomePage> {
   NativeCapabilities? _caps;
   HermesBridgeStatus? _hermesStatus;
   HermesHandoffV1? _pendingHandoff;
+  OnboardingState _onboarding = OnboardingState();
+  final _escalations = EscalationRepository();
   String? _status;
   String? _lastDeepLink;
 
@@ -92,6 +99,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
 
   Future<void> _bootstrap() async {
     try {
+      final onboarding = await OnboardingState.load();
       final caps = await NativeCapabilities.probe();
       if (caps.supportsNotifications) {
         await _notifications.initialize();
@@ -108,6 +116,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
       }
       if (!mounted) return;
       setState(() {
+        _onboarding = onboarding;
         _caps = caps;
         _hermesStatus = hermesStatus;
       });
@@ -132,11 +141,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
       case 'auth_complete':
         // System-browser OAuth finished → land in workspace shell.
         // Cookie hop Safari→WKWebView may still need a refresh; user can Retry.
-        setState(() {
-          _status =
-              'Signed in — opening workspace. If you still see login, tap Retry.';
-        });
-        _openWorkspace(path: action.route ?? '/');
+        unawaited(_onAuthComplete(action.route ?? '/'));
         break;
       case 'hermes_status':
         _openNativeHub(focusHermes: true);
@@ -152,7 +157,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
         });
         // Prefer short public channel path for focus.
         final path = channel != null && channel.isNotEmpty
-            ? '/^${channel.toLowerCase()}'
+            ? '/~${channel.toLowerCase()}'
             : (action.route != null && action.route != '/native-hub'
                 ? action.route!
                 : '/');
@@ -190,12 +195,121 @@ class _BevelHomePageState extends State<BevelHomePage> {
     super.dispose();
   }
 
+  Future<void> _onAuthComplete(String path) async {
+    final next = _onboarding.copyWith(completedGoogleSignIn: true);
+    await next.save();
+    if (!mounted) return;
+    setState(() {
+      _onboarding = next;
+      _status =
+          'Signed in — opening workspace. If you still see login, tap Retry.';
+    });
+    await _maybeShowEscalationInbox();
+    if (!mounted) return;
+    _openWorkspace(path: path);
+  }
+
+  Future<void> _maybeShowEscalationInbox() async {
+    final items = await _escalations.fetchUnacked();
+    if (!mounted || items.isEmpty) return;
+    // Local high-priority alert when returning with pending ^escalations
+    if (_onboarding.pushEscalations) {
+      await _notifications.showEscalationAlert(
+        id: 9001,
+        title: '${items.length} escalation${items.length == 1 ? '' : 's'}',
+        body: items.first.bodyPreview.isNotEmpty
+            ? items.first.bodyPreview
+            : 'Open BEVEL to acknowledge',
+        payload: 'bevel://timeline',
+      );
+    }
+    if (!mounted) return;
+    await EscalationInboxSheet.showIfNeeded(
+      context,
+      items: items,
+      onAck: (item) async {
+        await _escalations.ack(item.id);
+      },
+      onOpen: (item) {
+        Navigator.of(context).pop(); // close sheet
+        final slug = item.channelSlug;
+        _openWorkspace(
+          path: slug != null && slug.isNotEmpty ? '/~$slug' : '/timeline',
+        );
+      },
+    );
+  }
+
+  Future<void> _maybePromptNotifications() async {
+    if (!_onboarding.shouldPromptNotifications) return;
+    if (!(_caps?.supportsNotifications ?? false)) return;
+    if (!mounted) return;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141A21),
+        title: const Text('Stay on top of escalations'),
+        content: const Text(
+          'When someone writes ^yourhandle, BEVEL needs permission to '
+          'interrupt you — louder than a soft @mention. Enable notifications?',
+          style: TextStyle(color: Color(0xFFCBD5E1), height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+    final granted = go == true ? await _notifications.requestPermission() : false;
+    if (granted) {
+      await _notifications.syncPushToken();
+    }
+    final next = _onboarding.copyWith(
+      askedNotificationPermission: true,
+      notificationPermissionGranted: granted,
+    );
+    await next.save();
+    if (mounted) setState(() => _onboarding = next);
+  }
+
   void _openWorkspace({String path = '/'}) {
-    Navigator.of(context).push(
+    Navigator.of(context)
+        .push(
       MaterialPageRoute<void>(
         builder: (_) => WorkspaceShellPage(
           initialPath: path,
           hermes: _hermes,
+        ),
+      ),
+    )
+        .then((_) async {
+      final next = _onboarding.copyWith(completedWorkspaceOpen: true);
+      await next.save();
+      if (!mounted) return;
+      setState(() => _onboarding = next);
+      await _maybePromptNotifications();
+    });
+  }
+
+  void _openNotificationSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NotificationSettingsPage(
+          initial: _onboarding,
+          onChanged: (s) {
+            if (mounted) setState(() => _onboarding = s);
+          },
+          onRequestPermission: () async {
+            final ok = await _notifications.requestPermission();
+            if (ok) await _notifications.syncPushToken();
+            return ok;
+          },
         ),
       ),
     );
@@ -275,8 +389,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
     final caps = _caps;
     final isMac = caps?.platformLabel == 'macos';
     final hermesLabel = _hermesStatus?.summary;
+    final layout = BevelLayoutInfo.of(context);
 
-    return Scaffold(
+    return AdaptiveScaffold(
       appBar: AppBar(
         title: Row(
           children: [
@@ -318,9 +433,21 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 ),
               ),
             ],
+            if (layout.isFoldCover) ...[
+              const SizedBox(width: 8),
+              const Text(
+                'Cover',
+                style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+              ),
+            ],
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Notification settings',
+            onPressed: _openNotificationSettings,
+            icon: const Icon(Icons.notifications_outlined),
+          ),
           if (caps?.supportsHermesBridge == true)
             IconButton(
               tooltip: 'Open Hermes Desktop',
@@ -346,12 +473,16 @@ class _BevelHomePageState extends State<BevelHomePage> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Center(
+      body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+            constraints: BoxConstraints(maxWidth: layout.contentMaxWidth.clamp(280, 720)),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
+              padding: EdgeInsets.fromLTRB(
+                layout.isFoldCover ? 16 : 24,
+                layout.isFoldCover ? 20 : 32,
+                layout.isFoldCover ? 16 : 24,
+                40,
+              ),
               children: [
                 Text(
                   BevelConfig.appTagline,
@@ -490,10 +621,19 @@ class _BevelHomePageState extends State<BevelHomePage> {
                     style: TextStyle(color: scheme.primary, fontSize: 13),
                   ),
                 ],
+                const SizedBox(height: 12),
+                Text(
+                  'Layout: ${layout.layoutClass.name}'
+                  '${layout.isFoldCover ? ' · fold cover' : ''}'
+                  '${layout.isFoldInner ? ' · fold inner' : ''}'
+                  '${layout.prefersSplit ? ' · split' : ''}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF6B7A88),
+                      ),
+                ),
               ],
             ),
           ),
-        ),
       ),
     );
   }

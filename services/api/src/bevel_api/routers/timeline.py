@@ -283,6 +283,21 @@ async def put_me_profile(
     return {"ok": True, "user": users_repo.to_public_dict(updated)}
 
 
+@router.get("/extensions/sendgrid")
+async def sendgrid_extension_status() -> dict[str, Any]:
+    """Whether SendGrid is configured for escalation email (no secrets)."""
+    from bevel_api.lib import sendgrid as sg
+
+    return {
+        "ok": True,
+        "extension": "sendgrid",
+        "configured": sg.sendgrid_configured(),
+        "fromEmail": sg.from_address()[0] if sg.sendgrid_configured() else None,
+        "uses": ["escalation_email"],
+        "docs": "Set SENDGRID_API_KEY + SENDGRID_FROM_EMAIL on the API host.",
+    }
+
+
 @router.get("/me/personal-agent")
 async def get_personal_agent(
     session: SessionDep,
