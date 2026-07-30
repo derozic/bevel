@@ -74,29 +74,154 @@ function emailAllowedOnPlatform(email: string): boolean {
   )
 }
 
-function useSecureCookies(): boolean {
+function useSecureCookies(requestHost?: string): boolean {
+  const host = (requestHost || '').toLowerCase().split(':')[0] || ''
+  // Local Caddy HTTPS for *.lvh.me / production 2x4m must set Secure cookies.
+  if (
+    host.endsWith('.lvh.me') ||
+    host === 'lvh.me' ||
+    host.endsWith('.2x4m.cc') ||
+    host === '2x4m.cc' ||
+    host.endsWith('.bevel.is') ||
+    host === 'bevel.is'
+  ) {
+    return true
+  }
   return (
     process.env.NODE_ENV === 'production' ||
     process.env.NEXTAUTH_URL?.startsWith('https') === true ||
-    process.env.AUTH_URL?.startsWith('https') === true
+    process.env.AUTH_URL?.startsWith('https') === true ||
+    process.env.AUTH_COOKIE_SECURE === 'true'
+  )
+}
+
+/** Host lives under the 2x4m product suite (shared SSO with shop/market/web). */
+export function is2x4mSuiteHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().split(':')[0] || ''
+  return (
+    h === '2x4m.cc' ||
+    h.endsWith('.2x4m.cc') ||
+    h === '2x4m.lvh.me' ||
+    h.endsWith('.2x4m.lvh.me') ||
+    h === '2x4m.systems' ||
+    h.endsWith('.2x4m.systems')
   )
 }
 
 /**
- * Cookie domain so platform login can hop to org hosts under the same parent
- * (e.g. .lvh.me, .bevel.is). Never apply Domain=.bevel.is when the request host
- * is on another registrable domain (bevel.2x4m.cc) — that would drop the session.
+ * Cookie domain by request host:
+ * - bevel.2x4m.cc / *.2x4m.lvh.me → Domain=.2x4m.cc / .2x4m.lvh.me (SSO with 2x4m)
+ * - bevel.is / *.bevel.is → Domain=.bevel.is
+ * - else fall back to AUTH_COOKIE_DOMAIN when host is under that parent
+ *
+ * Never apply Domain=.bevel.is on bevel.2x4m.cc (different eTLD+1 → dropped session).
  */
 function cookieDomain(requestHost?: string): string | undefined {
+  const host = (requestHost || '').toLowerCase().split(':')[0] || ''
+  if (host) {
+    if (host === '2x4m.cc' || host.endsWith('.2x4m.cc')) return '.2x4m.cc'
+    if (host === '2x4m.lvh.me' || host.endsWith('.2x4m.lvh.me')) {
+      return '.2x4m.lvh.me'
+    }
+    if (host === '2x4m.systems' || host.endsWith('.2x4m.systems')) {
+      return '.2x4m.systems'
+    }
+    if (host === 'bevel.is' || host.endsWith('.bevel.is')) return '.bevel.is'
+  }
+
   const configured =
-    process.env.AUTH_COOKIE_DOMAIN || process.env.NEXTAUTH_COOKIE_DOMAIN || undefined
+    process.env.AUTH_COOKIE_DOMAIN ||
+    process.env.NEXTAUTH_COOKIE_DOMAIN ||
+    undefined
   if (!configured) return undefined
-  if (!requestHost) return configured
-  const host = requestHost.toLowerCase().split(':')[0] || ''
+  if (!host) return configured
   const bare = configured.replace(/^\./, '').toLowerCase()
   if (host === bare || host.endsWith(`.${bare}`)) return configured
-  // Host is outside the cookie domain (e.g. bevel.2x4m.cc vs .bevel.is)
   return undefined
+}
+
+/**
+ * Cookie *names* must match 2x4m's `@2x4m/auth` when on *.2x4m.* so a single
+ * Google sign-in on shop/web/agents is accepted on bevel.2x4m.cc (same AUTH_SECRET).
+ * On bevel.is keep Auth.js default authjs.* names.
+ */
+function buildAuthCookies(
+  secure: boolean,
+  domain: string | undefined,
+  requestHost?: string,
+): NextAuthConfig['cookies'] {
+  const suite = requestHost ? is2x4mSuiteHost(requestHost) : false
+  const hostOnly = {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    path: '/',
+    secure,
+  }
+  const shared = {
+    ...hostOnly,
+    ...(domain ? { domain } : {}),
+  }
+  const shortLivedHostOnly = { ...hostOnly, maxAge: 60 * 15 }
+  const sessionMaxAge = 30 * 24 * 60 * 60
+
+  if (suite) {
+    // Align with packages/auth createAuthConfig in derozic/2x4m
+    return {
+      sessionToken: {
+        name: 'next-auth.session-token',
+        options: { ...shared, maxAge: sessionMaxAge },
+      },
+      callbackUrl: {
+        name: 'next-auth.callback-url',
+        options: shared,
+      },
+      csrfToken: {
+        name: 'next-auth.csrf-token',
+        options: hostOnly,
+      },
+      pkceCodeVerifier: {
+        name: 'next-auth.pkce.code_verifier',
+        options: { ...shared, maxAge: 60 * 15 },
+      },
+      state: {
+        name: 'next-auth.state',
+        options: { ...shared, maxAge: 60 * 15 },
+      },
+      nonce: {
+        name: 'next-auth.nonce',
+        options: { ...shared, maxAge: 60 * 15 },
+      },
+    }
+  }
+
+  const securePrefix = secure ? '__Secure-' : ''
+  const csrfName = `${secure ? '__Host-' : ''}authjs.csrf-token`
+  return {
+    sessionToken: {
+      name: `${securePrefix}authjs.session-token`,
+      options: { ...shared, maxAge: sessionMaxAge },
+    },
+    callbackUrl: {
+      name: `${securePrefix}authjs.callback-url`,
+      options: shared,
+    },
+    csrfToken: {
+      name: csrfName,
+      options: hostOnly,
+    },
+    pkceCodeVerifier: {
+      name: `${securePrefix}authjs.pkce.code_verifier.v2`,
+      options: shortLivedHostOnly,
+    },
+    state: {
+      name: `${securePrefix}authjs.state.v2`,
+      options: shortLivedHostOnly,
+    },
+    nonce: {
+      name: `${securePrefix}authjs.nonce.v2`,
+      options: shortLivedHostOnly,
+    },
+  }
 }
 
 function isLoopbackHostname(hostname: string): boolean {
@@ -172,65 +297,6 @@ function isAllowedCrossHostRedirect(hostname: string): boolean {
   )
 }
 
-/**
- * Auth.js cookies for multi-host OAuth.
- *
- * Split strategy (important):
- * - **CSRF is host-only** (`__Host-` when secure). Auth.js only validates CSRF on
- *   the sign-in POST (same host as the form). Putting Domain=.lvh.me on CSRF caused
- *   MissingCSRF in browsers (cookie not paired with the form body).
- * - **PKCE / state / nonce are host-only**. They must be set and read on the same
- *   host as AUTH_URL (Google callback). Sharing Domain=.bevel.is caused dual cookies
- *   (host-only + domain) after cookie-option churn → InvalidCheck: pkceCodeVerifier
- *   value could not be parsed. OAuth must start on the callback host (platform).
- * - **session / callback-url share AUTH_COOKIE_DOMAIN** so the session can hop to
- *   org hosts under the same parent after /welcome when domains match.
- */
-function buildAuthCookies(secure: boolean, domain?: string): NextAuthConfig['cookies'] {
-  const hostOnly = {
-    httpOnly: true,
-    sameSite: 'lax' as const,
-    path: '/',
-    secure,
-  }
-  const shared = {
-    ...hostOnly,
-    ...(domain ? { domain } : {}),
-  }
-  // Short-lived OAuth checks: always host-only (never Domain).
-  const shortLivedHostOnly = { ...hostOnly, maxAge: 60 * 15 }
-  const securePrefix = secure ? '__Secure-' : ''
-  // CSRF stays host-only — use Auth.js default __Host- name when secure.
-  const csrfName = `${secure ? '__Host-' : ''}authjs.csrf-token`
-
-  return {
-    sessionToken: {
-      name: `${securePrefix}authjs.session-token`,
-      options: shared,
-    },
-    callbackUrl: {
-      name: `${securePrefix}authjs.callback-url`,
-      options: shared,
-    },
-    csrfToken: {
-      name: csrfName,
-      options: hostOnly,
-    },
-    pkceCodeVerifier: {
-      name: `${securePrefix}authjs.pkce.code_verifier`,
-      options: shortLivedHostOnly,
-    },
-    state: {
-      name: `${securePrefix}authjs.state`,
-      options: shortLivedHostOnly,
-    },
-    nonce: {
-      name: `${securePrefix}authjs.nonce`,
-      options: shortLivedHostOnly,
-    },
-  }
-}
-
 export function isGoogleAuthConfigured(): boolean {
   const id = process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID
   const secret = process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET
@@ -256,7 +322,7 @@ export function createTenantAuthConfig(
   const { tenant, host, trustHost = true } = options
   const platformEntry = host ? isPlatformEntryHost(host) : false
   const providers: NextAuthConfig['providers'] = []
-  const secure = useSecureCookies()
+  const secure = useSecureCookies(host)
   const domain = cookieDomain(host)
 
   // Cross-host handoff (bevel.is → bevel.2x4m.cc) — one-time code via FastAPI.
@@ -467,7 +533,7 @@ export function createTenantAuthConfig(
       strategy: 'jwt',
       maxAge: 30 * 24 * 60 * 60,
     },
-    cookies: buildAuthCookies(secure, domain),
+    cookies: buildAuthCookies(secure, domain, host),
     callbacks: {
       async signIn({ user, account }) {
         if (!user.email) return false

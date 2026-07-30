@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { is2x4mSuiteHost } from '@bevel/auth/config'
 
 function authSecret(): string {
   return (
@@ -9,12 +10,16 @@ function authSecret(): string {
   )
 }
 
-function useSecureCookie(): boolean {
-  return (
-    process.env.NODE_ENV === 'production' ||
-    process.env.NEXTAUTH_URL?.startsWith('https') === true ||
-    process.env.AUTH_URL?.startsWith('https') === true
-  )
+function requestHost(request: NextRequest | Request): string {
+  try {
+    const h =
+      (request as NextRequest).headers?.get?.('x-forwarded-host') ||
+      (request as NextRequest).headers?.get?.('host') ||
+      ''
+    return h.toLowerCase().split(':')[0] || ''
+  } catch {
+    return ''
+  }
 }
 
 /**
@@ -29,15 +34,23 @@ export async function getGitHubAccessToken(
   repoWrite?: boolean
 }> {
   try {
-    const secure = useSecureCookie()
-    const token = await getToken({
-      req: request as NextRequest,
-      secret: authSecret(),
-      secureCookie: secure,
-      cookieName: secure
-        ? '__Secure-authjs.session-token'
-        : 'authjs.session-token',
-    })
+    const host = requestHost(request)
+    const suite = host ? is2x4mSuiteHost(host) : false
+    // Match packages/auth cookie names for this host family.
+    const cookieNames = suite
+      ? ['next-auth.session-token']
+      : ['__Secure-authjs.session-token', 'authjs.session-token']
+
+    let token = null
+    for (const cookieName of cookieNames) {
+      token = await getToken({
+        req: request as NextRequest,
+        secret: authSecret(),
+        secureCookie: !suite && cookieName.startsWith('__Secure-'),
+        cookieName,
+      })
+      if (token) break
+    }
     if (!token) return {}
     return {
       accessToken:

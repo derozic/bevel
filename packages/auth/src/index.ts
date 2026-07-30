@@ -1,6 +1,7 @@
 export {
   createTenantAuthConfig,
   homePathForTenant,
+  is2x4mSuiteHost,
   isGoogleAuthConfigured,
   isGitHubAuthConfigured,
   isOtpAuthEnabled,

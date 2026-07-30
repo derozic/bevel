@@ -49,8 +49,16 @@ https://bevel.2x4m.cc/api/auth/callback/google
    - Redirect to `https://bevel.2x4m.cc/api/auth/handoff?code=…&callbackUrl=/~general`
    - Org host redeems code → Auth.js credentials provider `handoff` → host-local session
 
-Cookie domain: `AUTH_COOKIE_DOMAIN=.bevel.is` applies only when the request host is under
-`.bevel.is`. On `bevel.2x4m.cc` cookies stay host-only.
+Cookie domain is **host-aware** (see `packages/auth` `cookieDomain`):
+
+| Request host | Cookie Domain | Cookie names |
+|--------------|---------------|--------------|
+| `*.bevel.is` | `.bevel.is` | Auth.js `authjs.*` |
+| `bevel.2x4m.cc` / `*.2x4m.cc` | `.2x4m.cc` | **2x4m suite** `next-auth.*` (shared SSO) |
+| `bevel.2x4m.lvh.me` / `*.2x4m.lvh.me` | `.2x4m.lvh.me` | **2x4m suite** `next-auth.*` |
+
+Same `AUTH_SECRET` / `NEXTAUTH_SECRET` as the 2x4m monorepo is required for
+`bevel.2x4m.cc` to accept a session issued by shop/web/agents.
 
 ### Infra (2x4m Ansible / systemd)
 
@@ -62,8 +70,10 @@ Environment=BEVEL_PUBLIC_URL=https://bevel.is
 Environment=AUTH_COOKIE_DOMAIN=.bevel.is
 Environment=BEVEL_API_URL=http://127.0.0.1:43203
 Environment=FLEET_INTERNAL_API_KEY=…
-# Avoid AUTH_URL pin when one Next process serves multiple production hosts.
+# Avoid AUTH_URL pin when one Next process serves bevel.is + bevel.2x4m.cc.
+# pin_auth_url: false in 2x4m ansible group_vars for the bevel service.
 # Environment=AUTH_URL=https://bevel.is
+# Match 2x4m monorepo AUTH_SECRET for suite SSO on bevel.2x4m.cc.
 ```
 
 ## Claim workspace (500 → writable tenants)
