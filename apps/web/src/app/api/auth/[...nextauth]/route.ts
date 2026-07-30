@@ -45,13 +45,17 @@ function publicRequest(req: NextRequest): NextRequest {
   headers.set('x-forwarded-proto', proto)
   headers.set('host', hostOnly)
 
+  // GET has no body; for POST pass through the original body stream.
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    return new NextRequest(url, { method: req.method, headers })
+  }
   return new NextRequest(url, {
     method: req.method,
     headers,
     body: req.body,
-    // @ts-expect-error duplex required for streaming body in Node
+    // Required when forwarding a readable stream body in the Fetch API.
     duplex: 'half',
-  })
+  } as RequestInit & { duplex: 'half' })
 }
 
 export async function GET(req: NextRequest) {
