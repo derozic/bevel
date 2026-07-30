@@ -33,6 +33,10 @@ class Message(Base):
     kind: Mapped[str] = mapped_column(String(32), nullable=False, default="message")
     # @mention agent ids extracted at write time for retention / notifications
     mentioned_agent_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # @handle soft mentions (people) — appear in timeline without full notify
+    mentioned_handles: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # ^handle escalations — full notify + personal agent assist
+    escalated_handles: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, index=True
