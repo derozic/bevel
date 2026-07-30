@@ -15,10 +15,12 @@ import 'native/native_capabilities.dart';
 import 'native/notification_service.dart';
 import 'native/oauth_browser.dart';
 import 'native/sharing_service.dart';
+import 'native/push_bootstrap.dart';
 import 'ui/escalation/escalation_inbox.dart';
 import 'ui/layout/adaptive_scaffold.dart';
 import 'ui/layout/bevel_breakpoints.dart';
 import 'ui/native_hub_page.dart';
+import 'ui/onboarding/google_workspace_onboarding.dart';
 import 'ui/onboarding/onboarding_state.dart';
 import 'ui/settings/notification_settings_page.dart';
 import 'ui/workspace_shell.dart';
@@ -103,6 +105,8 @@ class _BevelHomePageState extends State<BevelHomePage> {
       final caps = await NativeCapabilities.probe();
       if (caps.supportsNotifications) {
         await _notifications.initialize();
+        // Best-effort Firebase/FCM when platform config is present
+        unawaited(PushBootstrap.ensureInitialized());
       }
       if (caps.supportsHealth) {
         await _health.configure();
@@ -268,6 +272,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
     );
     final granted = go == true ? await _notifications.requestPermission() : false;
     if (granted) {
+      await PushBootstrap.ensureInitialized();
       await _notifications.syncPushToken();
     }
     final next = _onboarding.copyWith(
@@ -285,6 +290,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
         builder: (_) => WorkspaceShellPage(
           initialPath: path,
           hermes: _hermes,
+          onOpenNativeHub: () => _openNativeHub(),
         ),
       ),
     )
@@ -307,7 +313,10 @@ class _BevelHomePageState extends State<BevelHomePage> {
           },
           onRequestPermission: () async {
             final ok = await _notifications.requestPermission();
-            if (ok) await _notifications.syncPushToken();
+            if (ok) {
+              await PushBootstrap.ensureInitialized();
+              await _notifications.syncPushToken();
+            }
             return ok;
           },
         ),
@@ -390,6 +399,19 @@ class _BevelHomePageState extends State<BevelHomePage> {
     final isMac = caps?.platformLabel == 'macos';
     final hermesLabel = _hermesStatus?.summary;
     final layout = BevelLayoutInfo.of(context);
+
+    // Rich multi-step Google Workspace onboarding for first launch
+    if (_onboarding.needsOnboarding && caps != null) {
+      return GoogleWorkspaceOnboarding(
+        state: _onboarding,
+        onContinueWithGoogle: _continueWithGoogle,
+        onSkipToWorkspace: () => _openWorkspace(),
+        onFinished: (s) {
+          setState(() => _onboarding = s);
+        },
+        onOpenNotificationSettings: _openNotificationSettings,
+      );
+    }
 
     return AdaptiveScaffold(
       appBar: AppBar(

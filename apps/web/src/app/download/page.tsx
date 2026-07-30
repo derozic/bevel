@@ -227,6 +227,30 @@ export default function DownloadPage() {
               the Extension is connected.
             </p>
           </li>
+          <li className="rounded-xl border border-border bg-background/60 p-3 sm:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+              Store packaging
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-muted">
+              Release bundles via{' '}
+              <code className="rounded bg-surface px-1 text-[11px]">
+                ./scripts/mobile/release.sh
+              </code>
+              . Screenshot sizes and dual-pane shots:{' '}
+              <code className="rounded bg-surface px-1 text-[11px]">
+                docs/STORE_SCREENSHOTS.md
+              </code>
+              . Push config (FCM/APNs) from 1Password —{' '}
+              <code className="rounded bg-surface px-1 text-[11px]">
+                docs/NATIVE_PUSH.md
+              </code>
+              . Checklist:{' '}
+              <code className="rounded bg-surface px-1 text-[11px]">
+                scripts/mobile/store-checklist.sh
+              </code>
+              .
+            </p>
+          </li>
         </ul>
       </section>
 

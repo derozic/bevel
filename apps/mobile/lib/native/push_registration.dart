@@ -6,12 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config.dart';
+import 'push_bootstrap.dart';
 
 /// Registers APNs / FCM device tokens with the BEVEL control plane.
-///
-/// Token acquisition (firebase_messaging / apns) is platform-specific and
-/// lands when push credentials are provisioned. Call [registerToken] once the
-/// OS returns a device token.
 class PushRegistrationService {
   PushRegistrationService({http.Client? client})
       : _client = client ?? http.Client();
@@ -64,6 +61,7 @@ class PushRegistrationService {
           'tenantSlug': tenantSlug ?? '',
           'deviceModel': deviceModel,
           'appVersion': BevelConfig.versionLabel,
+          'provider': 'fcm',
         }),
       );
       return res.statusCode >= 200 && res.statusCode < 300;
@@ -72,11 +70,10 @@ class PushRegistrationService {
     }
   }
 
-  /// Placeholder until firebase_messaging / APNs plugin is wired.
-  /// Returns null when remote push is not yet configured on this build.
+  /// FCM token (Android) or APNs-backed FCM token (iOS/macOS).
+  /// Returns null when Firebase platform files are missing or OS denies push.
   Future<String?> fetchPlatformDeviceToken() async {
-    // Extension point: integrate firebase_messaging (Android/iOS) and
-    // FlutterAppDelegate APNs callbacks (iOS/macOS). See docs/NATIVE_INTEGRATIONS.md.
-    return null;
+    if (kIsWeb) return null;
+    return PushBootstrap.deviceToken();
   }
 }

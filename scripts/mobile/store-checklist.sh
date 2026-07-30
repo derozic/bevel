@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Print store / TestFlight / Play checklist for the current mobile version.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+VER="$(grep -E '^version:' "$ROOT/apps/mobile/pubspec.yaml" | awk '{print $2}')"
+echo "BEVEL native store checklist — pubspec $VER"
+echo ""
+echo "Artifacts:  ./scripts/mobile/release.sh [macos|android|ios]"
+echo "Out:        dist/native/<version>/"
+echo "Screens:    docs/STORE_SCREENSHOTS.md"
+echo "Push:       docs/NATIVE_PUSH.md (1Password GoogleService files)"
+echo ""
+echo "[ ] google-services.json + GoogleService-Info.plist from 1Password"
+echo "[ ] APNs key uploaded to Firebase Console"
+echo "[ ] iOS: Team, Push, Associated Domains, HealthKit"
+echo "[ ] Android: key.properties + upload keystore (1Password)"
+echo "[ ] Privacy nutrition / Data safety (notifications, Health optional)"
+echo "[ ] Screenshots per STORE_SCREENSHOTS.md"
+echo "[ ] BEVEL_BASE_URL=https://bevel.is production dart-defines"
+echo "[ ] TestFlight internal + Play internal testing"
+echo "[ ] Update /download#ios and #android with store URLs when live"

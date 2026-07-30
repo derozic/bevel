@@ -4,6 +4,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// FCM: only apply when 1Password-sourced google-services.json is present.
+// Builds without Firebase config still compile; push tokens stay null.
+val googleServicesJson = file("google-services.json")
+if (googleServicesJson.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.derozic.bevel.bevel_app"
     compileSdk = flutter.compileSdkVersion
