@@ -61,6 +61,12 @@ export function ChannelChatShell({
 }) {
   const { data: session, status } = useSession()
   const prefs = usePreferencesOptional()
+  const channelEscalated = Boolean(
+    channelSlug &&
+      (prefs?.prefs.home.escalatedChannels ?? []).some(
+        (s) => s.toLowerCase() === channelSlug.toLowerCase(),
+      ),
+  )
   const [workRepos, setWorkRepos] = useState<FleetWorkRepo[]>([])
   const [defaultRepo, setDefaultRepo] = useState('derozic/2x4m')
   const [selectedWorkRepo, setSelectedWorkRepo] = useState<string | null>(null)
@@ -219,6 +225,7 @@ export function ChannelChatShell({
         userMenu={<UserMenu size="sm" align="end" />}
         agentMessageHref={(agentId) => bevelTalkPath(agentId)}
         peopleLookupPath="/api/users/lookup"
+        channelEscalated={channelEscalated}
         showAvatars={prefs?.prefs.messages.showAvatars !== false}
         nameStyle={prefs?.prefs.messages.nameStyle ?? 'full_and_display'}
         clock24h={prefs?.prefs.messages.clock24h ?? false}
@@ -234,7 +241,7 @@ export function ChannelChatShell({
               body,
               agentId: event.agentId,
               tag: `msg-${event.id}`,
-              url: `/^${channelSlug}`,
+              url: `/~${channelSlug}`,
               icon: '/icons/icon-192.png',
             })
           })()

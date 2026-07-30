@@ -7,20 +7,23 @@ import '../config.dart';
 import '../native/hermes_bridge.dart';
 import '../native/oauth_browser.dart';
 import '../native/sharing_service.dart';
+import 'layout/bevel_breakpoints.dart';
+import 'layout/workspace_rail.dart';
 
 /// In-app workspace browser (WKWebView on macOS / iOS, WebView on Android).
 ///
-/// This is the primary Mac Silicon surface: full workspace chrome inside the
-/// native BEVEL window instead of bouncing to an external browser.
+/// Expanded layouts (iPad Pro, Fold inner, tablets) show a native rail + WebView.
 class WorkspaceShellPage extends StatefulWidget {
   const WorkspaceShellPage({
     super.key,
     this.initialPath = '/',
     this.hermes,
+    this.onOpenNativeHub,
   });
 
   final String initialPath;
   final HermesBridge? hermes;
+  final VoidCallback? onOpenNativeHub;
 
   @override
   State<WorkspaceShellPage> createState() => _WorkspaceShellPageState();
@@ -99,6 +102,10 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   Future<void> _goHome() =>
       _controller.loadRequest(BevelConfig.workspaceUri('/'));
 
+  Future<void> _navigatePath(String path) {
+    return _controller.loadRequest(BevelConfig.workspaceUri(path));
+  }
+
   Future<void> _share() async {
     final uri = _currentUri ?? BevelConfig.workspaceUri();
     await _sharing.shareWorkspace(
@@ -128,7 +135,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       projectPath: null, // resolved by bridge from env / ~/dev
       prompt:
           'Continue work from BEVEL workspace: ${uri.toString()}'
-          '${channel != null ? ' (channel ^$channel)' : ''}'
+          '${channel != null ? ' (channel ~$channel)' : ''}'
           '${tenant != null ? ' tenant=$tenant' : ''}. '
           'Use skill bevel-workspace. When done: open returnUrl '
           '(bevel://hermes/return) with a short status summary.',
@@ -157,14 +164,16 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       if (slug.isEmpty || slug == 'talk' || slug == 'session') return null;
       return slug;
     }
-    // Public short path: /^general
+    // Public short path: /~general (legacy /^general still accepted)
     final segs = path.split('/').where((s) => s.isNotEmpty).toList();
-    if (segs.isNotEmpty && segs.first.startsWith('^')) {
-      final slug = segs.first.substring(1);
-      return slug.isEmpty ? null : slug;
+    if (segs.isNotEmpty) {
+      final first = segs.first;
+      if (first.startsWith('~') || first.startsWith('^')) {
+        final slug = first.substring(1);
+        return slug.isEmpty ? null : slug;
+      }
     }
-    // Fragment sometimes used
-    if (uri.fragment.startsWith('^')) {
+    if (uri.fragment.startsWith('~') || uri.fragment.startsWith('^')) {
       return uri.fragment.substring(1);
     }
     return null;
@@ -189,6 +198,51 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final hermes = widget.hermes;
+    final layout = BevelLayoutInfo.of(context);
+    final path = _currentUri?.path ?? widget.initialPath;
+    final showRail = layout.prefersSplit ||
+        (layout.isFoldInner && layout.isLandscape && layout.size.width >= 700);
+
+    final webBody = Stack(
+      children: [
+        if (_error != null)
+          _ErrorPane(
+            message: _error!,
+            onRetry: _reload,
+            onExternal: _openExternal,
+          )
+        else
+          WebViewWidget(controller: _controller),
+        if (kDebugMode)
+          Positioned(
+            right: 12,
+            bottom: 12,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xCC0F1419),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF243040)),
+              ),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Text(
+                  showRail
+                      ? 'dual-pane · ${layout.layoutClass.name}'
+                      : layout.isFoldCover
+                          ? 'cover · compact'
+                          : '${layout.layoutClass.name}'
+                              '${defaultTargetPlatform == TargetPlatform.macOS ? ' · Silicon' : ''}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF9AA8B5),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -200,7 +254,10 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
             Text(
-              _currentUri?.host ?? Uri.parse(BevelConfig.workspaceUrl).host,
+              showRail
+                  ? '${_currentUri?.host ?? Uri.parse(BevelConfig.workspaceUrl).host} · dual-pane'
+                  : (_currentUri?.host ??
+                      Uri.parse(BevelConfig.workspaceUrl).host),
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(0xFF9AA8B5),
@@ -210,6 +267,12 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           ],
         ),
         actions: [
+          if (!showRail)
+            IconButton(
+              tooltip: 'Timeline',
+              onPressed: () => _navigatePath('/timeline'),
+              icon: const Icon(Icons.schedule_outlined),
+            ),
           IconButton(
             tooltip: 'Sign in (system browser)',
             onPressed: () => _oauth.openSystemLogin(),
@@ -266,40 +329,30 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               : const SizedBox(height: 2),
         ),
       ),
-      body: Stack(
-        children: [
-          if (_error != null)
-            _ErrorPane(
-              message: _error!,
-              onRetry: _reload,
-              onExternal: _openExternal,
-            )
-          else
-            WebViewWidget(controller: _controller),
-          if (kDebugMode && defaultTargetPlatform == TargetPlatform.macOS)
-            Positioned(
-              right: 12,
-              bottom: 12,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xCC0F1419),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF243040)),
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  child: Text(
-                    'macOS · Apple Silicon',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF9AA8B5),
+      body: showRail
+          ? Row(
+              children: [
+                SizedBox(
+                  width: layout.isFoldInner ? 260 : 300,
+                  child: Material(
+                    color: const Color(0xFF0F1419),
+                    child: WorkspaceRail(
+                      activePath: path,
+                      onNavigate: _navigatePath,
+                      onOpenTimeline: () => _navigatePath('/timeline'),
+                      onOpenNativeHub: widget.onOpenNativeHub,
                     ),
                   ),
                 ),
-              ),
-            ),
-        ],
-      ),
+                const VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: Color(0xFF243040),
+                ),
+                Expanded(child: webBody),
+              ],
+            )
+          : webBody,
     );
   }
 }

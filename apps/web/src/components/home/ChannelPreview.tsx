@@ -53,7 +53,7 @@ export function ChannelPreview() {
         <span className="size-2.5 shrink-0 rounded-full bg-warning" />
         <span className="size-2.5 shrink-0 rounded-full bg-success" />
         <div className="ml-3 flex min-w-0 flex-1 items-center gap-2">
-          <span className="truncate font-mono text-xs text-muted">^shipping</span>
+          <span className="truncate font-mono text-xs text-muted">~shipping</span>
           <span className="hidden rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted sm:inline">
             4 present
           </span>

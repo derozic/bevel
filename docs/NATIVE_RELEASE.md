@@ -147,6 +147,9 @@ When release artifacts are published, update that page’s store / direct-downlo
 
 1. **Done:** Flutter scaffold, arm64 macOS + Android + iOS build scripts, download UX
 2. **Done:** In-app WebView shell, OAuth via system browser, deep links
-3. **Done:** Push token registration API + client hook (APNs/FCM plugin wiring next)
-4. **Next:** Signed TestFlight + Play internal track + notarized macOS zip
-5. **Then:** Store listings, privacy nutrition labels, production `BEVEL_BASE_URL`
+3. **Done:** Push token registration API + `firebase_messaging` client (needs 1Password config files)
+4. **Done:** Adaptive dual-pane (iPad / Fold inner), Google Workspace onboarding, escalation inbox
+5. **Next:** Signed TestFlight + Play internal track + notarized macOS zip + store screenshots
+6. **Then:** Live store URLs on `/download#ios` / `#android`
+
+See also: [NATIVE_PUSH.md](./NATIVE_PUSH.md), [STORE_SCREENSHOTS.md](./STORE_SCREENSHOTS.md).

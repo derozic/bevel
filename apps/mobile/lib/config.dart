@@ -37,7 +37,7 @@ class BevelConfig {
   static const String loginPath = '/login';
 
   /// Semantic version shown in About / release notes (mirrors pubspec).
-  static const String versionLabel = '0.2.0';
+  static const String versionLabel = '0.3.1';
 
   /// Magenta Extensions + analytics API.
   static const String magentaApiBase = String.fromEnvironment(
@@ -113,6 +113,14 @@ class BevelConfig {
     defaultValue: 'https://api.bevel.is',
   );
 
+  /// Optional internal key for trusted native builds (release dart-define).
+  /// Required for timeline/escalation calls that assert identity headers.
+  /// Never commit the real value; set via CI / 1Password at build time.
+  static const String fleetInternalApiKey = String.fromEnvironment(
+    'FLEET_INTERNAL_API_KEY',
+    defaultValue: '',
+  );
+
   /// OAuth IdP hosts and Auth.js sign-in paths that must leave the WebView.
   /// Google blocks embedded WebViews; system browser / ASWebAuthenticationSession
   /// is required for reliable Google and GitHub sign-in.
@@ -148,11 +156,14 @@ class BevelConfig {
   /// Prefer system browser for the whole login surface (cookie + OAuth hop).
   /// Starts on platform entry ([baseUrl]) with native return deep link.
   static Uri systemBrowserLoginUri() {
+    // After Auth.js, land on native-complete which re-opens the app with email.
+    final returnTo = entryUri('/api/auth/native-complete').toString();
     return entryUri(loginPath).replace(
       queryParameters: {
         ...entryUri(loginPath).queryParameters,
         'native': '1',
-        'return': 'bevel://auth/complete',
+        'callbackUrl': returnTo,
+        'return': returnTo,
       },
     );
   }

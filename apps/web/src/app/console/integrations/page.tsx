@@ -86,6 +86,17 @@ export default function IntegrationsPage() {
       stats: null
     },
     {
+      id: "sendgrid",
+      name: "SendGrid",
+      category: "Communication",
+      description:
+        "Escalation email when someone writes ^handle — harder than a push alone. API key lives on the server (SENDGRID_API_KEY).",
+      icon: MessageSquare,
+      connected: false,
+      color: "from-orange-500/10 to-amber-500/10 hover:border-orange-500/40",
+      stats: null
+    },
+    {
       id: "discord",
       name: "Discord",
       category: "Communication",

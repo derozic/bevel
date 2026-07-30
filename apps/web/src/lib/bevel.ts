@@ -7,7 +7,9 @@ import {
   BEVEL_TRADEMARK_NOTICE,
   BEVEL_PRODUCT,
   CHANNEL_TAG_PREFIX,
+  CHANNEL_ESCALATED_PREFIX,
   channelTag,
+  isEscalatedChannelTag,
   type BevelProduct,
 } from '@bevel/realtime-client'
 
@@ -20,8 +22,26 @@ export {
   BEVEL_TRADEMARK_NOTICE,
   BEVEL_PRODUCT,
   CHANNEL_TAG_PREFIX,
+  CHANNEL_ESCALATED_PREFIX,
   channelTag,
+  isEscalatedChannelTag,
   type BevelProduct,
+}
+
+/** Sort rail channels: escalated first (A–Z), then normal (A–Z). */
+export function sortChannelsByEscalation<T extends { slug: string }>(
+  channels: T[],
+  escalatedSlugs: readonly string[],
+): T[] {
+  const escalated = new Set(
+    escalatedSlugs.map((s) => s.trim().toLowerCase()).filter(Boolean),
+  )
+  return [...channels].sort((a, b) => {
+    const aEsc = escalated.has(a.slug.toLowerCase())
+    const bEsc = escalated.has(b.slug.toLowerCase())
+    if (aEsc !== bEsc) return aEsc ? -1 : 1
+    return a.slug.localeCompare(b.slug, undefined, { sensitivity: 'base' })
+  })
 }
 
 export const BEVEL_TAGLINE = BEVEL_PRODUCT.tagline

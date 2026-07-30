@@ -32,19 +32,28 @@ def normalize_handle(raw: str | None) -> str | None:
     return h
 
 
-def to_public_dict(user: User) -> dict[str, Any]:
-    return {
+def to_public_dict(
+    user: User,
+    *,
+    include_email: bool = False,
+    include_agent_config: bool = False,
+) -> dict[str, Any]:
+    """Directory-safe user card. Email only for the authenticated self."""
+    out: dict[str, Any] = {
         "id": user.id,
-        "email": user.email,
         "name": user.name,
         "imageUrl": user.image_url,
         "handle": user.handle,
         "tenantId": user.tenant_id,
         "role": user.role,
         "personalAgentId": user.personal_agent_id,
-        "personalAgentConfig": dict(user.personal_agent_config or {}),
         "isActive": user.is_active,
     }
+    if include_email:
+        out["email"] = user.email
+    if include_agent_config:
+        out["personalAgentConfig"] = dict(user.personal_agent_config or {})
+    return out
 
 
 async def get_by_email(session: AsyncSession, email: str) -> User | None:

@@ -100,7 +100,7 @@ export class FleetChannel extends Room {
         : channel?.defaultAgentIds ?? ['hermes', 'johnny']
     ).map((id) => id.toLowerCase())
 
-    this.state.title = channel?.name ?? `^${this.channelSlug}`
+    this.state.title = channel?.name ?? `~${this.channelSlug}`
     for (const tag of channel?.tags ?? []) {
       this.state.tags.push(tag)
     }

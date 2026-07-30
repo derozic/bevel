@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:ui' show Color;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -26,8 +27,19 @@ class NotificationService {
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
     'bevel_workspace',
     'Workspace activity',
-    description: 'Channel messages, mentions, and agent updates',
+    description: 'Channel messages, soft @mentions, and agent updates',
     importance: Importance.high,
+  );
+
+  /// Hard escalations (^handle) — louder than normal workspace noise.
+  static const AndroidNotificationChannel _escalationChannel =
+      AndroidNotificationChannel(
+    'bevel_escalation',
+    'Escalations',
+    description: 'High-priority ^handle escalations that need action',
+    importance: Importance.max,
+    playSound: true,
+    enableVibration: true,
   );
 
   bool get isSupported {
@@ -59,6 +71,7 @@ class NotificationService {
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     await android?.createNotificationChannel(_channel);
+    await android?.createNotificationChannel(_escalationChannel);
 
     _ready = true;
   }
@@ -153,6 +166,48 @@ class NotificationService {
         ),
       ),
       payload: payload,
+    );
+  }
+
+  /// Hard escalation (^handle) — max Android importance + time-sensitive iOS.
+  Future<void> showEscalationAlert({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    if (!_ready) await initialize();
+
+    await _plugin.show(
+      id,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _escalationChannel.id,
+          _escalationChannel.name,
+          channelDescription: _escalationChannel.description,
+          importance: Importance.max,
+          priority: Priority.max,
+          category: AndroidNotificationCategory.alarm,
+          fullScreenIntent: true,
+          icon: '@mipmap/ic_launcher',
+          color: const Color(0xFFF59E0B),
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+          interruptionLevel: InterruptionLevel.timeSensitive,
+        ),
+        macOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+          interruptionLevel: InterruptionLevel.timeSensitive,
+        ),
+      ),
+      payload: payload ?? 'bevel://timeline',
     );
   }
 

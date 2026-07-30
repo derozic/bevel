@@ -6,8 +6,9 @@ import {
   ArrowLeftIcon,
   ClockIcon,
   Cog6ToothIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import type {
@@ -23,6 +24,8 @@ import {
   bevelChannelPath,
   bevelConversationPath,
   bevelTalkPath,
+  channelTag,
+  sortChannelsByEscalation,
 } from '@/lib/bevel'
 import { FeatureFlagsBar } from '@/components/FeatureFlagsBar'
 import {
@@ -130,11 +133,17 @@ export function BevelRail({
 }) {
   const { status } = useSession()
   const pathname = usePathname()
+  const prefs = usePreferencesOptional()
   const timelineActive =
     pathname === '/timeline' ||
     pathname === '/bevel/timeline' ||
     pathname?.startsWith('/timeline/') ||
     pathname?.startsWith('/bevel/timeline')
+  const escalatedSet = useMemo(() => {
+    const list = prefs?.prefs.home.escalatedChannels ?? []
+    return new Set(list.map((s) => s.trim().toLowerCase()).filter(Boolean))
+  }, [prefs?.prefs.home.escalatedChannels])
+  const [propertiesSlug, setPropertiesSlug] = useState<string | null>(null)
   const [channels, setChannels] = useState<FleetChannelSummary[]>(() => {
     const cached = readChannelCache()
     if (cached.length > 0) {
@@ -260,8 +269,43 @@ export function BevelRail({
     return () => window.clearInterval(interval)
   }, [loadConversations, status])
 
-  const visible = channels
+  const visible = useMemo(
+    () =>
+      sortChannelsByEscalation(
+        channels,
+        prefs?.prefs.home.escalatedChannels ?? [],
+      ),
+    [channels, prefs?.prefs.home.escalatedChannels],
+  )
   const visibleConversations = conversations.slice(0, 24)
+
+  const toggleEscalated = useCallback(
+    (slug: string) => {
+      if (!prefs) return
+      const key = slug.trim().toLowerCase()
+      if (!key) return
+      const current = prefs.prefs.home.escalatedChannels ?? []
+      const next = current.some((s) => s.toLowerCase() === key)
+        ? current.filter((s) => s.toLowerCase() !== key)
+        : [...current, key]
+      prefs.updatePrefs({ home: { escalatedChannels: next } })
+    },
+    [prefs],
+  )
+
+  const onChannelClick = useCallback(
+    (e: MouseEvent<HTMLAnchorElement>, slug: string) => {
+      // Ctrl/Cmd+click toggles high-priority (^) without navigating
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        toggleEscalated(slug)
+        return
+      }
+      onNavigate?.()
+    },
+    [onNavigate, toggleEscalated],
+  )
 
   return (
     <div className="bevel-rail">
@@ -319,19 +363,91 @@ export function BevelRail({
           </Link>
         </nav>
         <nav aria-label={BEVEL_COPY.channelsLabel}>
-          {visible.map((ch) => (
-            <Link
-              key={ch.slug}
-              href={bevelChannelPath(ch.slug)}
-              onClick={onNavigate}
-              data-active={activeSlug === ch.slug ? 'true' : 'false'}
-              className="bevel-rail-channel"
-              aria-busy={loading ? true : undefined}
-            >
-              <span className="bevel-rail-channel-slug">~{ch.slug}</span>
-              <span className="bevel-rail-channel-name">{ch.name || '\u00a0'}</span>
-            </Link>
-          ))}
+          {visible.map((ch) => {
+            const escalated = escalatedSet.has(ch.slug.toLowerCase())
+            const propsOpen = propertiesSlug === ch.slug
+            return (
+              <div key={ch.slug} className="bevel-rail-channel-wrap">
+                <Link
+                  href={bevelChannelPath(ch.slug)}
+                  onClick={(e) => onChannelClick(e, ch.slug)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setPropertiesSlug((s) => (s === ch.slug ? null : ch.slug))
+                  }}
+                  data-active={activeSlug === ch.slug ? 'true' : 'false'}
+                  data-escalated={escalated ? 'true' : 'false'}
+                  className="bevel-rail-channel"
+                  aria-busy={loading ? true : undefined}
+                  title={
+                    escalated
+                      ? `${channelTag(ch.slug, { escalated: true })} — high priority. Ctrl/Cmd+click to remove.`
+                      : `${channelTag(ch.slug)} — Ctrl/Cmd+click to escalate (^)`
+                  }
+                >
+                  <span className="bevel-rail-channel-slug">
+                    {channelTag(ch.slug, { escalated })}
+                  </span>
+                  <span className="bevel-rail-channel-name">
+                    {ch.name || '\u00a0'}
+                  </span>
+                </Link>
+                <button
+                  type="button"
+                  className="bevel-rail-channel-props"
+                  aria-label={`Channel properties for ${ch.slug}`}
+                  aria-expanded={propsOpen}
+                  title="Channel properties"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setPropertiesSlug((s) => (s === ch.slug ? null : ch.slug))
+                  }}
+                >
+                  <Cog6ToothIcon className="h-3 w-3" />
+                </button>
+                {propsOpen ? (
+                  <div
+                    className="bevel-rail-channel-panel"
+                    role="dialog"
+                    aria-label={`${ch.name || ch.slug} properties`}
+                  >
+                    <p className="bevel-rail-channel-panel-title">
+                      {channelTag(ch.slug, { escalated })} · properties
+                    </p>
+                    <p className="bevel-rail-channel-panel-hint">
+                      Default channels show as ~slug. Escalated channels pin to
+                      the top as ^slug.
+                    </p>
+                    <button
+                      type="button"
+                      className="bevel-rail-channel-panel-action"
+                      data-escalated={escalated ? 'true' : 'false'}
+                      onClick={() => {
+                        toggleEscalated(ch.slug)
+                      }}
+                    >
+                      <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                      {escalated
+                        ? 'Remove high priority'
+                        : 'Escalate channel (^)'}
+                    </button>
+                    <p className="bevel-rail-channel-panel-meta">
+                      Tip: Ctrl/Cmd+click the channel, or right-click for this
+                      panel.
+                    </p>
+                    <button
+                      type="button"
+                      className="bevel-rail-channel-panel-close"
+                      onClick={() => setPropertiesSlug(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
         </nav>
 
         <div className="bevel-rail-section">
@@ -435,7 +551,7 @@ export function BevelRail({
                 onClick={onNavigate}
                 className="font-semibold underline"
               >
-                ^{createdSlug}
+                ~{createdSlug}
               </Link>
               — open when you are ready.
             </p>

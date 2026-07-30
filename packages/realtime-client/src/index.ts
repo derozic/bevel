@@ -27,7 +27,9 @@ export {
   BEVEL_TRADEMARK_NOTICE,
   BEVEL_PRODUCT,
   CHANNEL_TAG_PREFIX,
+  CHANNEL_ESCALATED_PREFIX,
   channelTag,
+  isEscalatedChannelTag,
   type BevelProduct,
 } from './product/bevel'
 export {

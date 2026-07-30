@@ -40,6 +40,10 @@ DART_DEFINES=(
 if [[ -n "$WORKSPACE_URL" ]]; then
   DART_DEFINES+=(--dart-define="BEVEL_WORKSPACE_URL=$WORKSPACE_URL")
 fi
+# Optional: trusted native → API identity for timeline/escalations (1Password)
+if [[ -n "${FLEET_INTERNAL_API_KEY:-}" ]]; then
+  DART_DEFINES+=(--dart-define="FLEET_INTERNAL_API_KEY=$FLEET_INTERNAL_API_KEY")
+fi
 
 TARGET="${1:-all}"
 ARCH="$(uname -m)"

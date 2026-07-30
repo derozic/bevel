@@ -31,7 +31,8 @@ const NATIVE_PLATFORMS = [
   {
     id: 'ios',
     name: 'iOS',
-    detail: 'iPhone and iPad · TestFlight / App Store',
+    detail:
+      'iPhone Pro Max class · iPad Pro 11" + 13" · TestFlight / App Store',
     icon: DevicePhoneMobileIcon,
     href: '#ios',
     badge: 'Flutter',
@@ -40,7 +41,8 @@ const NATIVE_PLATFORMS = [
   {
     id: 'android',
     name: 'Android',
-    detail: 'Phone and tablet · Play Store / APK',
+    detail:
+      'Phone · Pixel Tablet · Galaxy Z Fold 7/8 cover + inner · Play / APK',
     icon: DeviceTabletIcon,
     href: '#android',
     badge: 'Flutter',
@@ -176,6 +178,81 @@ export default function DownloadPage() {
           )
         })}
       </ul>
+
+      <section
+        id="devices"
+        className="rounded-2xl border border-border bg-surface/40 p-5 text-sm"
+      >
+        <h2 className="text-base font-semibold text-foreground">
+          Device matrix
+        </h2>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          One Flutter tree targets phones, tablets, and foldables. Layout
+          classes: compact (phone / Fold cover), medium (Pro Max class),
+          expanded (iPad Pro, Pixel Tablet, Fold inner).
+        </p>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          <li className="rounded-xl border border-border bg-background/60 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+              iOS
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              iPhone Pro Max · iPad Pro 11&quot; + 13&quot;
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              Safe areas for Dynamic Island / home indicator. iPad landscape
+              can split timeline + workspace when width allows.
+            </p>
+          </li>
+          <li className="rounded-xl border border-border bg-background/60 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+              Android
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              Pixel Tablet · Galaxy Z Fold 7 / 8
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              Cover screen: large targets, minimal chrome. Inner display:
+              full workspace. Escalation push uses a max-importance channel.
+            </p>
+          </li>
+          <li className="rounded-xl border border-border bg-background/60 p-3 sm:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+              Escalations
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-muted">
+              <code className="rounded bg-surface px-1 text-[11px]">^handle</code>{' '}
+              is harder than a normal notification: high-priority push, login
+              popup queue, timeline priority, and optional SendGrid email when
+              the Extension is connected.
+            </p>
+          </li>
+          <li className="rounded-xl border border-border bg-background/60 p-3 sm:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+              Store packaging
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-muted">
+              Release bundles via{' '}
+              <code className="rounded bg-surface px-1 text-[11px]">
+                ./scripts/mobile/release.sh
+              </code>
+              . Screenshot sizes and dual-pane shots:{' '}
+              <code className="rounded bg-surface px-1 text-[11px]">
+                docs/STORE_SCREENSHOTS.md
+              </code>
+              . Push config (FCM/APNs) from 1Password —{' '}
+              <code className="rounded bg-surface px-1 text-[11px]">
+                docs/NATIVE_PUSH.md
+              </code>
+              . Checklist:{' '}
+              <code className="rounded bg-surface px-1 text-[11px]">
+                scripts/mobile/store-checklist.sh
+              </code>
+              .
+            </p>
+          </li>
+        </ul>
+      </section>
 
       <section className="rounded-2xl border border-border bg-background/50 p-5 text-sm text-muted">
         <div className="flex items-start gap-3">

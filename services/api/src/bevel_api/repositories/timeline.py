@@ -160,8 +160,15 @@ async def upsert_item(
         kind=kind,
     )
     if existing:
+        # Merge payload so delivery markers (emailedAt, etc.) survive re-upserts
+        merged = dict(existing.payload or {})
+        for key, val in (payload or {}).items():
+            if key in {"emailedAt", "emailProvider"} and merged.get(key):
+                continue  # preserve first successful delivery stamp
+            if val is not None:
+                merged[key] = val
         existing.body_preview = body_preview
-        existing.payload = payload
+        existing.payload = merged
         existing.actor_label = actor_label
         existing.priority = priority
         if channel_slug is not None:
@@ -212,10 +219,9 @@ async def fan_out_from_message(
     notified: list[dict[str, Any]] = []
 
     async def resolve_handle(handle: str) -> User | None:
+        # Stay inside the message tenant — no cross-tenant handle leak
         return await users_repo.get_by_handle(
             session, handle=handle, tenant_id=tenant_id
-        ) or await users_repo.get_by_handle(
-            session, handle=handle, tenant_id=None
         )
 
     for handle in soft:
@@ -292,6 +298,36 @@ async def fan_out_from_message(
             created_at=message.created_at,
         )
         created.append(item)
+
+        email_result: dict[str, Any] | None = None
+        # Hard escalation: email via SendGrid Extension when configured
+        payload = dict(item.payload or {})
+        already_emailed = bool(payload.get("emailedAt"))
+        if not already_emailed and user.email:
+            try:
+                from bevel_api.lib import sendgrid as sg
+
+                if sg.sendgrid_configured():
+                    public_web = (
+                        __import__("os").getenv("PUBLIC_WEB_URL")
+                        or "https://bevel.2x4m.cc"
+                    ).rstrip("/")
+                    email_result = await sg.send_escalation_email(
+                        to_email=user.email,
+                        actor_label=actor_label,
+                        body_preview=body_preview,
+                        channel_slug=message.channel_slug,
+                        timeline_url=f"{public_web}/timeline",
+                        personal_agent_id=user.personal_agent_id,
+                    )
+                    if email_result.get("ok"):
+                        payload["emailedAt"] = _utcnow().isoformat()
+                        payload["emailProvider"] = "sendgrid"
+                        item.payload = payload
+                        await session.flush()
+            except Exception:
+                email_result = {"ok": False, "error": "email_failed"}
+
         notified.append(
             {
                 "handle": handle,
@@ -300,6 +336,7 @@ async def fan_out_from_message(
                 "userId": user.id,
                 "itemId": item.id,
                 "personalAgentId": user.personal_agent_id,
+                "email": email_result,
             }
         )
 

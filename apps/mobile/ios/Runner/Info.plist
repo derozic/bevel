@@ -42,7 +42,14 @@
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>BEVEL may write workouts you explicitly log from the app into Apple Health.</string>
 	<key>NSUserNotificationsUsageDescription</key>
-	<string>BEVEL sends notifications for mentions, channel activity, and agent updates you care about.</string>
+	<string>BEVEL notifies you for soft @mentions and hard ^escalations so you never miss work that needs you. Escalations are louder than normal channel traffic.</string>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>1</integer>
+		<integer>2</integer>
+	</array>
+	<key>UIRequiresFullScreen</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
