@@ -10,6 +10,9 @@ class OnboardingState {
     this.emailEscalations = true,
     this.pushSoftMentions = false,
     this.pushEscalations = true,
+    this.userEmail = '',
+    this.userId = '',
+    this.userName = '',
   });
 
   final bool completedGoogleSignIn;
@@ -19,6 +22,10 @@ class OnboardingState {
   final bool emailEscalations;
   final bool pushSoftMentions;
   final bool pushEscalations;
+  /// From native OAuth return deep link (bevel://auth/complete?email=)
+  final String userEmail;
+  final String userId;
+  final String userName;
 
   bool get needsOnboarding => !completedGoogleSignIn;
 
@@ -34,6 +41,9 @@ class OnboardingState {
     bool? emailEscalations,
     bool? pushSoftMentions,
     bool? pushEscalations,
+    String? userEmail,
+    String? userId,
+    String? userName,
   }) {
     return OnboardingState(
       completedGoogleSignIn:
@@ -47,6 +57,9 @@ class OnboardingState {
       emailEscalations: emailEscalations ?? this.emailEscalations,
       pushSoftMentions: pushSoftMentions ?? this.pushSoftMentions,
       pushEscalations: pushEscalations ?? this.pushEscalations,
+      userEmail: userEmail ?? this.userEmail,
+      userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
     );
   }
 
@@ -63,6 +76,9 @@ class OnboardingState {
       emailEscalations: p.getBool('${_prefix}email_esc') ?? true,
       pushSoftMentions: p.getBool('${_prefix}push_soft') ?? false,
       pushEscalations: p.getBool('${_prefix}push_esc') ?? true,
+      userEmail: p.getString('${_prefix}email') ?? '',
+      userId: p.getString('${_prefix}user_id') ?? '',
+      userName: p.getString('${_prefix}user_name') ?? '',
     );
   }
 
@@ -75,5 +91,8 @@ class OnboardingState {
     await p.setBool('${_prefix}email_esc', emailEscalations);
     await p.setBool('${_prefix}push_soft', pushSoftMentions);
     await p.setBool('${_prefix}push_esc', pushEscalations);
+    await p.setString('${_prefix}email', userEmail);
+    await p.setString('${_prefix}user_id', userId);
+    await p.setString('${_prefix}user_name', userName);
   }
 }

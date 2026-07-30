@@ -13,16 +13,22 @@ class BevelDeepLinkAction {
     this.handoff,
     this.returnStatus,
     this.returnSummary,
+    this.email,
+    this.userId,
+    this.userName,
     required this.raw,
   });
 
-  /// navigate | hermes_open | hermes_return | hermes_status
+  /// navigate | hermes_open | hermes_return | hermes_status | auth_complete
   final String kind;
   final String? route;
   final String? channel;
   final HermesHandoffV1? handoff;
   final String? returnStatus;
   final String? returnSummary;
+  final String? email;
+  final String? userId;
+  final String? userName;
   final Uri raw;
 }
 
@@ -146,9 +152,14 @@ class DeepLinkService {
             ? (segs.isNotEmpty ? segs.first.toLowerCase() : 'complete')
             : (segs.length > 1 ? segs[1].toLowerCase() : 'complete');
         if (action == 'complete' || action == 'callback') {
+          final q = uri.queryParameters;
+          final path = q['path'];
           return BevelDeepLinkAction(
             kind: 'auth_complete',
-            route: '/',
+            route: (path != null && path.isNotEmpty) ? path : '/',
+            email: q['email'],
+            userId: q['userId'] ?? q['user_id'],
+            userName: q['name'],
             raw: uri,
           );
         }

@@ -30,8 +30,24 @@ def _user_id_from_headers(
     return uid, email
 
 
+def _assert_trusted_identity(request: Request) -> None:
+    """Identity headers may only be set by a trusted caller (BFF / internal).
+
+    Without this check, anyone who can reach the API could spoof
+    X-Bevel-User-Email and read or mutate another member's timeline/profile.
+    The Next.js BFF always attaches FLEET_INTERNAL_API_KEY when proxying.
+    """
+    if not internal_ok(request):
+        raise HTTPException(
+            401,
+            "Unauthorized — timeline/profile identity requires X-Fleet-Internal-Key "
+            "(use the web BFF or internal services)",
+        )
+
+
 async def _require_user(
     session: AsyncSession,
+    request: Request,
     *,
     user_id: str | None,
     email: str | None,
@@ -39,6 +55,7 @@ async def _require_user(
     image_url: str | None = None,
     tenant_id: str | None = None,
 ) -> User:
+    _assert_trusted_identity(request)
     if user_id:
         result = await session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
@@ -90,10 +107,12 @@ class FanOutBody(BaseModel):
 
 @router.get("/timeline")
 async def get_timeline(
+    request: Request,
     session: SessionDep,
     kind: str = Query(default="all"),
     limit: int = Query(default=50, ge=1, le=200),
     before: Optional[str] = Query(default=None),
+    unacked: bool = Query(default=False, description="Only unacked escalations"),
     x_bevel_user_id: Annotated[str | None, Header()] = None,
     x_bevel_user_email: Annotated[str | None, Header()] = None,
     x_bevel_user_name: Annotated[str | None, Header()] = None,
@@ -101,6 +120,7 @@ async def get_timeline(
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
     user = await _require_user(
         session,
+        request,
         user_id=uid,
         email=email,
         name=x_bevel_user_name,
@@ -118,6 +138,8 @@ async def get_timeline(
         limit=limit,
         before=before_dt,
     )
+    if unacked:
+        rows = [r for r in rows if r.acked_at is None]
     return {
         "ok": True,
         "items": [timeline_repo.to_api_dict(r) for r in rows],
@@ -130,12 +152,13 @@ async def get_timeline(
 @router.post("/timeline/{item_id}/read")
 async def read_timeline_item(
     item_id: str,
+    request: Request,
     session: SessionDep,
     x_bevel_user_id: Annotated[str | None, Header()] = None,
     x_bevel_user_email: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    user = await _require_user(session, user_id=uid, email=email)
+    user = await _require_user(session, request, user_id=uid, email=email)
     row = await timeline_repo.mark_read(session, item_id=item_id, user_id=user.id)
     if not row:
         raise HTTPException(404, "Timeline item not found")
@@ -145,12 +168,13 @@ async def read_timeline_item(
 @router.post("/timeline/{item_id}/ack")
 async def ack_timeline_item(
     item_id: str,
+    request: Request,
     session: SessionDep,
     x_bevel_user_id: Annotated[str | None, Header()] = None,
     x_bevel_user_email: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    user = await _require_user(session, user_id=uid, email=email)
+    user = await _require_user(session, request, user_id=uid, email=email)
     row = await timeline_repo.mark_acked(session, item_id=item_id, user_id=user.id)
     if not row:
         raise HTTPException(404, "Timeline item not found")
@@ -159,13 +183,14 @@ async def ack_timeline_item(
 
 @router.get("/timeline/sources")
 async def list_timeline_sources(
+    request: Request,
     session: SessionDep,
     tenant: Optional[str] = Query(default=None),
     x_bevel_user_id: Annotated[str | None, Header()] = None,
     x_bevel_user_email: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    user = await _require_user(session, user_id=uid, email=email)
+    user = await _require_user(session, request, user_id=uid, email=email)
     rows = await timeline_repo.list_sources(
         session, user_id=user.id, tenant_id=tenant or user.tenant_id
     )
@@ -178,13 +203,14 @@ async def list_timeline_sources(
 @router.put("/timeline/sources")
 async def put_timeline_source(
     body: TimelineSourceBody,
+    request: Request,
     session: SessionDep,
     x_bevel_user_id: Annotated[str | None, Header()] = None,
     x_bevel_user_email: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
     """Admin/user: include git activity, workspace members, or a ~channel in feed."""
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    user = await _require_user(session, user_id=uid, email=email)
+    user = await _require_user(session, request, user_id=uid, email=email)
     kind = body.sourceKind.strip().lower()
     if kind not in {"git", "workspace", "channel", "self"}:
         raise HTTPException(
@@ -227,10 +253,11 @@ async def user_by_handle(
     session: SessionDep,
     tenant: Optional[str] = Query(default=None),
 ) -> dict[str, Any]:
+    # Prefer tenant-scoped lookup; only broaden when no tenant filter given
     user = await users_repo.get_by_handle(
         session, handle=handle, tenant_id=tenant
     )
-    if not user:
+    if not user and tenant is None:
         user = await users_repo.get_by_handle(
             session, handle=handle, tenant_id=None
         )
@@ -242,6 +269,7 @@ async def user_by_handle(
 @router.put("/me/profile")
 async def put_me_profile(
     body: ProfileUpdateBody,
+    request: Request,
     session: SessionDep,
     x_bevel_user_id: Annotated[str | None, Header()] = None,
     x_bevel_user_email: Annotated[str | None, Header()] = None,
@@ -250,6 +278,7 @@ async def put_me_profile(
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
     user = await _require_user(
         session,
+        request,
         user_id=uid,
         email=email,
         name=body.name or x_bevel_user_name,
@@ -280,7 +309,12 @@ async def put_me_profile(
         raise HTTPException(400, str(exc)) from exc
     if not updated:
         raise HTTPException(404, "User not found")
-    return {"ok": True, "user": users_repo.to_public_dict(updated)}
+    return {
+        "ok": True,
+        "user": users_repo.to_public_dict(
+            updated, include_email=True, include_agent_config=True
+        ),
+    }
 
 
 @router.get("/extensions/sendgrid")
@@ -300,12 +334,13 @@ async def sendgrid_extension_status() -> dict[str, Any]:
 
 @router.get("/me/personal-agent")
 async def get_personal_agent(
+    request: Request,
     session: SessionDep,
     x_bevel_user_id: Annotated[str | None, Header()] = None,
     x_bevel_user_email: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    user = await _require_user(session, user_id=uid, email=email)
+    user = await _require_user(session, request, user_id=uid, email=email)
     agent_id = user.personal_agent_id or None
     return {
         "ok": True,

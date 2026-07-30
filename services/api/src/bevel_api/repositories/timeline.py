@@ -160,8 +160,15 @@ async def upsert_item(
         kind=kind,
     )
     if existing:
+        # Merge payload so delivery markers (emailedAt, etc.) survive re-upserts
+        merged = dict(existing.payload or {})
+        for key, val in (payload or {}).items():
+            if key in {"emailedAt", "emailProvider"} and merged.get(key):
+                continue  # preserve first successful delivery stamp
+            if val is not None:
+                merged[key] = val
         existing.body_preview = body_preview
-        existing.payload = payload
+        existing.payload = merged
         existing.actor_label = actor_label
         existing.priority = priority
         if channel_slug is not None:
@@ -212,10 +219,9 @@ async def fan_out_from_message(
     notified: list[dict[str, Any]] = []
 
     async def resolve_handle(handle: str) -> User | None:
+        # Stay inside the message tenant — no cross-tenant handle leak
         return await users_repo.get_by_handle(
             session, handle=handle, tenant_id=tenant_id
-        ) or await users_repo.get_by_handle(
-            session, handle=handle, tenant_id=None
         )
 
     for handle in soft:

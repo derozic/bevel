@@ -12,6 +12,7 @@ class EscalationItem {
     required this.bodyPreview,
     this.channelSlug,
     this.createdAt,
+    this.ackedAt,
   });
 
   final String id;
@@ -19,6 +20,9 @@ class EscalationItem {
   final String bodyPreview;
   final String? channelSlug;
   final String? createdAt;
+  final String? ackedAt;
+
+  bool get isUnacked => ackedAt == null || ackedAt!.isEmpty;
 
   factory EscalationItem.fromJson(Map<String, dynamic> j) {
     return EscalationItem(
@@ -27,6 +31,7 @@ class EscalationItem {
       bodyPreview: j['bodyPreview'] as String? ?? '',
       channelSlug: j['channelSlug'] as String?,
       createdAt: j['createdAt'] as String?,
+      ackedAt: j['ackedAt'] as String?,
     );
   }
 }
@@ -37,36 +42,52 @@ class EscalationRepository {
 
   final http.Client _client;
 
-  Future<List<EscalationItem>> fetchUnacked({
+  Map<String, String> _identityHeaders({
     String? userEmail,
     String? userId,
-  }) async {
-    final uri = Uri.parse(
-      '${BevelConfig.apiBaseUrl}/api/v1/timeline?kind=escalation&limit=50',
-    );
+  }) {
     final headers = <String, String>{
       'Accept': 'application/json',
+      'Content-Type': 'application/json',
     };
+    // Trusted caller key (release dart-define) — required by API identity guard
+    final key = BevelConfig.fleetInternalApiKey;
+    if (key.isNotEmpty) {
+      headers['X-Fleet-Internal-Key'] = key;
+    }
     if (userEmail != null && userEmail.isNotEmpty) {
       headers['X-Bevel-User-Email'] = userEmail;
     }
     if (userId != null && userId.isNotEmpty) {
       headers['X-Bevel-User-Id'] = userId;
     }
+    return headers;
+  }
+
+  Future<List<EscalationItem>> fetchUnacked({
+    String? userEmail,
+    String? userId,
+  }) async {
+    if ((userEmail == null || userEmail.isEmpty) &&
+        (userId == null || userId.isEmpty)) {
+      return [];
+    }
+    final uri = Uri.parse(
+      '${BevelConfig.apiBaseUrl}/api/v1/timeline?kind=escalation&unacked=true&limit=50',
+    );
     try {
-      final res = await _client.get(uri, headers: headers);
+      final res = await _client.get(
+        uri,
+        headers: _identityHeaders(userEmail: userEmail, userId: userId),
+      );
       if (res.statusCode < 200 || res.statusCode >= 300) return [];
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final items = (data['items'] as List? ?? [])
           .whereType<Map>()
           .map((e) => EscalationItem.fromJson(Map<String, dynamic>.from(e)))
-          .where((e) => e.id.isNotEmpty)
+          .where((e) => e.id.isNotEmpty && e.isUnacked)
           .toList();
-      // Prefer unacked: ackedAt null is ideal; API may not filter — client-side
-      return items.where((e) {
-        // payload may include ackedAt at top level when present
-        return true;
-      }).toList();
+      return items;
     } catch (_) {
       return [];
     }
@@ -76,11 +97,11 @@ class EscalationRepository {
     final uri = Uri.parse(
       '${BevelConfig.apiBaseUrl}/api/v1/timeline/$itemId/ack',
     );
-    final headers = <String, String>{'Content-Type': 'application/json'};
-    if (userEmail != null) headers['X-Bevel-User-Email'] = userEmail;
-    if (userId != null) headers['X-Bevel-User-Id'] = userId;
     try {
-      final res = await _client.post(uri, headers: headers);
+      final res = await _client.post(
+        uri,
+        headers: _identityHeaders(userEmail: userEmail, userId: userId),
+      );
       return res.statusCode >= 200 && res.statusCode < 300;
     } catch (_) {
       return false;

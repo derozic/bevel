@@ -145,7 +145,14 @@ class _BevelHomePageState extends State<BevelHomePage> {
       case 'auth_complete':
         // System-browser OAuth finished → land in workspace shell.
         // Cookie hop Safari→WKWebView may still need a refresh; user can Retry.
-        unawaited(_onAuthComplete(action.route ?? '/'));
+        unawaited(
+          _onAuthComplete(
+            action.route ?? '/',
+            email: action.email,
+            userId: action.userId,
+            userName: action.userName,
+          ),
+        );
         break;
       case 'hermes_status':
         _openNativeHub(focusHermes: true);
@@ -199,8 +206,18 @@ class _BevelHomePageState extends State<BevelHomePage> {
     super.dispose();
   }
 
-  Future<void> _onAuthComplete(String path) async {
-    final next = _onboarding.copyWith(completedGoogleSignIn: true);
+  Future<void> _onAuthComplete(
+    String path, {
+    String? email,
+    String? userId,
+    String? userName,
+  }) async {
+    final next = _onboarding.copyWith(
+      completedGoogleSignIn: true,
+      userEmail: email?.trim().isNotEmpty == true ? email!.trim() : null,
+      userId: userId?.trim().isNotEmpty == true ? userId!.trim() : null,
+      userName: userName?.trim().isNotEmpty == true ? userName!.trim() : null,
+    );
     await next.save();
     if (!mounted) return;
     setState(() {
@@ -214,7 +231,14 @@ class _BevelHomePageState extends State<BevelHomePage> {
   }
 
   Future<void> _maybeShowEscalationInbox() async {
-    final items = await _escalations.fetchUnacked();
+    final email = _onboarding.userEmail;
+    final userId = _onboarding.userId;
+    if (email.isEmpty && userId.isEmpty) return;
+
+    final items = await _escalations.fetchUnacked(
+      userEmail: email.isNotEmpty ? email : null,
+      userId: userId.isNotEmpty ? userId : null,
+    );
     if (!mounted || items.isEmpty) return;
     // Local high-priority alert when returning with pending ^escalations
     if (_onboarding.pushEscalations) {
@@ -232,7 +256,11 @@ class _BevelHomePageState extends State<BevelHomePage> {
       context,
       items: items,
       onAck: (item) async {
-        await _escalations.ack(item.id);
+        await _escalations.ack(
+          item.id,
+          userEmail: email.isNotEmpty ? email : null,
+          userId: userId.isNotEmpty ? userId : null,
+        );
       },
       onOpen: (item) {
         Navigator.of(context).pop(); // close sheet
