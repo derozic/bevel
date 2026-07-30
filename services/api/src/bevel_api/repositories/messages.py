@@ -12,8 +12,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bevel_api.db.models.message import Message
 
-# @agent or @Name tokens used in chat
-_MENTION_RE = re.compile(r"@([a-zA-Z0-9_-]{2,64})")
+# @agent or @Name tokens used in chat (agents + soft person mentions)
+_MENTION_RE = re.compile(r"(?<![a-zA-Z0-9_])@([a-zA-Z0-9_-]{2,64})\b")
+# ^handle escalations (people) — full notify + personal agent
+_ESCALATION_RE = re.compile(r"(?<![a-zA-Z0-9_])\^([a-zA-Z0-9_-]{2,64})\b")
+
+# Fleet agent ids — @these stay agent dispatch, not people timeline soft-mentions
+# (unless a real user also claims that handle; fan-out resolves users first).
+KNOWN_FLEET_AGENT_IDS: frozenset[str] = frozenset(
+    {
+        "hermes",
+        "johnny",
+        "terry",
+        "forge",
+        "brain",
+        "loom",
+        "northstar",
+        "lego",
+        "tegan",
+        "system",
+    }
+)
 
 
 def _utcnow() -> datetime:
@@ -24,17 +43,47 @@ def _id() -> str:
     return f"msg_{uuid.uuid4().hex[:16]}"
 
 
-def extract_mentioned_agent_ids(body: str) -> list[str]:
-    if not body:
-        return []
+def _unique_tokens(matches: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
-    for match in _MENTION_RE.finditer(body):
-        token = match.group(1).lower()
-        if token not in seen:
-            seen.add(token)
-            out.append(token)
+    for token in matches:
+        t = token.lower()
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
     return out
+
+
+def extract_mentioned_agent_ids(body: str) -> list[str]:
+    """All @tokens — agents resolve client-side; also used as soft person handles."""
+    if not body:
+        return []
+    return _unique_tokens([m.group(1) for m in _MENTION_RE.finditer(body)])
+
+
+def extract_mentioned_handles(
+    body: str,
+    *,
+    exclude_agent_ids: frozenset[str] | None = None,
+) -> list[str]:
+    """@username soft mentions → timeline feed without full notification fan-out.
+
+    Pure fleet agent tokens (e.g. @hermes) are excluded by default so agent
+    chips do not pollute people handles. A person who shares an agent id as
+    their handle is still reachable via fan-out if they exist in users.
+    """
+    if not body:
+        return []
+    skip = exclude_agent_ids if exclude_agent_ids is not None else KNOWN_FLEET_AGENT_IDS
+    tokens = _unique_tokens([m.group(1) for m in _MENTION_RE.finditer(body)])
+    return [t for t in tokens if t not in skip]
+
+
+def extract_escalated_handles(body: str) -> list[str]:
+    """^username escalations → full notify + personal agent assist."""
+    if not body:
+        return []
+    return _unique_tokens([m.group(1) for m in _ESCALATION_RE.finditer(body)])
 
 
 def to_api_dict(row: Message) -> dict[str, Any]:
@@ -51,6 +100,8 @@ def to_api_dict(row: Message) -> dict[str, Any]:
         "tags": list(meta.get("tags") or []),
         "kind": row.kind,
         "mentionedAgentIds": list(row.mentioned_agent_ids or []),
+        "mentionedHandles": list(row.mentioned_handles or []),
+        "escalatedHandles": list(row.escalated_handles or []),
         "channelSlug": row.channel_slug,
         "tenantId": row.tenant_id,
         "createdAt": row.created_at.isoformat() if row.created_at else None,
@@ -184,6 +235,8 @@ async def append(
         if "body" in msg:
             existing.body = body
             existing.mentioned_agent_ids = extract_mentioned_agent_ids(body)
+            existing.mentioned_handles = extract_mentioned_handles(body)
+            existing.escalated_handles = extract_escalated_handles(body)
         if msg.get("speakerId") or msg.get("speaker_id"):
             existing.speaker_id = str(
                 msg.get("speakerId") or msg.get("speaker_id")
@@ -235,6 +288,8 @@ async def append(
         body=body,
         kind=str(msg.get("kind") or "message"),
         mentioned_agent_ids=extract_mentioned_agent_ids(body),
+        mentioned_handles=extract_mentioned_handles(body),
+        escalated_handles=extract_escalated_handles(body),
         metadata_=metadata,
         created_at=created_at,
     )

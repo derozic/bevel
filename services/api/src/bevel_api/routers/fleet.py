@@ -128,10 +128,41 @@ async def post_message(
         )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
+
+    # Fan-out @mentions (soft) and ^escalations into personal timelines
+    timeline_fanout: dict[str, Any] | None = None
+    meta = dict(record.metadata_ or {})
+    status = str(meta.get("status") or "final")
+    if status not in {"pending", "streaming", "partial"} and (
+        record.mentioned_handles or record.escalated_handles
+    ):
+        try:
+            from bevel_api.repositories import timeline as timeline_repo
+
+            actor_user_id = (
+                str(body.get("actorUserId") or body.get("actor_user_id") or "")
+                .strip()
+                or None
+            )
+            # speakerId may be human:<id>
+            if not actor_user_id:
+                sid = str(record.speaker_id or "")
+                if sid.startswith("human:"):
+                    actor_user_id = sid.split(":", 1)[1] or None
+            timeline_fanout = await timeline_repo.fan_out_from_message(
+                session,
+                message=record,
+                actor_user_id=actor_user_id,
+            )
+        except Exception:
+            # Never block message write on timeline failures
+            timeline_fanout = {"ok": False, "error": "fanout_failed"}
+
     return {
         "ok": True,
         "upserted": True,
         "message": messages_repo.to_api_dict(record),
+        "timeline": timeline_fanout,
     }
 
 
