@@ -245,6 +245,11 @@ export const bevelUserPreferencesSchema = z.object({
       tiktok: z.string().default(''),
       youtube: z.string().default(''),
     }),
+    /**
+     * Personal assistant agent id (e.g. hermes).
+     * Helps on ^escalations and personal-assistant features in Bevel.
+     */
+    personalAgentId: z.string().default(''),
   }),
   account: z.object({
     displayNameSource: z.enum(['google', 'profile', 'custom']),
@@ -383,6 +388,9 @@ export function formatProfileForAgents(profile: BevelProfile): string {
       ? ` (@${profile.handle.replace(/^@/, '')})`
       : ''
     lines.push(`Name: ${name}${handle}`)
+  }
+  if (profile.personalAgentId?.trim()) {
+    lines.push(`Personal agent: ${profile.personalAgentId.trim()}`)
   }
   if (profile.pronouns?.trim()) lines.push(`Pronouns: ${profile.pronouns.trim()}`)
   if (profile.jobTitle?.trim() || profile.org?.trim()) {
@@ -790,6 +798,7 @@ export const DEFAULT_PREFERENCES: BevelUserPreferences = {
       tiktok: '',
       youtube: '',
     },
+    personalAgentId: '',
   },
   account: {
     displayNameSource: 'google',

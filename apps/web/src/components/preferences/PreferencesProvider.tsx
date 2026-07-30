@@ -118,6 +118,24 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     (value: BevelUserPreferences, source: 'auto' | 'manual') => {
       try {
         savePreferences(tenantSlug, userId, value)
+        // Server SoT for handle + personal agent (timeline @/^ resolution)
+        const profile = value.profile
+        if (profile?.handle || profile?.personalAgentId || profile?.displayName) {
+          void fetch('/api/me/profile', {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              handle: profile.handle || undefined,
+              name: profile.displayName || undefined,
+              imageUrl: profile.photoUrl || undefined,
+              personalAgentId: profile.personalAgentId || undefined,
+              tenantId: tenantSlug || undefined,
+            }),
+          }).catch(() => {
+            /* local prefs still saved; API may be offline in dev */
+          })
+        }
         const at = Date.now()
         setLastSavedAt(at)
         setDirty(false)

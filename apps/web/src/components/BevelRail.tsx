@@ -1,7 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeftIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
+import { usePathname } from 'next/navigation'
+import {
+  ArrowLeftIcon,
+  ClockIcon,
+  Cog6ToothIcon,
+} from '@heroicons/react/24/outline'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
@@ -124,6 +129,12 @@ export function BevelRail({
   headerAction?: ReactNode
 }) {
   const { status } = useSession()
+  const pathname = usePathname()
+  const timelineActive =
+    pathname === '/timeline' ||
+    pathname === '/bevel/timeline' ||
+    pathname?.startsWith('/timeline/') ||
+    pathname?.startsWith('/bevel/timeline')
   const [channels, setChannels] = useState<FleetChannelSummary[]>(() => {
     const cached = readChannelCache()
     if (cached.length > 0) {
@@ -293,6 +304,20 @@ export function BevelRail({
       </div>
 
       <div className="bevel-rail-nav">
+        <nav aria-label="Timeline" className="mb-2">
+          <Link
+            href="/timeline"
+            onClick={onNavigate}
+            className="bevel-rail-channel"
+            data-active={timelineActive ? 'true' : 'false'}
+          >
+            <span className="bevel-rail-channel-slug flex items-center gap-1">
+              <ClockIcon className="h-3 w-3" aria-hidden />
+              feed
+            </span>
+            <span className="bevel-rail-channel-name">Timeline</span>
+          </Link>
+        </nav>
         <nav aria-label={BEVEL_COPY.channelsLabel}>
           {visible.map((ch) => (
             <Link
@@ -303,7 +328,7 @@ export function BevelRail({
               className="bevel-rail-channel"
               aria-busy={loading ? true : undefined}
             >
-              <span className="bevel-rail-channel-slug">^{ch.slug}</span>
+              <span className="bevel-rail-channel-slug">~{ch.slug}</span>
               <span className="bevel-rail-channel-name">{ch.name || '\u00a0'}</span>
             </Link>
           ))}

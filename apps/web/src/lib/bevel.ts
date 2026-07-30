@@ -34,6 +34,14 @@ export const BEVEL_ARCHIVE_PATH = '/sessions'
 /** Direct agent threads: /talk/brain */
 export const BEVEL_TALK_PATH = '/talk'
 export const BEVEL_SESSION_PATH = '/session'
+/** Personal reverse-chrono feed for @mentions and ^escalations */
+export const BEVEL_TIMELINE_PATH = '/timeline'
+
+/** User lookup / connection card for @handle and ^handle */
+export function bevelUserPath(handle: string): string {
+  const h = handle.trim().toLowerCase().replace(/^[@^~#]+/, '')
+  return `/u/${encodeURIComponent(h || 'unknown')}`
+}
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/
 

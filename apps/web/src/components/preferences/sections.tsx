@@ -942,6 +942,43 @@ export function ProfileSection() {
       </PrefGroup>
 
       <PrefGroup
+        title="Personal agent"
+        description="Each bevel can have a personal assistant. Hermes integrates with the desktop app; ^escalations route through your agent so they help you get it done."
+      >
+        <label className="block space-y-1 text-sm">
+          <span className="font-medium text-foreground">
+            Personal agent id
+          </span>
+          <input
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+            value={p.personalAgentId ?? ''}
+            onChange={(e) =>
+              setField(
+                'personalAgentId',
+                e.target.value.trim().toLowerCase().replace(/^@/, ''),
+              )
+            }
+            placeholder="hermes"
+            list="bevel-personal-agent-suggestions"
+          />
+          <datalist id="bevel-personal-agent-suggestions">
+            <option value="hermes" />
+            <option value="brain" />
+            <option value="johnny" />
+            <option value="terry" />
+            <option value="forge" />
+          </datalist>
+          <span className="text-[11px] text-muted">
+            @mentions land in your timeline; ^escalations also trigger full
+            notifications and this agent.
+            {(p.personalAgentId ?? '') === 'hermes'
+              ? ' Hermes enables deeper desktop integration.'
+              : ''}
+          </span>
+        </label>
+      </PrefGroup>
+
+      <PrefGroup
         title="For agents"
         description="Helps BEVEL agents understand your capabilities, domains, and how to work with you — used in routing and context, not required for the public card."
       >
