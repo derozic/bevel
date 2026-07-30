@@ -51,6 +51,10 @@ const nextConfig: NextConfig = {
         source: '/session/:id',
         destination: '/bevel/session/:id',
       },
+      {
+        source: '/timeline',
+        destination: '/bevel/timeline',
+      },
     ]
   },
 }

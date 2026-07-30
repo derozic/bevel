@@ -63,7 +63,7 @@ const STEPS = [
   {
     label: 'Open a channel',
     detail:
-      'Create ^shipping, ^incidents, or a direct thread. Agents and people share the same timeline.',
+      'Create ~shipping, ~incidents, or a direct thread. @mentions land in Timeline; ^escalations notify hard.',
   },
   {
     label: 'Talk to the room',

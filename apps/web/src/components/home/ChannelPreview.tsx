@@ -85,11 +85,15 @@ export function ChannelPreview() {
                 </span>
               </div>
               <p className="text-sm leading-relaxed text-muted">
-                {msg.body.split(/(@\w+)/g).map((part, i) =>
-                  part.startsWith('@') ? (
+                {msg.body.split(/([@^]\w+)/g).map((part, i) =>
+                  part.startsWith('@') || part.startsWith('^') ? (
                     <span
                       key={i}
-                      className="rounded px-1 font-medium text-accent bg-accent/15"
+                      className={
+                        part.startsWith('^')
+                          ? 'rounded px-1 font-medium text-amber-800 bg-amber-500/15'
+                          : 'rounded px-1 font-medium text-accent bg-accent/15'
+                      }
                     >
                       {part}
                     </span>
@@ -106,7 +110,7 @@ export function ChannelPreview() {
       <div className="border-t border-border px-4 py-3">
         <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
           <span className="text-sm text-muted">
-            Say something in ^shipping… or @Brain
+            Say something in ~shipping… or @Brain / ^scott
           </span>
           <span className="ml-auto size-2 animate-pulse rounded-full bg-accent" />
         </div>

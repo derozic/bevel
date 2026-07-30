@@ -7,6 +7,7 @@ from bevel_api.repositories import (
     messages,
     push_tokens,
     tenants,
+    timeline,
     users,
 )
 
@@ -18,4 +19,5 @@ __all__ = [
     "handoff",
     "announcements",
     "push_tokens",
+    "timeline",
 ]

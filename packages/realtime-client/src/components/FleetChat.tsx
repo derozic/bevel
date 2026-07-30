@@ -20,9 +20,11 @@ import {
 import { ChatMessageBody } from '../lib/chat-markdown'
 import {
   applyMention,
-  filterMentionCandidates,
+  filterMixedMentionCandidates,
   mentionDraftAt,
   mentionedAgentIds,
+  type MentionCandidate,
+  type PersonCandidate,
 } from '../lib/mentions'
 import { formatSpeaker } from '../lib/system-voice'
 import { readRoomSnapshot, writeRoomSnapshot } from '../lib/room-state-cache'
@@ -132,6 +134,16 @@ function scheduleSeatRetry(
 }
 
 export type FleetChatProps = {
+  /**
+   * Optional people directory for @ / ^ autocomplete.
+   * Prefer live lookup via peopleLookupPath when available.
+   */
+  people?: PersonCandidate[]
+  /**
+   * GET path that returns `{ users: [{ handle, name, imageUrl }] }`.
+   * Queried while typing @ or ^ (e.g. `/api/users/lookup`).
+   */
+  peopleLookupPath?: string
   initialAgents?: string[]
   agents?: FleetAgent[]
   className?: string
@@ -370,6 +382,8 @@ function MessageRow({
 export function FleetChat({
   initialAgents = ['hermes', 'johnny'],
   agents: agentsProp,
+  people: peopleProp,
+  peopleLookupPath,
   className,
   fillViewport = false,
   showChannelToggle = false,
@@ -862,10 +876,49 @@ export function FleetChat({
     () => mentionDraftAt(input, caret),
     [input, caret],
   )
-  const mentionCandidates = useMemo(() => {
+  const [lookupPeople, setLookupPeople] = useState<PersonCandidate[]>([])
+  const peopleDirectory = peopleProp ?? lookupPeople
+
+  // Live people lookup while typing @ or ^
+  useEffect(() => {
+    if (!mentionDraft || !peopleLookupPath) return
+    const q = mentionDraft.query.trim()
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => {
+      const url = `${peopleLookupPath}${peopleLookupPath.includes('?') ? '&' : '?'}q=${encodeURIComponent(q)}&limit=12`
+      fetch(url, { credentials: 'include', signal: controller.signal })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { users?: Array<{ handle?: string; name?: string; imageUrl?: string | null }> } | null) => {
+          const users = data?.users ?? []
+          setLookupPeople(
+            users
+              .filter((u) => u.handle)
+              .map((u) => ({
+                handle: String(u.handle).toLowerCase(),
+                name: u.name,
+                imageUrl: u.imageUrl,
+              })),
+          )
+        })
+        .catch(() => {
+          /* offline — keep static peopleProp */
+        })
+    }, 120)
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [mentionDraft, peopleLookupPath])
+
+  const mentionCandidates: MentionCandidate[] = useMemo(() => {
     if (!mentionDraft) return []
-    return filterMentionCandidates(catalog, mentionDraft.query)
-  }, [catalog, mentionDraft])
+    return filterMixedMentionCandidates(
+      mentionDraft.kind,
+      catalog,
+      peopleDirectory,
+      mentionDraft.query,
+    )
+  }, [catalog, mentionDraft, peopleDirectory])
 
   // When @agent resolves, light them up on the roster and auto-include
   useEffect(() => {
@@ -883,9 +936,22 @@ export function FleetChat({
     })
   }, [liveMentions])
 
-  function insertMention(agentId: string) {
+  function insertMentionCandidate(pick: MentionCandidate) {
     if (!mentionDraft) return
-    const { text, caret: nextCaret } = applyMention(input, mentionDraft, agentId)
+    const token =
+      pick.type === 'agent' ? pick.agent.id : pick.person.handle
+    const kind =
+      pick.type === 'person' && pick.escalate
+        ? 'escalation'
+        : mentionDraft.kind === 'escalation'
+          ? 'escalation'
+          : 'mention'
+    const { text, caret: nextCaret } = applyMention(
+      input,
+      mentionDraft,
+      token,
+      kind,
+    )
     setInput(text)
     setCaret(nextCaret)
     requestAnimationFrame(() => {
@@ -948,7 +1014,7 @@ export function FleetChat({
 
   const sessionsPath = fleet.sessionsPath
   const headerLabel = isChannel
-    ? `^${channelSlug}`
+    ? `~${channelSlug}`
     : sessionTitle ?? (sessionId ? `Session ${sessionId.slice(0, 8)}…` : BEVEL_COPY.connectingSession)
 
   const visible = visibleMessages(messages)
@@ -1214,26 +1280,54 @@ export function FleetChat({
               <ul
                 className="fleet-chat-mention-menu"
                 role="listbox"
-                aria-label="Mention agent"
+                aria-label={
+                  mentionDraft.kind === 'escalation'
+                    ? 'Escalate to person'
+                    : 'Mention person or agent'
+                }
               >
-                {mentionCandidates.map((a, i) => {
+                {mentionCandidates.map((c, i) => {
                   const active = i === mentionHighlight
+                  const key =
+                    c.type === 'agent'
+                      ? `agent:${c.agent.id}`
+                      : `person:${c.person.handle}:${c.escalate ? 'esc' : 'soft'}`
+                  const name =
+                    c.type === 'agent'
+                      ? c.agent.name
+                      : c.person.name || c.person.handle
+                  const token =
+                    c.type === 'agent'
+                      ? `@${c.agent.id}`
+                      : c.escalate || mentionDraft.kind === 'escalation'
+                        ? `^${c.person.handle}`
+                        : `@${c.person.handle}`
+                  const avatar =
+                    c.type === 'agent' ? c.agent.avatar : c.person.imageUrl
                   return (
-                    <li key={a.id} role="option" aria-selected={active}>
+                    <li key={key} role="option" aria-selected={active}>
                       <button
                         type="button"
                         className="fleet-chat-mention-option"
                         data-active={active ? 'true' : 'false'}
+                        data-kind={
+                          c.type === 'person' &&
+                          (c.escalate || mentionDraft.kind === 'escalation')
+                            ? 'escalation'
+                            : c.type
+                        }
                         onMouseDown={(e) => {
                           e.preventDefault()
-                          insertMention(a.id)
+                          insertMentionCandidate(c)
                         }}
                         onMouseEnter={() => setMentionHighlight(i)}
                       >
-                        {a.avatar ? (
+                        {avatar &&
+                        typeof avatar === 'string' &&
+                        (avatar.startsWith('/') || avatar.startsWith('http')) ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={a.avatar}
+                            src={avatar}
                             alt=""
                             className="fleet-chat-mention-option-avatar"
                           />
@@ -1242,15 +1336,21 @@ export function FleetChat({
                             className="fleet-chat-mention-option-avatar fleet-chat-mention-option-avatar--fallback"
                             aria-hidden
                           >
-                            {a.name.slice(0, 1).toUpperCase()}
+                            {name.slice(0, 1).toUpperCase()}
                           </span>
                         )}
                         <span className="fleet-chat-mention-option-text">
                           <span className="fleet-chat-mention-option-name">
-                            {a.name}
+                            {name}
                           </span>
                           <span className="fleet-chat-mention-option-id">
-                            @{a.id}
+                            {token}
+                            {c.type === 'person' &&
+                            (c.escalate || mentionDraft.kind === 'escalation')
+                              ? ' · escalate'
+                              : c.type === 'person'
+                                ? ' · person'
+                                : ' · agent'}
                           </span>
                         </span>
                       </button>
@@ -1297,14 +1397,16 @@ export function FleetChat({
                     e.preventDefault()
                     const pick =
                       mentionCandidates[mentionHighlight] ?? mentionCandidates[0]
-                    if (pick) insertMention(pick.id)
+                    if (pick) insertMentionCandidate(pick)
                     return
                   }
                   if (e.key === 'Escape') {
                     e.preventDefault()
                     setCaret(input.length)
-                    // break draft by moving caret conceptually — append space if needed
-                    setInput((v) => (v.endsWith('@') ? v.slice(0, -1) : v))
+                    // break draft by dropping trailing incomplete token marker
+                    setInput((v) =>
+                      v.endsWith('@') || v.endsWith('^') ? v.slice(0, -1) : v,
+                    )
                     return
                   }
                 }

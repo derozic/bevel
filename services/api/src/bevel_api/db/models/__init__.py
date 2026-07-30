@@ -5,6 +5,7 @@ from bevel_api.db.models.matrix import MatrixEventMap, MatrixRoomMap, MatrixUser
 from bevel_api.db.models.message import Message
 from bevel_api.db.models.push_token import PushToken
 from bevel_api.db.models.tenant import Tenant
+from bevel_api.db.models.timeline import TimelineItem, TimelineSource
 from bevel_api.db.models.user import User
 
 __all__ = [
@@ -18,4 +19,6 @@ __all__ = [
     "MatrixRoomMap",
     "MatrixEventMap",
     "MatrixUserMap",
+    "TimelineItem",
+    "TimelineSource",
 ]

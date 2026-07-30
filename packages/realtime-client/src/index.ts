@@ -46,9 +46,14 @@ export type { FleetAgent } from './types'
 export {
   applyMention,
   filterMentionCandidates,
+  filterMixedMentionCandidates,
+  filterPersonCandidates,
   mentionDraftAt,
   mentionedAgentIds,
   parseResolvedMentions,
+  type MentionCandidate,
+  type MentionDraft,
+  type PersonCandidate,
 } from './lib/mentions'
 export { resolveRealtimeUrl } from './lib/realtime-client'
 export { formatSpeaker, SYSTEM_SPEAKER } from './lib/system-voice'

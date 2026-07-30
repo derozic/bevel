@@ -898,7 +898,33 @@
 
 .fleet-chat-mention {
   font-weight: 600;
+  text-decoration: none;
+  border-radius: 0.2rem;
+  padding: 0 0.15em;
   color: color-mix(in srgb, var(--msg-accent, #15803d) 70%, var(--ink));
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.fleet-chat-mention:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* @username — soft mention (timeline feed, no full notify) */
+.fleet-chat-mention--soft {
+  color: color-mix(in srgb, var(--msg-accent, #15803d) 75%, var(--ink));
+  background: color-mix(in srgb, var(--msg-accent, #15803d) 12%, transparent);
+}
+
+/* ^username — escalation (full notify + personal agent) */
+.fleet-chat-mention--escalation {
+  color: color-mix(in srgb, #b45309 80%, var(--ink));
+  background: color-mix(in srgb, #f59e0b 18%, transparent);
+  font-weight: 700;
+}
+
+.fleet-chat-mention--escalation:hover {
+  background: color-mix(in srgb, #f59e0b 28%, transparent);
 }
 
 /* Human + agent avatars — explicit sizes (profile URLs are huge without this) */

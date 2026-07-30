@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import {
   applyMention,
   filterMentionCandidates,
+  filterMixedMentionCandidates,
   mentionDraftAt,
   mentionedAgentIds,
   parseResolvedMentions,
@@ -58,9 +59,18 @@ section('mentionDraftAt tracks incomplete @token under caret', () => {
   const text = 'ping @jo'
   const draft = mentionDraftAt(text, text.length)
   assert.ok(draft)
+  assert.equal(draft!.kind, 'mention')
   assert.equal(draft!.query, 'jo')
   assert.equal(draft!.start, 5)
   assert.equal(draft!.end, text.length)
+})
+
+section('mentionDraftAt tracks incomplete ^escalation under caret', () => {
+  const text = 'need ^sc'
+  const draft = mentionDraftAt(text, text.length)
+  assert.ok(draft)
+  assert.equal(draft!.kind, 'escalation')
+  assert.equal(draft!.query, 'sc')
 })
 
 section('mentionDraftAt ignores email-like mid-token @', () => {
@@ -78,6 +88,26 @@ section('applyMention replaces draft range without duplicating', () => {
   assert.equal(draft2, null)
   const ids = mentionedAgentIds(once.text, catalog)
   assert.deepEqual(ids, ['johnny'])
+})
+
+section('applyMention inserts ^ for escalations', () => {
+  const text = 'wake ^sc'
+  const draft = mentionDraftAt(text, text.length)!
+  const once = applyMention(text, draft, 'scott', 'escalation')
+  assert.equal(once.text, 'wake ^scott ')
+})
+
+section('filterMixedMentionCandidates people first for @; people only for ^', () => {
+  const people = [
+    { handle: 'scott', name: 'Scott' },
+    { handle: 'peter', name: 'Peter' },
+  ]
+  const soft = filterMixedMentionCandidates('mention', catalog, people, 'sc')
+  assert.equal(soft[0]!.type, 'person')
+  if (soft[0]!.type === 'person') assert.equal(soft[0]!.person.handle, 'scott')
+  const hard = filterMixedMentionCandidates('escalation', catalog, people, 'sc')
+  assert.ok(hard.every((c) => c.type === 'person'))
+  assert.equal(hard.length, 1)
 })
 
 section('filterMentionCandidates matches id name and category', () => {

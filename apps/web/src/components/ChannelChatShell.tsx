@@ -218,6 +218,7 @@ export function ChannelChatShell({
         onChannelToggle={onChannelToggle}
         userMenu={<UserMenu size="sm" align="end" />}
         agentMessageHref={(agentId) => bevelTalkPath(agentId)}
+        peopleLookupPath="/api/users/lookup"
         showAvatars={prefs?.prefs.messages.showAvatars !== false}
         nameStyle={prefs?.prefs.messages.nameStyle ?? 'full_and_display'}
         clock24h={prefs?.prefs.messages.clock24h ?? false}
