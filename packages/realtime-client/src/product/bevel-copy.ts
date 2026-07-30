@@ -42,8 +42,8 @@ export const BEVEL_COPY = {
 
   placeholderWork: (slug: string, sampleAgent?: string) =>
     sampleAgent
-      ? `Task for ^${slug} — @${sampleAgent} will use the repo…`
-      : `Task for ^${slug} — agents will use the repo…`,
+      ? `Task for ~${slug} — @${sampleAgent} will use the repo…`
+      : `Task for ~${slug} — agents will use the repo…`,
 
   work: {
     toggle: 'Work',

@@ -40,6 +40,7 @@ import {
   resolveBevelConnectionIssue,
   type BevelConnectionIssue,
 } from '../product/bevel-copy'
+import { channelTag } from '../product/bevel'
 import type { FleetAgent } from '../types'
 import { AgentChip } from './AgentChip'
 import { HumanAvatar } from './HumanAvatar'
@@ -144,6 +145,8 @@ export type FleetChatProps = {
    * Queried while typing @ or ^ (e.g. `/api/users/lookup`).
    */
   peopleLookupPath?: string
+  /** When true, channel header shows `^slug` (high priority) instead of `~slug`. */
+  channelEscalated?: boolean
   initialAgents?: string[]
   agents?: FleetAgent[]
   className?: string
@@ -384,6 +387,7 @@ export function FleetChat({
   agents: agentsProp,
   people: peopleProp,
   peopleLookupPath,
+  channelEscalated = false,
   className,
   fillViewport = false,
   showChannelToggle = false,
@@ -1014,7 +1018,7 @@ export function FleetChat({
 
   const sessionsPath = fleet.sessionsPath
   const headerLabel = isChannel
-    ? `~${channelSlug}`
+    ? channelTag(channelSlug, { escalated: channelEscalated })
     : sessionTitle ?? (sessionId ? `Session ${sessionId.slice(0, 8)}…` : BEVEL_COPY.connectingSession)
 
   const visible = visibleMessages(messages)

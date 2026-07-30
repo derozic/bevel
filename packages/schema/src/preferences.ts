@@ -163,6 +163,12 @@ export const bevelUserPreferencesSchema = z.object({
       directories: z.boolean(),
     }),
     filter: conversationFilterSchema,
+    /**
+     * High-priority channel slugs for this member.
+     * Display as `^slug` (vs default `~slug`), sorted to the top of the rail.
+     * Ctrl/Cmd+click or channel properties toggles membership.
+     */
+    escalatedChannels: z.array(z.string()).default([]),
   }),
   appearance: z.object({
     themeId: themeIdSchema,
@@ -745,6 +751,7 @@ export const DEFAULT_PREFERENCES: BevelUserPreferences = {
       directories: true,
     },
     filter: 'active',
+    escalatedChannels: [],
   },
   appearance: {
     themeId: 'tenant',
