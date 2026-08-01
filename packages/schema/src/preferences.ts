@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const PREFERENCES_VERSION = 5 as const
+export const PREFERENCES_VERSION = 6 as const
 
 export const notifyOnSchema = z.enum(['mentions_dms', 'all', 'nothing'])
 export const densitySchema = z.enum(['clean', 'compact'])
@@ -257,6 +257,16 @@ export const bevelUserPreferencesSchema = z.object({
      */
     personalAgentId: z.string().default(''),
   }),
+  /**
+   * Agent Trace pane (parallel to chat). Off by default for non-power users.
+   * Server-side preference when prefs are vaulted; also used client-side.
+   */
+  agentTrace: z
+    .object({
+      /** Show third-column / sheet of agent thinking, tools, handoffs. */
+      visible: z.boolean().default(false),
+    })
+    .default({ visible: false }),
   account: z.object({
     displayNameSource: z.enum(['google', 'profile', 'custom']),
   }),
@@ -806,6 +816,9 @@ export const DEFAULT_PREFERENCES: BevelUserPreferences = {
       youtube: '',
     },
     personalAgentId: '',
+  },
+  agentTrace: {
+    visible: false,
   },
   account: {
     displayNameSource: 'google',
