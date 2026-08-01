@@ -7,7 +7,8 @@ import { resolveWorkspaceLogoUrl } from '@/lib/workspace-logo'
 
 /** Product home links for workspace → platform (used by rail back-link). */
 export const PLATFORM_HOME_LINKS: Record<string, { href: string; label: string }> = {
-  '2x4m': { href: 'https://2x4m.lvh.me', label: '2x4m' },
+  // Production suite — local dev can override via tenant theme later
+  '2x4m': { href: 'https://2x4m.cc', label: '2x4m' },
 }
 
 const PLATFORM_LINKS = PLATFORM_HOME_LINKS
