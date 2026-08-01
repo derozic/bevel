@@ -19,6 +19,7 @@ from bevel_api.routers import announcements as announcements_router
 from bevel_api.routers import devices as devices_router
 from bevel_api.routers import fleet as fleet_router
 from bevel_api.routers import handoff as handoff_router
+from bevel_api.routers import intelligence as intelligence_router
 from bevel_api.routers import matrix as matrix_router
 from bevel_api.routers import services as services_router
 from bevel_api.routers import tenants as tenants_router
@@ -106,6 +107,7 @@ app.include_router(handoff_router.router, prefix="/api")
 app.include_router(matrix_router.router, prefix="/api")
 app.include_router(timeline_router.router, prefix="/api")
 app.include_router(traces_router.router, prefix="/api")
+app.include_router(intelligence_router.router, prefix="/api")
 # Application Service paths expected by Synapse (no /api prefix)
 app.include_router(matrix_router.as_router, prefix="/_matrix/app/v1")
 

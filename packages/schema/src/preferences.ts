@@ -39,6 +39,8 @@ export type DaypartId = Exclude<DaypartPreference, 'auto'>
  * Frontier + research + local Ollama (Mac) + custom OpenAI-compatible endpoints.
  */
 export const AI_PROVIDER_IDS = [
+  /** Google Antigravity — onboard default intelligence (control plane). */
+  'antigravity',
   'claude',
   'openai',
   'gemini',
@@ -287,6 +289,7 @@ export const bevelUserPreferencesSchema = z.object({
     streamSummaries: z.boolean(),
     naturalLanguage: z.boolean(),
     providers: z.object({
+      antigravity: aiProviderStateSchema,
       claude: aiProviderStateSchema,
       openai: aiProviderStateSchema,
       gemini: aiProviderStateSchema,
@@ -831,10 +834,12 @@ export const DEFAULT_PREFERENCES: BevelUserPreferences = {
     echoCancellation: true,
   },
   ai: {
-    activeProvider: 'claude',
+    /** Antigravity is the onboard default when GEMINI_API_KEY is configured. */
+    activeProvider: 'antigravity',
     streamSummaries: true,
     naturalLanguage: true,
     providers: {
+      antigravity: { ...emptyProvider, enabled: true },
       claude: { ...emptyProvider },
       openai: { ...emptyProvider },
       gemini: { ...emptyProvider },
