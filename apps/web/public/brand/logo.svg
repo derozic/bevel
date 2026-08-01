@@ -1,10 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" role="img" aria-label="BEVEL">
-  <!--
-    Production site header mark — BevelCutMark (login / marketing).
-    Same geometry as https://bevel.is header SVG (viewBox 0 0 18 18, scaled).
-    Magenta equivalent of /brand/cyan-mark.svg: 40×40, transparent exterior.
-    Ink (not app-icon green) — matches header on white.
-  -->
+  <!-- Production header BevelCutMark in ink — same paths as apps/web BevelCutMark.tsx -->
   <g transform="translate(2 2) scale(2)">
     <path d="M2 14.5V3.5L7.5 9 2 14.5Z" fill="#0a0a0a" opacity="0.35"/>
     <path d="M2 3.5h14L9 10.5 2 3.5Z" fill="#0a0a0a"/>
