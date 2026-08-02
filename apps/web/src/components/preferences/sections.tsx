@@ -1381,7 +1381,13 @@ export function AccountSection() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => void signOut({ callbackUrl: '/' })}
+          onClick={() =>
+            void signOut({
+              callbackUrl:
+                process.env.NEXT_PUBLIC_BEVEL_PUBLIC_URL ||
+                'https://bevel.is/login',
+            })
+          }
         >
           Sign out
         </Button>
@@ -2185,7 +2191,13 @@ export function SecuritySection() {
       <Button
         type="button"
         variant="outline"
-        onClick={() => void signOut({ callbackUrl: '/' })}
+        onClick={() =>
+          void signOut({
+            callbackUrl:
+              process.env.NEXT_PUBLIC_BEVEL_PUBLIC_URL ||
+              'https://bevel.is/login',
+          })
+        }
       >
         Sign out of this browser
       </Button>

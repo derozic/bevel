@@ -12,12 +12,14 @@ import { issueAuthHandoffCode } from '@/lib/auth-handoff'
 
 /**
  * Post-login router.
- * Platform entry (bevel.is) → org host / workspace picker based on Google Workspace email.
- * Org host → `/~general` (tilde path; never percent-encoded).
  *
- * When platform and org hosts sit on different registrable domains
- * (bevel.is vs bevel.2x4m.cc), cookies cannot hop — issue a Postgres-backed
- * one-time handoff code and land on /api/auth/handoff on the org host.
+ * Platform (bevel.is):
+ * - 0 workspaces → /claim
+ * - N>1 → /workspaces (picker) — never silent 2x4m
+ * - 1 workspace → /workspaces still when BEVEL_PLATFORM_AUTO_HANDOFF=0 (dogfood),
+ *   else handoff to that org
+ *
+ * Org host → /~general with handoff when needed.
  */
 export default async function WelcomePage() {
   const session = await auth()
@@ -38,45 +40,57 @@ export default async function WelcomePage() {
   const email = session.user.email
   const { tenants, preferred } = resolveWorkspacesForEmail(email)
   const home = preferred ?? resolveHomeTenantForEmail(email)
+  const onPlatform = isPlatformEntryHost(host)
 
-  if (session.needsWorkspacePick || (!home && tenants.length > 1)) {
+  // Multi-workspace or explicit pick flag → always show chooser on platform.
+  if (session.needsWorkspacePick || tenants.length > 1) {
     redirect('/workspaces')
   }
 
-  // No org yet — claim a namespace instead of a dead-end AccessDenied.
   if (!home && tenants.length === 0) {
+    // Apex home with empty memberships (profile still valid)
+    if (onPlatform) {
+      redirect('/account')
+    }
     redirect('/claim')
   }
 
   const target = home ?? tenants[0]!
-  const onPlatform = isPlatformEntryHost(host)
   const callbackPath = '/~general'
 
-  // Hop to the organization's BEVEL host so channels/history bind to that namespace.
-  if (onPlatform && target.host !== host) {
-    const orgHost = target.host.toLowerCase().split(':')[0] || target.host
+  // Dogfood: stay on apex and open picker even for a single workspace.
+  const autoHandoff =
+    process.env.BEVEL_PLATFORM_AUTO_HANDOFF !== '0' &&
+    process.env.BEVEL_PLATFORM_AUTO_HANDOFF !== 'false'
 
-    if (needsAuthHandoff(host, orgHost)) {
-      const issued = await issueAuthHandoffCode({
-        email,
-        name: session.user.name,
-        imageUrl: session.user.image,
-        tenantSlug: target.slug,
-        callbackPath,
-      })
-      if (issued?.code) {
-        const dest = new URL(`https://${orgHost}/api/auth/handoff`)
-        dest.searchParams.set('code', issued.code)
-        dest.searchParams.set('callbackUrl', callbackPath)
-        redirect(dest.toString())
-      }
-      // Fall through to plain hop if API unavailable (may land logged-out — ops alert)
-      console.error(
-        '[welcome] handoff issue failed; falling back to bare org redirect',
-      )
+  if (onPlatform) {
+    if (!autoHandoff) {
+      redirect('/workspaces')
     }
+    if (target.host.toLowerCase().split(':')[0] !== host) {
+      const orgHost = target.host.toLowerCase().split(':')[0] || target.host
 
-    redirect(publicTenantUrl(target, callbackPath))
+      if (needsAuthHandoff(host, orgHost)) {
+        const issued = await issueAuthHandoffCode({
+          email,
+          name: session.user.name,
+          imageUrl: session.user.image,
+          tenantSlug: target.slug,
+          callbackPath,
+        })
+        if (issued?.code) {
+          const dest = new URL(`https://${orgHost}/api/auth/handoff`)
+          dest.searchParams.set('code', issued.code)
+          dest.searchParams.set('callbackUrl', callbackPath)
+          redirect(dest.toString())
+        }
+        console.error(
+          '[welcome] handoff issue failed; falling back to bare org redirect',
+        )
+      }
+
+      redirect(publicTenantUrl(target, callbackPath))
+    }
   }
 
   // Already on the org host — relative redirect to default channel.

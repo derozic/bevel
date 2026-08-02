@@ -213,7 +213,14 @@ export function UserMenu({
 
         <DropdownMenuItem
           destructive
-          onSelect={() => void signOut({ callbackUrl: '/' })}
+          onSelect={() =>
+            void signOut({
+              // Always return to platform apex — not the org host that assumed 2x4m.
+              callbackUrl:
+                process.env.NEXT_PUBLIC_BEVEL_PUBLIC_URL ||
+                'https://bevel.is/login',
+            })
+          }
         >
           <ArrowRightEndOnRectangleIcon
             className="size-4 shrink-0 opacity-80"

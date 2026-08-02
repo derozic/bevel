@@ -45,22 +45,19 @@ features:
 
 auth:
   mode: google
-  # Align with 2x4m platform authorized-domains (packages/auth)
+  # Company domains only — do NOT include derozic.com (stole platform home for s@derozic.com).
+  # Personal product workspaces use exact allowed_emails (decli / preso / olimbic / 2ndbrain).
   allowed_domains:
     - 2x4m.cc
     - 2x4m.systems
-    - derozic.com
     - comma.cm
   allowed_emails:
     - twobyform@gmail.com
-    - sderozic@gmail.com
     - scott@comma.cm
-  # Platform login: Workspace users on these domains land in 2x4m
-  # with that org's channels + history (home workspace).
+  # Prefer 2x4m only for true suite company domains (not gmail / derozic personal).
   default_for_domains:
     - 2x4m.cc
     - 2x4m.systems
-    - derozic.com
     - comma.cm
   require_github_for_work: true
 

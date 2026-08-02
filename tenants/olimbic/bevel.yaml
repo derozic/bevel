@@ -1,18 +1,17 @@
-tenant: 2ndbrain
-name: 2ndBrain
-domain: bevel.2ndbra.in
+tenant: olimbic
+name: Olimbic
+domain: bevel.olimbic.games
 hosts:
-  - bevel.2ndbra.in
-  - bevel.2ndbrain.lvh.me
-  - 2ndbrain.lvh.me
-  - 2ndbrain.bevel.lvh.me
+  - bevel.olimbic.games
+  - bevel.olimbic.lvh.me
+  - olimbic.bevel.lvh.me
 
 plan: pro
 feature_access: beta
 
 brand:
   theme: ./theme.json
-  product_name: 2ndBrain
+  product_name: Olimbic
 
 features:
   async_streams: true
@@ -27,10 +26,10 @@ features:
 auth:
   mode: google
   allowed_emails:
-    - rozicscott@gmail.com
+    - barndough@gmail.com
 
 realtime:
-  namespace: 2ndbrain
+  namespace: olimbic
   presence: true
   url: https://realtime.bevel.lvh.me
 
@@ -43,9 +42,6 @@ transports:
     protocol: websocket
 
 deployment:
-  preview_url: https://bevel.2ndbrain.lvh.me
-  production_url: https://bevel.2ndbra.in
+  preview_url: https://bevel.olimbic.lvh.me
+  production_url: https://bevel.olimbic.games
   target: custom
-
-work_repos:
-  - derozic/2ndbrain-mono

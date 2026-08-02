@@ -1,8 +1,14 @@
 tenant: preso
 name: Preso
-domain: bevel.preso.lvh.me
+domain: bevel.pres0.com
 hosts:
+  - bevel.pres0.com
+  - bevel.preso.lvh.me
   - agents.preso.lvh.me
+  - preso.bevel.lvh.me
+
+plan: pro
+feature_access: beta
 
 brand:
   theme: ./theme.json
@@ -15,22 +21,31 @@ features:
   channels: true
   direct_messages: true
   agent_dispatch: true
-  work_mode: false
+  work_mode: true
   custom_branding: true
 
 auth:
   mode: google
-  allowed_domains:
-    - derozic.com
+  allowed_emails:
+    - sderozic@gmail.com
 
 realtime:
   namespace: preso
   presence: true
   url: https://realtime.bevel.lvh.me
 
+transports:
+  asyncStream:
+    kind: async-stream
+    protocol: sse
+  liveBidirectional:
+    kind: live-bidirectional
+    protocol: websocket
+
 deployment:
   preview_url: https://bevel.preso.lvh.me
-  target: vercel
+  production_url: https://bevel.pres0.com
+  target: custom
 
 work_repos:
-  - derozic/preso
+  - derozic/preso2x4m

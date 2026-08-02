@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Button } from '@bevel/ui'
 import { BevelCutMark } from '@/components/BevelCutMark'
 import { BevelMark } from '@/components/BevelMark'
+import { SuiteNav } from '@/components/SuiteNav'
 import { BEVEL_HOME_PATH } from '@/lib/bevel'
 import { MARKETING_NAV } from '@/lib/marketing'
 
@@ -167,6 +168,8 @@ export function MarketingSiteHeader({
       <BrandLink />
       <nav className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
         <MarketingNavLinks hideOn={navHide} />
+        {/* Right-half suite chip (Slack / Phoenix density) */}
+        <SuiteNav className="hidden sm:flex" size="sm" showLabel />
         {trailing}
       </nav>
     </header>

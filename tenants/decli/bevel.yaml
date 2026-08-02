@@ -1,18 +1,17 @@
-tenant: 2ndbrain
-name: 2ndBrain
-domain: bevel.2ndbra.in
+tenant: decli
+name: Decli
+domain: bevel.decli.dev
 hosts:
-  - bevel.2ndbra.in
-  - bevel.2ndbrain.lvh.me
-  - 2ndbrain.lvh.me
-  - 2ndbrain.bevel.lvh.me
+  - bevel.decli.dev
+  - bevel.decli.lvh.me
+  - decli.bevel.lvh.me
 
 plan: pro
 feature_access: beta
 
 brand:
   theme: ./theme.json
-  product_name: 2ndBrain
+  product_name: Decli
 
 features:
   async_streams: true
@@ -26,11 +25,12 @@ features:
 
 auth:
   mode: google
+  # Closed membership — exact emails only (no broad domain grab)
   allowed_emails:
-    - rozicscott@gmail.com
+    - s@derozic.com
 
 realtime:
-  namespace: 2ndbrain
+  namespace: decli
   presence: true
   url: https://realtime.bevel.lvh.me
 
@@ -43,9 +43,6 @@ transports:
     protocol: websocket
 
 deployment:
-  preview_url: https://bevel.2ndbrain.lvh.me
-  production_url: https://bevel.2ndbra.in
+  preview_url: https://bevel.decli.lvh.me
+  production_url: https://bevel.decli.dev
   target: custom
-
-work_repos:
-  - derozic/2ndbrain-mono

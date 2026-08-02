@@ -439,6 +439,12 @@ export const AI_PROVIDER_META: Record<
   AiProviderId,
   { name: string; shortName: string; keyHint: string; description: string }
 > = {
+  antigravity: {
+    name: 'Google Antigravity',
+    shortName: 'Antigravity',
+    keyHint: 'GEMINI_API_KEY / AIza...',
+    description: 'Onboard default intelligence (control plane, finish-only tools).',
+  },
   claude: {
     name: 'Anthropic Claude',
     shortName: 'Claude',
