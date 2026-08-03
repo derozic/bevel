@@ -43,7 +43,6 @@ import {
 import { DEFAULT_CHANNELS, type FleetChannelSummary } from '@/lib/fleet-channels'
 import type { SessionSummary } from '@/lib/realtime'
 import { BevelMark } from './BevelMark'
-import { SuiteNav } from './SuiteNav'
 import { WorkspaceBrand } from './WorkspaceBrand'
 import { ConversationRoster } from './ConversationRoster'
 import { ConversationSearch } from './ConversationSearch'
@@ -341,12 +340,8 @@ export function BevelRail({
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {/* Right-half suite chip → apex bevel.is */}
-            <SuiteNav
-              size="sm"
-              showLabel={false}
-              productLabel={productName}
-            />
+            {/* Bevel suite mark lives left of the user avatar in the chat header —
+                not here next to WorkspaceBrand (crowds the product logo). */}
             {!privateAgentsOnly ? (
               <button
                 type="button"

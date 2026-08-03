@@ -278,11 +278,25 @@
   max-height: 8rem;
 }
 
-/* Header toggle in fleet chat */
+/* Header trailing cluster: Trace, then BEVEL mark, then avatar (via userMenu) */
 .fleet-chat-header-actions {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.bevel-header-mark {
+  box-shadow: 1px 1px 0 0 color-mix(in srgb, var(--ink, #111827) 10%, transparent);
+}
+
+.bevel-header-mark:hover {
+  transform: translateY(-0.5px);
+}
+
+.bevel-header-mark:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--bevel-accent, #7c5cff) 55%, transparent);
+  outline-offset: 2px;
 }
 
 .trace-toggle {

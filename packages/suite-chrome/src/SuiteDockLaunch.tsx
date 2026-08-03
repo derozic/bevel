@@ -2,6 +2,8 @@
 
 /**
  * Suite dock: BEVEL mark for product hosts (2x4m, etc.).
+ * Placement: trailing nav only — immediately left of user avatar / auth.
+ * Do not render next to the product logo/wordmark (crowds brand).
  * Desktop hover/focus → GET {baseUrl}/api/suite/launch (unread + latest preview).
  *
  * SOURCE OF TRUTH: derozic/bevel packages/suite-chrome

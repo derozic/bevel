@@ -1,4 +1,5 @@
-/* Bevel suite dock — between ⌘K and avatar */
+/* Bevel suite dock — trailing cluster only (left of avatar / auth).
+   Never place next to product logo/wordmark — it crowds brand. */
 
 .bevel-nav-launch {
   position: relative;

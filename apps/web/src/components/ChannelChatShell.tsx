@@ -6,6 +6,7 @@ import { CpuChipIcon } from '@heroicons/react/24/outline'
 import { FleetChat, FleetProvider, type FleetWorkRepo } from '@bevel/realtime-client'
 import { agents } from '@/lib/agent-catalog'
 import { BEVEL_ARCHIVE_PATH, BEVEL_COPY, bevelTalkPath } from '@/lib/bevel'
+import { BevelHeaderMark } from '@/components/BevelHeaderMark'
 import { UserMenu } from '@/components/UserMenu'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 import { TracePane } from '@/components/trace/TracePane'
@@ -244,19 +245,23 @@ export function ChannelChatShell({
             highlightQuery={highlightQuery}
             onChannelToggle={onChannelToggle}
             headerActions={
-              <button
-                type="button"
-                className="trace-toggle"
-                data-on={traceVisible ? 'true' : 'false'}
-                aria-pressed={traceVisible}
-                aria-label={traceVisible ? 'Hide agent trace' : 'Show agent trace'}
-                title="Agent Trace — parallel log of thinking, tools, and handoffs"
-                onClick={() => setTraceVisible(!traceVisible)}
-              >
-                <span className="trace-toggle__dot" aria-hidden />
-                <CpuChipIcon className="h-3.5 w-3.5" aria-hidden />
-                Trace
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="trace-toggle"
+                  data-on={traceVisible ? 'true' : 'false'}
+                  aria-pressed={traceVisible}
+                  aria-label={traceVisible ? 'Hide agent trace' : 'Show agent trace'}
+                  title="Agent Trace — parallel log of thinking, tools, and handoffs"
+                  onClick={() => setTraceVisible(!traceVisible)}
+                >
+                  <span className="trace-toggle__dot" aria-hidden />
+                  <CpuChipIcon className="h-3.5 w-3.5" aria-hidden />
+                  Trace
+                </button>
+                {/* Suite mark immediately left of avatar — not next to product logo */}
+                <BevelHeaderMark />
+              </>
             }
             userMenu={<UserMenu size="sm" align="end" />}
             agentMessageHref={(agentId) => bevelTalkPath(agentId)}
