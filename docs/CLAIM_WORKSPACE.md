@@ -2,7 +2,7 @@
 
 ## Symptom
 
-`https://bevel.2x4m.cc/claim` → **Could not claim workspace (500)**.
+`https://bevel.is/claim` → **Could not claim workspace (500)** (also seen on org hosts).
 
 Claim **writes files** under `BEVEL_TENANTS_ROOT/{slug}/` (`bevel.yaml` + `theme.json`).  
 A 500 almost always means the process **cannot write** that path (or an uncaught error before the fix).
@@ -12,9 +12,11 @@ A 500 almost always means the process **cannot write** that path (or an uncaught
 ```ini
 Environment=BEVEL_TENANTS_ROOT=/opt/bevel/tenants
 Environment=BEVEL_CLAIM_MODE=soft
-Environment=BEVEL_PUBLIC_URL=https://bevel.2x4m.cc
-Environment=AUTH_URL=https://bevel.2x4m.cc
-Environment=NEXTAUTH_URL=https://bevel.2x4m.cc
+Environment=BEVEL_PUBLIC_URL=https://bevel.is
+# Prefer AUTH_TRUST_HOST without pinning AUTH_URL when one process serves
+# bevel.is + org hosts (bevel.2x4m.cc, …).
+# Environment=AUTH_URL=https://bevel.is
+Environment=AUTH_COOKIE_DOMAIN=.bevel.is
 Environment=AUTH_TRUST_HOST=true
 ReadWritePaths=/opt/bevel
 ```
@@ -33,7 +35,7 @@ sudo systemctl restart 2x4m-bevel.service
 With `BEVEL_CLAIM_MODE=soft` (default when `NODE_ENV=production`):
 
 - New workspace **namespace** = slug (realtime room key)
-- **Host** stays `bevel.2x4m.cc` (no wildcard DNS required)
+- **Host** stays platform apex `bevel.is` (or soft-mode host) when DNS wildcards are not ready
 - After claim → `/onboarding?workspace={slug}` on the same host
 
 Dedicated hosts (`slug.bevel.is`) need `BEVEL_CLAIM_MODE=dns` + DNS/Caddy.
@@ -41,7 +43,7 @@ Dedicated hosts (`slug.bevel.is`) need `BEVEL_CLAIM_MODE=dns` + DNS/Caddy.
 ## Ops preflight
 
 ```bash
-curl -sS https://bevel.2x4m.cc/api/claim/workspace | jq .
+curl -sS https://bevel.is/api/claim/workspace | jq .
 # tenantsRootWritable should be true
 ```
 

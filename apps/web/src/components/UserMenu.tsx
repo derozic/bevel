@@ -34,6 +34,7 @@ import {
   DAYPART_ORDER,
   resolveDaypart,
 } from '@/lib/daypart'
+import { platformLoginUrl } from '@/lib/platform'
 
 function initials(name?: string | null, email?: string | null): string {
   if (name?.trim()) {
@@ -215,10 +216,8 @@ export function UserMenu({
           destructive
           onSelect={() =>
             void signOut({
-              // Always return to platform apex — not the org host that assumed 2x4m.
-              callbackUrl:
-                process.env.NEXT_PUBLIC_BEVEL_PUBLIC_URL ||
-                'https://bevel.is/login',
+              // Platform apex only — never leave users on a product org host.
+              callbackUrl: platformLoginUrl(),
             })
           }
         >

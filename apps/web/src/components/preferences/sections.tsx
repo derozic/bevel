@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { signIn, signOut, useSession } from 'next-auth/react'
+import { platformLoginUrl } from '@/lib/platform'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import {
   AI_PROVIDER_IDS,
@@ -1382,11 +1383,7 @@ export function AccountSection() {
           type="button"
           variant="outline"
           onClick={() =>
-            void signOut({
-              callbackUrl:
-                process.env.NEXT_PUBLIC_BEVEL_PUBLIC_URL ||
-                'https://bevel.is/login',
-            })
+            void signOut({ callbackUrl: platformLoginUrl() })
           }
         >
           Sign out
@@ -2192,11 +2189,7 @@ export function SecuritySection() {
         type="button"
         variant="outline"
         onClick={() =>
-          void signOut({
-            callbackUrl:
-              process.env.NEXT_PUBLIC_BEVEL_PUBLIC_URL ||
-              'https://bevel.is/login',
-          })
+          void signOut({ callbackUrl: platformLoginUrl() })
         }
       >
         Sign out of this browser

@@ -6,11 +6,11 @@
  */
 import Link from 'next/link'
 import { BevelNavMark } from '@/components/BevelNavMark'
+import { platformPublicUrl } from '@/lib/platform'
 import { cn } from '@bevel/ui'
 
-const APEX =
-  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_BEVEL_PUBLIC_URL) ||
-  'https://bevel.is'
+/** Canonical platform apex — always bevel.is (never org host). */
+const APEX = platformPublicUrl()
 
 export function SuiteNav({
   className,

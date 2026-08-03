@@ -4,8 +4,10 @@
 
 | Surface | Host | Role |
 |---------|------|------|
-| **Apex** | `https://bevel.is` | Platform login, profile (`/account`), workspace picker (`/workspaces`), primary agent / AI preference |
-| **Workspace** | `bevel.<product>` | Org channels, brand, agents, Trace |
+| **Apex (canonical)** | `https://bevel.is` | **Primary domain** — platform login, profile (`/account`), workspace picker (`/workspaces`), primary agent / AI preference |
+| **Workspace** | `bevel.<product>` | Secondary org hosts (channels, brand, agents, Trace) |
+
+`BEVEL_PUBLIC_URL` / `NEXT_PUBLIC_BEVEL_PUBLIC_URL` must be **`https://bevel.is`**, never `bevel.2x4m.cc` or another product host.
 
 Logging out returns to **bevel.is/login** so the next sign-in re-resolves memberships (no sticky 2x4m assumption).
 

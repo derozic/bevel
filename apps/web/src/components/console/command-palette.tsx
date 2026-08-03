@@ -437,11 +437,7 @@ function CommandPalette() {
           icon: LogOut,
           run: () => {
             setOpen(false);
-            void signOut({
-              callbackUrl:
-                process.env.NEXT_PUBLIC_BEVEL_PUBLIC_URL ||
-                "https://bevel.is/login",
-            });
+            void signOut({ callbackUrl: "https://bevel.is/login" });
           },
         });
       } else {
