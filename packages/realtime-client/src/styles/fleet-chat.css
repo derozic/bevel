@@ -79,6 +79,13 @@
   color: var(--ink);
 }
 
+.fleet-chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
 .fleet-chat-channels-btn:hover {
   background: color-mix(in srgb, var(--ink) 6%, var(--surface));
 }

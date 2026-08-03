@@ -4,6 +4,7 @@
 @import "@bevel/realtime-client/styles/fleet-chat.css";
 @import "../styles/bevel-workspace.css";
 @import "../styles/daypart.css";
+@import "../styles/trace-pane.css";
 
 /* Tailwind v4 theme — maps design tokens to utilities (bg-*, text-*, border-*, font-*) */
 @theme {

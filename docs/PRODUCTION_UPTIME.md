@@ -31,6 +31,7 @@ All three units should be `enabled` + `active`:
 - `2x4m-bevel.service` — `Restart=always`
 - `bevel-api.service` — `Restart=on-failure` (or `always`)
 - `bevel-realtime.service` — `Restart=on-failure` (or `always`)
+- Fleet runner: `GET http://127.0.0.1:43208/health` must report `fleet.runner: ok` and `fleet.openrouter: configured` or `@mentions` fail
 - `postgresql` / `caddy` — host shared services
 
 ```bash

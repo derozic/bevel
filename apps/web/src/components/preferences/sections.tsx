@@ -3249,9 +3249,21 @@ export function MessagesSection() {
   const initial = fullName.slice(0, 1).toUpperCase()
   const nameStyle = prefs.messages.nameStyle
   const showAvatars = prefs.messages.showAvatars !== false
+  const traceVisible = prefs.agentTrace.visible === true
 
   return (
     <PrefSection title="Messages" description="How names and clocks appear.">
+      <PrefGroup
+        title="Agent Trace"
+        description="Parallel pane of agent thinking, tools, handoffs, and errors next to chat."
+      >
+        <PrefToggle
+          label="Show Trace pane"
+          description="Toggleable third column (desktop) or sheet (narrow). Also available from the Trace button in the chat header."
+          checked={traceVisible}
+          onChange={(visible) => updatePrefs({ agentTrace: { visible } })}
+        />
+      </PrefGroup>
       <PrefGroup
         title="Names"
         description="Preview uses your profile photo and name."

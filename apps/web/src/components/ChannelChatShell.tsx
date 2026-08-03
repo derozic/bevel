@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { signIn, useSession } from 'next-auth/react'
+import { CpuChipIcon } from '@heroicons/react/24/outline'
 import { FleetChat, FleetProvider, type FleetWorkRepo } from '@bevel/realtime-client'
 import { agents } from '@/lib/agent-catalog'
 import { BEVEL_ARCHIVE_PATH, BEVEL_COPY, bevelTalkPath } from '@/lib/bevel'
 import { UserMenu } from '@/components/UserMenu'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
+import { TracePane } from '@/components/trace/TracePane'
 import {
   ensureNotificationPermission,
   showBevelNotification,
@@ -67,6 +69,20 @@ export function ChannelChatShell({
         (s) => s.toLowerCase() === channelSlug.toLowerCase(),
       ),
   )
+  const traceVisible = prefs?.prefs.agentTrace.visible === true
+  const tenantId =
+    session?.tenantSlug ||
+    session?.tenantId ||
+    process.env.NEXT_PUBLIC_DEFAULT_TENANT ||
+    '2x4m'
+  const traceRoomKind = roomMode === 'session' ? 'agent_session' : 'channel'
+  const traceRoomId =
+    roomMode === 'session' ? sessionId || channelSlug : channelSlug
+
+  function setTraceVisible(visible: boolean) {
+    prefs?.updatePrefs({ agentTrace: { visible } })
+  }
+
   const [workRepos, setWorkRepos] = useState<FleetWorkRepo[]>([])
   const [defaultRepo, setDefaultRepo] = useState('derozic/2x4m')
   const [selectedWorkRepo, setSelectedWorkRepo] = useState<string | null>(null)
@@ -215,38 +231,87 @@ export function ChannelChatShell({
             : undefined
       }
     >
-      <FleetChat
-        initialAgents={initialAgents}
-        fillViewport={fillViewport}
-        showChannelToggle={showChannelToggle}
-        focusMessageId={focusMessageId}
-        highlightQuery={highlightQuery}
-        onChannelToggle={onChannelToggle}
-        userMenu={<UserMenu size="sm" align="end" />}
-        agentMessageHref={(agentId) => bevelTalkPath(agentId)}
-        peopleLookupPath="/api/users/lookup"
-        channelEscalated={channelEscalated}
-        showAvatars={prefs?.prefs.messages.showAvatars !== false}
-        nameStyle={prefs?.prefs.messages.nameStyle ?? 'full_and_display'}
-        clock24h={prefs?.prefs.messages.clock24h ?? false}
-        onProgramMessage={(event) => {
-          // Prefer desktop notifications when enabled in prefs
-          if (prefs?.prefs.notifications.desktopEnabled === false) return
-          const title = event.speaker || event.agentId || 'Agent'
-          const body = event.body.slice(0, 240)
-          void (async () => {
-            await ensureNotificationPermission()
-            await showBevelNotification({
-              title,
-              body,
-              agentId: event.agentId,
-              tag: `msg-${event.id}`,
-              url: `/~${channelSlug}`,
-              icon: '/icons/icon-192.png',
-            })
-          })()
-        }}
-      />
+      <div
+        className={fillViewport ? 'channel-workspace' : undefined}
+        data-trace={traceVisible && fillViewport ? 'true' : 'false'}
+      >
+        <div className={fillViewport ? 'channel-workspace__chat' : undefined}>
+          <FleetChat
+            initialAgents={initialAgents}
+            fillViewport={fillViewport}
+            showChannelToggle={showChannelToggle}
+            focusMessageId={focusMessageId}
+            highlightQuery={highlightQuery}
+            onChannelToggle={onChannelToggle}
+            headerActions={
+              <button
+                type="button"
+                className="trace-toggle"
+                data-on={traceVisible ? 'true' : 'false'}
+                aria-pressed={traceVisible}
+                aria-label={traceVisible ? 'Hide agent trace' : 'Show agent trace'}
+                title="Agent Trace — parallel log of thinking, tools, and handoffs"
+                onClick={() => setTraceVisible(!traceVisible)}
+              >
+                <span className="trace-toggle__dot" aria-hidden />
+                <CpuChipIcon className="h-3.5 w-3.5" aria-hidden />
+                Trace
+              </button>
+            }
+            userMenu={<UserMenu size="sm" align="end" />}
+            agentMessageHref={(agentId) => bevelTalkPath(agentId)}
+            peopleLookupPath="/api/users/lookup"
+            channelEscalated={channelEscalated}
+            showAvatars={prefs?.prefs.messages.showAvatars !== false}
+            nameStyle={prefs?.prefs.messages.nameStyle ?? 'full_and_display'}
+            clock24h={prefs?.prefs.messages.clock24h ?? false}
+            onProgramMessage={(event) => {
+              // Prefer desktop notifications when enabled in prefs
+              if (prefs?.prefs.notifications.desktopEnabled === false) return
+              const title = event.speaker || event.agentId || 'Agent'
+              const body = event.body.slice(0, 240)
+              void (async () => {
+                await ensureNotificationPermission()
+                await showBevelNotification({
+                  title,
+                  body,
+                  agentId: event.agentId,
+                  tag: `msg-${event.id}`,
+                  url: `/~${channelSlug}`,
+                  icon: '/icons/icon-192.png',
+                })
+              })()
+            }}
+            onAgentRosterChange={(ids) => {
+              // Persist channel membership ACL (agents as members)
+              if (roomMode !== 'channel' || !channelSlug) return
+              void fetch(
+                `/api/fleet/channels/${encodeURIComponent(channelSlug)}/agents?tenant=${encodeURIComponent(tenantId)}`,
+                {
+                  method: 'PUT',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ agentIds: ids }),
+                },
+              ).catch(() => {
+                /* best-effort */
+              })
+            }}
+          />
+        </div>
+        {traceVisible && fillViewport ? (
+          <div className="channel-workspace__trace">
+            <TracePane
+              open={traceVisible}
+              onClose={() => setTraceVisible(false)}
+              roomKind={traceRoomKind}
+              roomId={traceRoomId}
+              tenantId={tenantId}
+              clock24h={prefs?.prefs.messages.clock24h ?? false}
+            />
+          </div>
+        ) : null}
+      </div>
     </FleetProvider>
   )
 }

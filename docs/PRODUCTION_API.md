@@ -125,11 +125,27 @@ REALTIME_PORT=43208
 API_INTERNAL_URL=http://127.0.0.1:43203
 FLEET_INTERNAL_API_KEY=SECRET
 AUTH_SECRET=same-as-web
-AGENTS_REPO_ROOT=/opt/bevel
+# Fleet runner lives in the agents install (not monorepo root).
+AGENTS_REPO_ROOT=/opt/bevel/agents
+AGENTS_REGISTRY_PATH=/opt/bevel/agents/registry.json
+AGENTS_FEDERATED_ROOT=/opt/bevel/agents
 AGENTS_SESSIONS_DIR=/opt/bevel/data/sessions
+# Required for OpenRouter-backed fleet chat (@loom @brain @northstar @johnny …)
+OPENROUTER_API_KEY=SECRET
+# Tenant slug written on AgentTrace events (must match web session.tenantSlug)
+BEVEL_DEFAULT_TENANT=2x4m
+# API base for trace ingest + channel persist
+API_INTERNAL_URL=http://127.0.0.1:43203
 ```
 
-Build before start: `cd /opt/bevel/services/realtime && pnpm run build`.
+Build before start:
+
+```bash
+cd /opt/bevel/agents && pnpm install && pnpm run build   # or ensure dist/ + node_modules present
+cd /opt/bevel/services/realtime && pnpm run build
+```
+
+Fleet `@mentions` are handled by **realtime** (`agent-dispatch` → `require($AGENTS_REPO_ROOT/dist/runner.js)`), not by the FastAPI `bevel-api` process.
 
 Caddy:
 

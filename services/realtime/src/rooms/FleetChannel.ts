@@ -1,6 +1,6 @@
 import { Client, Room, ServerError } from 'colyseus'
 import { verifyAuthToken } from '../auth-verify.js'
-import { dispatchAgentChat, dispatchAgentWork } from '../agent-dispatch.js'
+import { dispatchAgentChat, dispatchAgentWork, sanitizeAgentError } from '../agent-dispatch.js'
 import { canDispatchWork, normalizeWorkRepo } from '../work-repos.js'
 import { appendChannelMessage, fetchChannel, fetchChannelMessages } from '../fleet-channel-api.js'
 import { logAgentWorkToProduct } from '../product-log.js'
@@ -20,7 +20,6 @@ import {
   agentThinking,
   askingFleet,
   channelMemberJoined,
-  fleetRateLimited,
   handingToAgent,
   pickAgent,
   puttingOnWork,
@@ -76,6 +75,8 @@ export class FleetChannel extends Room {
   private channelSlug = 'general'
   private speakerNames = new Map<string, string>()
   private speakerProfiles = new Map<string, SpeakerProfile>()
+  /** Channel membership ACL — only these agents may be @mentioned / dispatched. */
+  private memberAgentIds = new Set<string>()
 
   static async onAuth(token: string, options: JoinOptions): Promise<AuthPayload> {
     const authToken = token || options.authToken
@@ -94,11 +95,20 @@ export class FleetChannel extends Room {
     this.state.poweredByLabel = BEVEL_POWERED_BY_LABEL
 
     const channel = await fetchChannel(this.channelSlug)
-    const agentIds = (
-      options.agentIds?.length
-        ? options.agentIds
+    // ACL: membership roster is source of truth; join options can only narrow it.
+    const memberIds = (
+      channel?.agentIds?.length
+        ? channel.agentIds
         : channel?.defaultAgentIds ?? ['hermes', 'johnny']
     ).map((id) => id.toLowerCase())
+    const requested = (options.agentIds ?? []).map((id) => id.toLowerCase())
+    const agentIds = (
+      requested.length
+        ? requested.filter((id) => memberIds.includes(id))
+        : memberIds
+    )
+    // Remember full ACL for mention authorization
+    this.memberAgentIds = new Set(memberIds)
 
     this.state.title = channel?.name ?? `~${this.channelSlug}`
     for (const tag of channel?.tags ?? []) {
@@ -312,7 +322,12 @@ export class FleetChannel extends Room {
     target: string,
     agentName: string,
     output: string,
-    opts: { work?: boolean; workRepo?: string } = {},
+    opts: {
+      work?: boolean
+      workRepo?: string
+      phase?: string
+      errorCode?: string
+    } = {},
   ) {
     const reply = new ChatMessage()
     reply.id = uid()
@@ -321,7 +336,7 @@ export class FleetChannel extends Room {
     reply.speakerType = 'agent'
     reply.agentId = target
     reply.body = output
-    reply.status = 'final'
+    reply.status = opts.phase === 'error' ? 'error' : 'final'
     reply.ts = Date.now()
     this.pushMessage(reply)
 
@@ -338,6 +353,8 @@ export class FleetChannel extends Room {
         channelSlug: this.channelSlug,
         work: opts.work === true,
         workRepo: opts.workRepo,
+        phase: opts.phase,
+        errorCode: opts.errorCode,
       },
     })
 
@@ -348,7 +365,7 @@ export class FleetChannel extends Room {
       speakerType: 'agent',
       agentId: target,
       body: output,
-      status: 'final',
+      status: opts.phase === 'error' ? 'error' : 'final',
       tags: opts.work ? ['work', 'github'] : undefined,
     })
 
@@ -469,12 +486,21 @@ export class FleetChannel extends Room {
       if (agentRow) agentRow.status = 'thinking'
     }
 
+    const traceRoom = {
+      roomKind: 'channel' as const,
+      roomId: this.channelSlug,
+    }
+
     const results = await Promise.allSettled(
       targets.map(async (target) => {
         const agentName = this.state.agents.find((a) => a.id === target)?.name ?? target
         const res = opts.work
-          ? await dispatchAgentWork(target, text, history, workRepo)
-          : await dispatchAgentChat(target, text, history)
+          ? await dispatchAgentWork(target, text, history, workRepo, {
+              trace: { ...traceRoom, agentId: target },
+            })
+          : await dispatchAgentChat(target, text, history, {
+              trace: { ...traceRoom, agentId: target },
+            })
         return { target, agentName, res }
       })
     )
@@ -497,42 +523,45 @@ export class FleetChannel extends Room {
         )
       } else {
         const agentName = agentRow?.name ?? target
-        const reason = result.reason
-        const is429 =
-          reason instanceof Error &&
-          (reason.message.includes('429') || reason.name === 'OpenRouterRateLimitError')
-        this.pushAgentReply(
-          target,
-          agentName,
-          is429
-            ? fleetRateLimited(agentName)
-            : reason instanceof Error
-              ? reason.message
-              : 'Agent failed',
-          workMeta,
-        )
+        const sanitized = sanitizeAgentError(agentName, result.reason)
+        this.pushAgentReply(target, agentName, sanitized.publicMessage, {
+          ...workMeta,
+          phase: 'error',
+          errorCode: sanitized.code,
+        })
       }
     }
   }
 
   private resolveTargetAgents(text: string, explicit?: string): string[] {
-    const inSession = (id: string) => this.state.agentIds.includes(id)
+    // ACL: must be a channel member. Live session roster may be a subset for UX.
+    const allowed = (id: string) => {
+      const key = id.toLowerCase()
+      if (this.memberAgentIds.size > 0 && !this.memberAgentIds.has(key)) return false
+      return this.state.agentIds.includes(key) || this.memberAgentIds.has(key)
+    }
     if (explicit) {
       const id = explicit.toLowerCase()
-      return inSession(id) ? [id] : []
+      return allowed(id) ? [id] : []
     }
     const mention = text.match(/@([a-z0-9_-]+)\b/i)
     if (mention) {
       const id = mention[1].toLowerCase()
-      return inSession(id) ? [id] : []
+      return allowed(id) ? [id] : []
     }
-    if (this.state.agentIds.length === 1) return [this.state.agentIds[0]]
+    if (this.state.agentIds.length === 1 && allowed(this.state.agentIds[0])) {
+      return [this.state.agentIds[0]]
+    }
     const lower = text.toLowerCase()
     for (const agent of this.state.agents) {
-      if (lower.includes(`@${agent.id}`) || lower.includes(agent.name.toLowerCase())) {
+      if (
+        allowed(agent.id) &&
+        (lower.includes(`@${agent.id}`) || lower.includes(agent.name.toLowerCase()))
+      ) {
         return [agent.id]
       }
     }
-    return [...this.state.agentIds]
+    // No explicit target: only agents currently in the live roster who are members
+    return this.state.agentIds.filter((id) => allowed(id))
   }
 }

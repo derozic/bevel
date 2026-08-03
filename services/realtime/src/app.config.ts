@@ -2,6 +2,7 @@ import { defineRoom, defineServer, matchMaker } from 'colyseus'
 import cors from 'cors'
 import express from 'express'
 import { requireRealtimeAuth } from './api-auth.js'
+import { fleetHealthStatus, probeFleetHealth } from './fleet-health.js'
 import { listSessionSummaries, readRecording, summarizeRecording } from './recording.js'
 import { AgentSession } from './rooms/AgentSession.js'
 import { FleetChannel } from './rooms/FleetChannel.js'
@@ -59,14 +60,17 @@ export const server = defineServer({
     app.use(express.json())
 
     app.get('/health', (_req, res) => {
-      res.json({
-        status: 'ok',
+      const fleet = probeFleetHealth()
+      const fleetStatus = fleetHealthStatus(fleet)
+      res.status(fleetStatus === 'ok' ? 200 : 503).json({
+        status: fleetStatus === 'ok' ? 'ok' : 'degraded',
         service: 'agents-realtime',
         colyseus: true,
         searchIndex: {
           ready: conversationSearchIndex.isReady(),
           documents: conversationSearchIndex.size,
         },
+        fleet,
       })
     })
 

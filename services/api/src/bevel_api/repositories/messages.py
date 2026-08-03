@@ -108,6 +108,35 @@ def to_api_dict(row: Message) -> dict[str, Any]:
     }
 
 
+async def search_messages(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    q: str,
+    channel_id: str | None = None,
+    limit: int = 50,
+) -> list[Message]:
+    """Simple ILIKE search over message body (Postgres)."""
+    needle = (q or "").strip()
+    if not needle:
+        return []
+    lim = max(1, min(limit, 200))
+    pattern = f"%{needle}%"
+    stmt = (
+        select(Message)
+        .where(
+            Message.tenant_id == tenant_id,
+            Message.body.ilike(pattern),
+        )
+        .order_by(Message.created_at.desc())
+        .limit(lim)
+    )
+    if channel_id:
+        stmt = stmt.where(Message.channel_id == channel_id)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def list_for_channel(
     session: AsyncSession,
     *,

@@ -82,10 +82,27 @@ Secrets in `payload` are scrubbed server-side when keys/values look like credent
 
 ## Roadmap (emitters + UI)
 
-1. Fleet runner emits steps around `agent-dispatch`
-2. Hermes skill streams tools into bound sessions
-3. `TracePane` + 3-col workspace CSS
-4. Fold AdaptiveScaffold third column
+1. ~~Fleet runner emits steps around `agent-dispatch`~~ — realtime emits `run_start` / `run_end` / `run_error` via `POST /api/v1/traces` (best-effort; requires `API_INTERNAL_URL` + `FLEET_INTERNAL_API_KEY`)
+2. Hermes skill streams tools into bound sessions (tool_call / tool_result kinds)
+3. ~~`TracePane` + 3-col workspace CSS~~ — `apps/web/src/components/trace/TracePane.tsx`, chat header **Trace** toggle, prefs under Messages → Agent Trace
+4. Fold AdaptiveScaffold third column / mobile sheet polish
+
+### Realtime emitter
+
+`services/realtime/src/trace-emit.ts` + `agent-dispatch.ts` attach a `runId` per `@mention`. Channel/session rooms pass `roomKind` (`channel` | `agent_session`) + `roomId`. Failures never block agent replies.
+
+**Tenant alignment:** emitters use `BEVEL_DEFAULT_TENANT` (default `2x4m`); the Trace pane queries with `session.tenantSlug` (same default). Set both consistently per host.
+
+### UI
+
+| Control | Where |
+|---------|--------|
+| Toggle | Chat header **Trace** button (`headerActions` on `FleetChat`) |
+| Preference | Messages → Show Trace pane (`prefs.agentTrace.visible`) |
+| Layout | `channel-workspace` flex: chat + `channel-workspace__trace` |
+| Data | `GET /api/traces?roomKind=&roomId=&tenantId=` (poll ~2.5s while open) |
+
+
 
 ## Related
 

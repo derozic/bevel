@@ -6,10 +6,18 @@ import {
   resolveTenantsRoot,
   runDoctor,
 } from '@bevel/tenant-config'
+import {
+  cmdAgents,
+  cmdChannels,
+  cmdMessages,
+  cmdWorkflows,
+} from './cmd-fleet.js'
 
 const [, , command, arg, sub, ...restFlags] = process.argv
 
 async function main() {
+  // Agent-first JSON fleet commands receive remaining argv wholesale
+  const fleetArgv = process.argv.slice(3)
   switch (command) {
     case 'doctor':
       await cmdDoctor(arg)
@@ -22,6 +30,18 @@ async function main() {
       break
     case 'integrations':
       await cmdIntegrations(arg, sub)
+      break
+    case 'channels':
+      await cmdChannels(fleetArgv)
+      break
+    case 'messages':
+      await cmdMessages(fleetArgv)
+      break
+    case 'agents':
+      await cmdAgents(fleetArgv)
+      break
+    case 'workflows':
+      await cmdWorkflows(fleetArgv)
       break
     case undefined:
     case 'help':
@@ -201,23 +221,33 @@ async function cmdIntegrations(provider: string | undefined, action: string | un
 }
 
 function printHelp() {
-  console.log(`BEVEL control plane
+  console.log(`BEVEL control plane + fleet (JSON stdout for agent tools)
 
 Usage:
   bevel doctor <tenant> [--offline]   Validate tenant readiness
   bevel validate <tenant>             Parse and validate bevel.yaml
   bevel list                          List declared tenants
-  bevel integrations slack status     Slack bridge status
-  bevel integrations slack connect    Print OAuth / Slack CLI steps
-  bevel integrations slack test [C…]  auth.test (+ optional post)
-  bevel integrations slack mcp-config Print BEVEL + Slack MCP client JSON
-  bevel integrations slack disconnect
-  bevel help                          Show this help
+  bevel integrations slack status|connect|test|mcp-config|disconnect
 
-Slack strategy: docs/SLACK_INTEGRATION.md
-Slack MCP:      docs/SLACK_MCP.md  (https://mcp.slack.com/mcp)
-Slack CLI:      https://docs.slack.dev/tools/slack-cli
-Tenants live in tenants/{slug}/bevel.yaml
+Fleet (JSON, exit 0=ok 1=input 2=network 3=auth):
+  bevel channels list [--tenant 2x4m]
+  bevel channels get general [--tenant 2x4m]
+  bevel messages list --channel general [--limit 50]
+  bevel messages post --channel general --body "hello" [--agent brain]
+  bevel messages search --q "OOM" [--channel general]
+  bevel agents list [--channel general]
+  bevel agents members --channel general
+  bevel agents add --channel general --agent brain
+  bevel agents remove --channel general --agent brain
+  bevel agents ask --channel general --agent brain --message "ping"
+  bevel workflows list --channel general
+  bevel workflows create --channel general --name incident [--definition '{...}']
+  bevel workflows delete --channel general --id cwf_...
+
+Env: BEVEL_API_URL  FLEET_INTERNAL_API_KEY  BEVEL_TENANT (default 2x4m)
+
+Slack: docs/SLACK_INTEGRATION.md · MCP: docs/SLACK_MCP.md
+Tenants: tenants/{slug}/bevel.yaml
 `)
 }
 

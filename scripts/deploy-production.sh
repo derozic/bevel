@@ -91,6 +91,69 @@ sudo systemctl restart bevel-api
 sleep 2
 systemctl is-active bevel-api
 
+echo "==> Agents fleet runner (required by realtime agent-dispatch)"
+# @mentions load require($AGENTS_REPO_ROOT/dist/runner.js). Default path without
+# AGENTS_REPO_ROOT is /opt/bevel/dist/runner.js which has no axios deps.
+sudo -u deploy bash -lc '
+  set -euo pipefail
+  if [[ -f /opt/bevel/agents/package.json ]]; then
+    cd /opt/bevel/agents
+    if command -v pnpm >/dev/null; then
+      pnpm install --frozen-lockfile || pnpm install
+    fi
+    if [[ -f tsconfig.json ]]; then
+      pnpm run build || true
+    fi
+    test -f dist/runner.js
+    # Ensure Johnny (and other federated souls) resolve:
+    # registerFederatedAgents looks for $AGENTS_FEDERATED_ROOT/agents/<id>/SOUL.md
+    mkdir -p agents/johnny
+    if [[ ! -f agents/johnny/SOUL.md ]]; then
+      if [[ -f src/agents/johnny/SOUL.md ]]; then
+        cp src/agents/johnny/SOUL.md agents/johnny/SOUL.md
+      else
+        cat > agents/johnny/SOUL.md <<'"'"'SOUL'"'"'
+# Johnny — Platform Reliability Steward
+You are Johnny, platform reliability steward. Respond briefly and practically in fleet chat.
+SOUL
+      fi
+    fi
+  else
+    echo "WARN: /opt/bevel/agents missing — fleet @mentions will fail MODULE_NOT_FOUND"
+  fi
+'
+
+# Keep realtime env pointed at the working agents install (do not clobber secrets).
+ENVF=/opt/bevel/services/realtime/.env
+if [[ -f "$ENVF" ]]; then
+  sudo bash -lc '
+    set -euo pipefail
+    ENVF=/opt/bevel/services/realtime/.env
+    upsert() {
+      local k="$1" v="$2"
+      if grep -q "^${k}=" "$ENVF" 2>/dev/null; then
+        sed -i "s|^${k}=.*|${k}=${v}|" "$ENVF"
+      else
+        echo "${k}=${v}" >> "$ENVF"
+      fi
+    }
+    upsert AGENTS_REPO_ROOT /opt/bevel/agents
+    upsert AGENTS_REGISTRY_PATH /opt/bevel/agents/registry.json
+    upsert AGENTS_FEDERATED_ROOT /opt/bevel/agents
+    upsert AGENTS_SESSIONS_DIR /opt/bevel/data/sessions
+    # AgentTrace events must land under the same tenant slug the web Trace pane queries
+    upsert BEVEL_DEFAULT_TENANT 2x4m
+    if ! grep -q '^API_INTERNAL_URL=' "$ENVF" 2>/dev/null; then
+      upsert API_INTERNAL_URL http://127.0.0.1:43203
+    fi
+    chown deploy:deploy "$ENVF"
+    chmod 600 "$ENVF"
+    if ! grep -q "^OPENROUTER_API_KEY=." "$ENVF" 2>/dev/null; then
+      echo "WARN: OPENROUTER_API_KEY missing in $ENVF — fleet LLM calls will 401"
+    fi
+  '
+fi
+
 echo "==> Realtime (pnpm build + restart)"
 sudo -u deploy bash -lc '
   set -euo pipefail
@@ -106,6 +169,20 @@ sudo -u deploy bash -lc '
 sudo systemctl restart bevel-realtime
 sleep 1
 systemctl is-active bevel-realtime
+
+echo "==> Fleet health smoke (realtime /health)"
+# Fail deploy loudly if runner cannot load or OpenRouter is unset
+if command -v curl >/dev/null; then
+  HEALTH_JSON="$(curl -sS --max-time 5 http://127.0.0.1:43208/health || true)"
+  echo "$HEALTH_JSON" | head -c 800
+  echo
+  if echo "$HEALTH_JSON" | grep -q '"runner":"ok"' && echo "$HEALTH_JSON" | grep -q '"openrouter":"configured"'; then
+    echo "fleet health: ok"
+  else
+    echo "WARN: fleet health degraded — check AGENTS_REPO_ROOT / OPENROUTER_API_KEY / agents install"
+    # Do not hard-fail whole deploy (web may still be fine); operators see WARN
+  fi
+fi
 
 echo "==> Web (next build + restart 2x4m-bevel)"
 # Next can OOM on 4GB hosts — drop page cache pressure best-effort

@@ -6,6 +6,8 @@ export type FleetChannelRecord = {
   description?: string
   tags: string[]
   defaultAgentIds: string[]
+  /** Live ACL membership roster (agents as members). */
+  agentIds: string[]
 }
 
 export type FleetChannelMessageRecord = {
@@ -49,13 +51,20 @@ export async function fetchChannel(slug: string): Promise<FleetChannelRecord | n
       signal: AbortSignal.timeout(PERSIST_TIMEOUT_MS),
     })
     if (!res.ok) return null
-    const data = (await res.json()) as FleetChannelRecord & { default_agent_ids?: string[] }
+    const data = (await res.json()) as FleetChannelRecord & {
+      default_agent_ids?: string[]
+      agent_ids?: string[]
+    }
+    const defaults =
+      data.defaultAgentIds ?? data.default_agent_ids ?? ['hermes', 'johnny']
+    const members = data.agentIds ?? data.agent_ids ?? defaults
     return {
       slug: data.slug,
       name: data.name,
       description: data.description,
       tags: data.tags ?? [],
-      defaultAgentIds: data.defaultAgentIds ?? data.default_agent_ids ?? ['hermes', 'johnny'],
+      defaultAgentIds: defaults,
+      agentIds: members,
     }
   } catch {
     return null

@@ -1,6 +1,6 @@
 import { Client, Room, ServerError } from 'colyseus'
 import { verifyAuthToken } from '../auth-verify.js'
-import { dispatchAgentChat } from '../agent-dispatch.js'
+import { dispatchAgentChat, sanitizeAgentError } from '../agent-dispatch.js'
 import { recordEvent } from '../recording.js'
 import { loadMergedRegistry } from '../registry-merge.js'
 import {
@@ -15,7 +15,6 @@ import {
   SYSTEM_SPEAKER,
   agentThinking,
   askingFleet,
-  fleetRateLimited,
   handingToAgent,
   memberJoined,
   memberLeft,
@@ -316,10 +315,17 @@ export class AgentSession extends Room {
       if (agentRow) agentRow.status = 'thinking'
     }
 
+    const sessionId = this.state.sessionId
     const results = await Promise.allSettled(
       targets.map(async (target) => {
         const agentName = this.state.agents.find((a) => a.id === target)?.name ?? target
-        const res = await dispatchAgentChat(target, text, history)
+        const res = await dispatchAgentChat(target, text, history, {
+          trace: {
+            roomKind: 'agent_session',
+            roomId: sessionId,
+            agentId: target,
+          },
+        })
         return { target, agentName, res }
       })
     )
@@ -340,21 +346,11 @@ export class AgentSession extends Room {
         })
       } else {
         const agentName = agentRow?.name ?? target
-        const reason = result.reason
-        const is429 =
-          (reason instanceof Error &&
-            (reason.message.includes('429') ||
-              reason.message.includes('rate limit') ||
-              reason.name === 'OpenRouterRateLimitError')) ||
-          false
-        const errBody = is429
-          ? fleetRateLimited(agentName)
-          : reason instanceof Error
-            ? reason.message
-            : 'Agent failed'
-        this.pushAgentReply(target, agentName, errBody, {
+        const sanitized = sanitizeAgentError(agentName, result.reason)
+        this.pushAgentReply(target, agentName, sanitized.publicMessage, {
           phase: 'error',
-          rateLimited: is429,
+          errorCode: sanitized.code,
+          rateLimited: sanitized.code === 'rate_limit',
         })
       }
     }

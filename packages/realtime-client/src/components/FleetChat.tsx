@@ -164,6 +164,10 @@ export type FleetChatProps = {
    */
   userMenu?: ReactNode
   /**
+   * Extra controls before the account menu (e.g. Agent Trace toggle).
+   */
+  headerActions?: ReactNode
+  /**
    * Build a direct-message href for an agent (e.g. /brain/chat).
    * When provided, agent chips expose a Message action on their profile card.
    */
@@ -184,6 +188,11 @@ export type FleetChatProps = {
     speaker: string
     body: string
   }) => void
+  /**
+   * Fired when the live agent roster is toggled (chip click).
+   * Host persists channel membership ACL via fleet API.
+   */
+  onAgentRosterChange?: (agentIds: string[]) => void
 }
 
 /** Hide legacy join/leave/welcome noise still in live room state. */
@@ -395,11 +404,13 @@ export function FleetChat({
   focusMessageId,
   highlightQuery,
   userMenu,
+  headerActions,
   agentMessageHref,
   showAvatars = true,
   nameStyle = 'full_and_display',
   clock24h = false,
   onProgramMessage,
+  onAgentRosterChange,
 }: FleetChatProps) {
   const fleet = useFleet()
   const displayName = fleet.displayName
@@ -1096,6 +1107,9 @@ export function FleetChat({
               <span className="fleet-chat-presence-placeholder" aria-hidden />
             )}
           </div>
+          {headerActions ? (
+            <div className="fleet-chat-header-actions">{headerActions}</div>
+          ) : null}
           {userMenu ? (
             <div className="fleet-chat-user-menu" data-account-menu>
               {userMenu}
@@ -1115,11 +1129,13 @@ export function FleetChat({
                 messageHref={agentMessageHref?.(a.id)}
                 role={a.category}
                 onToggle={() => {
-                  setAgentIds((prev) =>
-                    prev.some((id) => id.toLowerCase() === a.id.toLowerCase())
+                  setAgentIds((prev) => {
+                    const next = prev.some((id) => id.toLowerCase() === a.id.toLowerCase())
                       ? prev.filter((x) => x.toLowerCase() !== a.id.toLowerCase())
-                      : [...prev, a.id],
-                  )
+                      : [...prev, a.id]
+                    onAgentRosterChange?.(next)
+                    return next
+                  })
                 }}
               />
             )

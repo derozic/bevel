@@ -44,7 +44,13 @@ def _id() -> str:
     return uuid.uuid4().hex
 
 
-def to_api_dict(row: Channel) -> dict[str, Any]:
+def to_api_dict(
+    row: Channel,
+    *,
+    agent_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    defaults = list(row.default_agent_ids or [])
+    members = list(agent_ids) if agent_ids is not None else defaults
     return {
         "id": row.id,
         "tenantId": row.tenant_id,
@@ -52,11 +58,28 @@ def to_api_dict(row: Channel) -> dict[str, Any]:
         "name": row.name,
         "description": row.description or "",
         "tags": list(row.tags or []),
-        "defaultAgentIds": list(row.default_agent_ids or []),
-        "default_agent_ids": list(row.default_agent_ids or []),
+        "defaultAgentIds": defaults,
+        "default_agent_ids": defaults,
+        # Live ACL roster (membership table). Falls back to defaults when not loaded.
+        "agentIds": members,
+        "agent_ids": members,
         "createdAt": row.created_at.isoformat() if row.created_at else None,
         "updatedAt": row.updated_at.isoformat() if row.updated_at else None,
     }
+
+
+async def to_api_dict_with_members(
+    session: AsyncSession,
+    row: Channel,
+) -> dict[str, Any]:
+    from bevel_api.repositories import channel_agents as channel_agents_repo
+
+    ids = await channel_agents_repo.agent_ids_for_channel(session, channel_id=row.id)
+    if not ids:
+        # Lazy migrate: seed from defaults once
+        await channel_agents_repo.sync_defaults_from_channel(session, row)
+        ids = await channel_agents_repo.agent_ids_for_channel(session, channel_id=row.id)
+    return to_api_dict(row, agent_ids=ids)
 
 
 async def list_for_tenant(session: AsyncSession, tenant_id: str) -> list[Channel]:
@@ -118,6 +141,10 @@ async def ensure_channel(
     )
     session.add(row)
     await session.flush()
+    # Seed membership ACL from defaults (agents as members, not decoration)
+    from bevel_api.repositories import channel_agents as channel_agents_repo
+
+    await channel_agents_repo.sync_defaults_from_channel(session, row)
     return row
 
 
@@ -133,5 +160,9 @@ async def ensure_defaults(session: AsyncSession, tenant_id: str) -> list[Channel
             tags=list(ch.get("tags") or []),
             default_agent_ids=list(ch.get("defaultAgentIds") or []),
         )
+        # Existing channels created before memberships: still sync defaults
+        from bevel_api.repositories import channel_agents as channel_agents_repo
+
+        await channel_agents_repo.sync_defaults_from_channel(session, row)
         out.append(row)
     return out
