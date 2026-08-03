@@ -51,13 +51,11 @@ auth:
     - 2x4m.cc
     - 2x4m.systems
     - comma.cm
+  # People roster lives in tenants/memberships.yaml (single source of truth).
+  # Keep company domains for suite SSO; do not default personal domains here.
   allowed_emails:
     - twobyform@gmail.com
     - scott@comma.cm
-    # Platform admin — multi-workspace picker on bevel.is
-    - scott@derozic.com
-    - s@derozic.com
-  # Prefer 2x4m only for true suite company domains (not gmail / derozic personal).
   default_for_domains:
     - 2x4m.cc
     - 2x4m.systems

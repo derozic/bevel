@@ -29,18 +29,18 @@ Example: `scott@derozic.com` on 2x4m + decli allowlists → picker lists Private
 | `/workspaces` | **Chooser**: Private + product workspaces |
 | `/account` | Apex profile + primary agent metadata |
 
-## Email → workspace (closed membership)
+## Memberships (canonical)
 
-| Email | Workspace | Production host |
-|-------|-----------|-----------------|
-| `s@derozic.com` | Decli | `https://bevel.decli.dev` |
-| `sderozic@gmail.com` | Preso | `https://bevel.pres0.com` |
-| `barndough@gmail.com` | Olimbic | `https://bevel.olimbic.games` |
-| `rozicscott@gmail.com` | 2ndBrain | `https://bevel.2ndbra.in` |
+See **`docs/IDENTITY.md`**. Roster: **`tenants/memberships.yaml`**.
 
-Configured via `auth.allowed_emails` in each `tenants/*/bevel.yaml`.
+| Email | Memberships (product) | Hosts |
+|-------|----------------------|--------|
+| `scott@derozic.com` / `s@derozic.com` | 2x4m, decli (admin) | bevel.2x4m.cc, bevel.decli.dev |
+| `sderozic@gmail.com` | preso | bevel.pres0.com |
+| `barndough@gmail.com` | olimbic | bevel.olimbic.games |
+| `rozicscott@gmail.com` | 2ndbrain | bevel.2ndbra.in |
 
-**2x4m** no longer lists `derozic.com` on `default_for_domains` (that forced every derozic login into 2x4m).
+Apex login **always** shows chooser: **Private** + memberships.
 
 ## Local hosts (Caddy)
 

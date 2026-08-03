@@ -26,8 +26,9 @@ features:
 
 auth:
   mode: google
-  allowed_emails:
-    - rozicscott@gmail.com
+  # Roster: tenants/memberships.yaml
+  allowed_emails: []
+
 
 realtime:
   namespace: 2ndbrain

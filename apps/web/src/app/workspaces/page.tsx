@@ -78,9 +78,9 @@ export default async function WorkspacesPage() {
           <p className="text-sm leading-relaxed text-muted">
             <span className="text-foreground">{session.user.email}</span>
             {domain ? <> (@{domain})</> : null}
-            {workspaces.length > 0
-              ? ' — pick private agents or a product workspace.'
-              : ' — open private agents, or claim a workspace.'}
+            {' — '}
+            one identity. Private is always yours; product workspaces are
+            memberships you enter on purpose.
           </p>
         </div>
         <SuiteNav size="sm" showLabel={false} className="shrink-0" />

@@ -6,6 +6,10 @@ import {
   loadDeclarativeTenant,
   resolveTenantsRoot,
 } from './loader'
+import {
+  emailIsMemberOfWorkspace as emailIsMemberOfWorkspaceFromFile,
+  membershipSlugsForEmail,
+} from './memberships'
 
 function parseDevTenantOverrides(): Map<string, string> {
   const map = new Map<string, string>()
@@ -105,11 +109,12 @@ export function lookupTenantsByEmailDomain(domain: string): Tenant[] {
 }
 
 /**
- * Resolve home workspace(s) for a Google Workspace email.
- * - exact allowed_emails match → those tenant(s) (gmail allowlists, etc.)
- * - unique domain match → that tenant
- * - multi match with default_for_domains → preferred tenant first
- * - multi match otherwise → all candidates (caller shows picker)
+ * Spaces a person can enter (product workspaces only — Private is always separate).
+ *
+ * Clean model:
+ * - memberships.yaml is primary (person ↔ workspace + role)
+ * - tenant allowed_emails still count (claim / closed gates)
+ * - preferred is always null → apex always uses chooser
  */
 export function resolveWorkspacesForEmail(email: string): {
   domain: string
@@ -118,38 +123,43 @@ export function resolveWorkspacesForEmail(email: string): {
 } {
   const normalized = email.toLowerCase().trim()
   const domain = normalized.split('@')[1] ?? ''
-  if (!domain) return { domain: '', tenants: [], preferred: null }
+  if (!normalized) return { domain: '', tenants: [], preferred: null }
 
-  // Exact email allowlist first — must run even when the domain is not on any
-  // tenant (e.g. sderozic@gmail.com on 2x4m allowed_emails). Previously we
-  // returned empty on domain miss and sent signed-in users to /claim.
-  const emailExact = listTenants().filter((t) =>
-    t.auth.allowedEmails?.some((e) => e.toLowerCase() === normalized),
-  )
-  if (emailExact.length === 1) {
-    return { domain, tenants: emailExact, preferred: emailExact[0]! }
+  const bySlug = new Map<string, Tenant>()
+  for (const slug of membershipSlugsForEmail(normalized)) {
+    const t = lookupTenantBySlug(slug)
+    if (t) bySlug.set(t.slug, t)
   }
-  if (emailExact.length > 1) {
-    return { domain, tenants: emailExact, preferred: null }
+  for (const t of listTenants()) {
+    if (t.auth.allowedEmails?.some((e) => e.toLowerCase() === normalized)) {
+      bySlug.set(t.slug, t)
+    }
   }
-
-  const tenants = lookupTenantsByEmailDomain(domain)
-  if (tenants.length === 0) return { domain, tenants: [], preferred: null }
-
-  const preferred =
-    tenants.find((t) =>
-      t.auth.defaultForDomains?.some((d) => d.toLowerCase() === domain),
-    ) ?? (tenants.length === 1 ? tenants[0]! : null)
-
-  return { domain, tenants, preferred }
+  return {
+    domain,
+    tenants: [...bySlug.values()],
+    preferred: null,
+  }
 }
 
-/** Single home tenant for auto-route, or null if picker required / none. */
+/** Single membership only — never used for apex silent handoff. */
 export function resolveHomeTenantForEmail(email: string): Tenant | null {
-  const { preferred, tenants } = resolveWorkspacesForEmail(email)
-  if (preferred) return preferred
+  const { tenants } = resolveWorkspacesForEmail(email)
   if (tenants.length === 1) return tenants[0]!
   return null
+}
+
+export function emailIsMemberOfWorkspace(
+  email: string,
+  workspaceSlug: string,
+): boolean {
+  if (emailIsMemberOfWorkspaceFromFile(email, workspaceSlug)) return true
+  const slug = workspaceSlug.toLowerCase().trim()
+  const t = lookupTenantBySlug(slug)
+  if (!t) return false
+  return Boolean(
+    t.auth.allowedEmails?.some((e) => e.toLowerCase() === email.toLowerCase()),
+  )
 }
 
 function isLoopbackHost(hostname: string): boolean {

@@ -25,8 +25,9 @@ features:
 
 auth:
   mode: google
-  allowed_emails:
-    - barndough@gmail.com
+  # Roster: tenants/memberships.yaml
+  allowed_emails: []
+
 
 realtime:
   namespace: olimbic

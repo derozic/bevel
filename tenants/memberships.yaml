@@ -1,0 +1,39 @@
+# BEVEL membership registry — single source of truth for "who is in which workspace".
+#
+# Product model (not patchy):
+#   1. Person = email at apex (bevel.is) — always has Private agents.
+#   2. Membership = explicit person ↔ workspace (+ role).
+#   3. After apex login → always Space chooser: Private + every membership.
+#   4. Never auto-handoff into an org because of email domain defaults.
+#
+# Tenant YAML allowed_emails / allowed_domains remain optional gates for
+# closed orgs and claim flows; this file is the operator roster for dogfood.
+
+version: 1
+
+people:
+  scott@derozic.com:
+    - workspace: 2x4m
+      role: admin
+    - workspace: decli
+      role: admin
+  s@derozic.com:
+    - workspace: 2x4m
+      role: admin
+    - workspace: decli
+      role: admin
+  sderozic@gmail.com:
+    - workspace: preso
+      role: admin
+  barndough@gmail.com:
+    - workspace: olimbic
+      role: admin
+  rozicscott@gmail.com:
+    - workspace: 2ndbrain
+      role: admin
+  twobyform@gmail.com:
+    - workspace: 2x4m
+      role: member
+  scott@comma.cm:
+    - workspace: 2x4m
+      role: member

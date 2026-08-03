@@ -26,9 +26,9 @@ features:
 auth:
   mode: google
   # Closed membership — exact emails only (no broad domain grab)
-  allowed_emails:
-    - s@derozic.com
-    - scott@derozic.com
+  # Roster: tenants/memberships.yaml
+  allowed_emails: []
+
 
 realtime:
   namespace: decli

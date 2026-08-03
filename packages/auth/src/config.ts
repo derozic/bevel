@@ -6,12 +6,14 @@ import { customFetch } from 'next-auth'
 import type { NextAuthConfig } from 'next-auth'
 import type { Tenant } from '@bevel/schema'
 import {
+  emailIsMemberOfWorkspace,
   isPlatformEntryHost,
   listTenants,
   lookupTenantBySlug,
   publicTenantUrl,
   resolveHomeTenantForEmail,
   resolveWorkspacesForEmail,
+  workspaceHasRoster,
 } from '@bevel/tenant-config'
 import { mintRealtimeToken, resolveAuthSecret } from './tokens'
 import {
@@ -31,6 +33,10 @@ export interface CreateTenantAuthConfigOptions {
 
 function emailAllowedOnTenant(email: string, tenant: Tenant): boolean {
   const normalized = email.toLowerCase()
+  // Explicit memberships.yaml roster (primary)
+  if (emailIsMemberOfWorkspace(normalized, tenant.slug)) {
+    return true
+  }
   if (tenant.auth.allowedEmails?.some((e) => e.toLowerCase() === normalized)) {
     return true
   }
@@ -38,6 +44,11 @@ function emailAllowedOnTenant(email: string, tenant: Tenant): boolean {
   if (domain && tenant.auth.allowedEmailDomains?.includes(domain)) {
     return true
   }
+  // Roster exists for this workspace → closed to roster/allowlist only
+  if (workspaceHasRoster(tenant.slug)) {
+    return false
+  }
+  // No roster and no allowlists → open workspace
   if (
     !tenant.auth.allowedEmails?.length &&
     !tenant.auth.allowedEmailDomains?.length
@@ -63,15 +74,9 @@ export function phoneOtpAllowedOnTenant(tenant: Tenant): boolean {
   return !tenantHasClosedMembership(tenant)
 }
 
-/** Platform login: allow if any org tenant accepts this Workspace email. */
-function emailAllowedOnPlatform(email: string): boolean {
-  const { tenants } = resolveWorkspacesForEmail(email)
-  if (tenants.length > 0) return true
-  // Exact email allowlist on any tenant
-  const normalized = email.toLowerCase()
-  return listTenants().some((t) =>
-    t.auth.allowedEmails?.some((e) => e.toLowerCase() === normalized),
-  )
+/** Platform login: any person can sign in at apex (Private always available). */
+function emailAllowedOnPlatform(_email: string): boolean {
+  return true
 }
 
 function useSecureCookies(requestHost?: string): boolean {

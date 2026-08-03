@@ -12,14 +12,10 @@ import { issueAuthHandoffCode } from '@/lib/auth-handoff'
 import { BEVEL_HOME_PATH, BEVEL_PRIVATE_PATH } from '@/lib/bevel'
 
 /**
- * Post-login router.
+ * Post-login router — clean model:
  *
- * Platform (bevel.is):
- * - Always offer a chooser when the email has ≥1 product workspace
- *   (private + orgs) so admins can pick where to enter.
- * - 0 workspaces → private /me only.
- *
- * Org host: open default channel (with handoff when needed).
+ * Apex (bevel.is): always Space chooser (Private + memberships).
+ * Org host: that workspace only (or chooser if multi + wrong host).
  */
 export default async function WelcomePage() {
   const session = await auth()
@@ -37,19 +33,13 @@ export default async function WelcomePage() {
     .toLowerCase()
     .split(':')[0]
 
-  const email = session.user.email
-  const { tenants } = resolveWorkspacesForEmail(email)
-  const onPlatform = isPlatformEntryHost(host)
-
-  if (onPlatform) {
-    // Member of any product workspace → pick private vs org (or multi-org).
-    if (tenants.length >= 1 || session.needsWorkspacePick) {
-      redirect('/workspaces')
-    }
-    // No org memberships — private agents only.
-    redirect(BEVEL_PRIVATE_PATH)
+  // Apex: always chooser (Private is always listed there).
+  if (isPlatformEntryHost(host)) {
+    redirect('/workspaces')
   }
 
+  const email = session.user.email
+  const { tenants } = resolveWorkspacesForEmail(email)
   const home = resolveHomeTenantForEmail(email)
 
   if (session.needsWorkspacePick || tenants.length > 1) {
@@ -78,9 +68,6 @@ export default async function WelcomePage() {
       dest.searchParams.set('callbackUrl', callbackPath)
       redirect(dest.toString())
     }
-    console.error(
-      '[welcome] handoff issue failed; falling back to bare org redirect',
-    )
     redirect(publicTenantUrl(target, callbackPath))
   }
 
