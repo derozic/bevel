@@ -28,6 +28,7 @@ auth:
   # Closed membership — exact emails only (no broad domain grab)
   allowed_emails:
     - s@derozic.com
+    - scott@derozic.com
 
 realtime:
   namespace: decli

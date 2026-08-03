@@ -14,8 +14,10 @@ import { BEVEL_HOME_PATH, BEVEL_PRIVATE_PATH } from '@/lib/bevel'
 /**
  * Post-login router.
  *
- * Platform (bevel.is): always land in **private** personal space (/me) —
- * agents only. Workspaces remain optional via picker / claim.
+ * Platform (bevel.is):
+ * - Always offer a chooser when the email has ≥1 product workspace
+ *   (private + orgs) so admins can pick where to enter.
+ * - 0 workspaces → private /me only.
  *
  * Org host: open default channel (with handoff when needed).
  */
@@ -35,23 +37,26 @@ export default async function WelcomePage() {
     .toLowerCase()
     .split(':')[0]
 
+  const email = session.user.email
+  const { tenants } = resolveWorkspacesForEmail(email)
   const onPlatform = isPlatformEntryHost(host)
 
-  // Apex: private top-level with your agents — never force an org handoff.
   if (onPlatform) {
+    // Member of any product workspace → pick private vs org (or multi-org).
+    if (tenants.length >= 1 || session.needsWorkspacePick) {
+      redirect('/workspaces')
+    }
+    // No org memberships — private agents only.
     redirect(BEVEL_PRIVATE_PATH)
   }
 
-  const email = session.user.email
-  const { tenants, preferred } = resolveWorkspacesForEmail(email)
-  const home = preferred ?? resolveHomeTenantForEmail(email)
+  const home = resolveHomeTenantForEmail(email)
 
   if (session.needsWorkspacePick || tenants.length > 1) {
     redirect('/workspaces')
   }
 
   if (!home && tenants.length === 0) {
-    // On an unknown org host without membership — send to private apex.
     redirect(BEVEL_PRIVATE_PATH)
   }
 

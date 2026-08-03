@@ -54,6 +54,9 @@ auth:
   allowed_emails:
     - twobyform@gmail.com
     - scott@comma.cm
+    # Platform admin — multi-workspace picker on bevel.is
+    - scott@derozic.com
+    - s@derozic.com
   # Prefer 2x4m only for true suite company domains (not gmail / derozic personal).
   default_for_domains:
     - 2x4m.cc

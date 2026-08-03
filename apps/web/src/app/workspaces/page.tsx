@@ -12,13 +12,18 @@ import {
 import { Button } from '@bevel/ui'
 import { BevelNavMark } from '@/components/BevelNavMark'
 import { SuiteNav } from '@/components/SuiteNav'
-import { BEVEL_NAME, BEVEL_TRADEMARK_NOTICE } from '@/lib/bevel'
+import {
+  BEVEL_HOME_PATH,
+  BEVEL_NAME,
+  BEVEL_PRIVATE_PATH,
+  BEVEL_TRADEMARK_NOTICE,
+} from '@/lib/bevel'
 import { auth } from '@/auth'
 import { issueAuthHandoffCode } from '@/lib/auth-handoff'
 
 /**
- * Workspace chooser — apex memberships.
- * Always lists orgs for the signed-in email (even a single one when dogfooding).
+ * Chooser after apex login: **Private** (agents only) + every product workspace
+ * the email is allowed into. Never auto-skip on bevel.is when orgs exist.
  */
 export default async function WorkspacesPage() {
   const session = await auth()
@@ -36,6 +41,7 @@ export default async function WorkspacesPage() {
     .toLowerCase()
     .split(':')[0]
 
+  const onPlatform = isPlatformEntryHost(host)
   const { tenants, domain } = resolveWorkspacesForEmail(session.user.email)
   const candidateSlugs = session.workspaceCandidates?.length
     ? session.workspaceCandidates
@@ -45,17 +51,13 @@ export default async function WorkspacesPage() {
     .map((slug) => lookupTenantBySlug(slug))
     .filter((t): t is NonNullable<typeof t> => Boolean(t))
 
-  const autoHandoff =
-    process.env.BEVEL_PLATFORM_AUTO_HANDOFF !== '0' &&
-    process.env.BEVEL_PLATFORM_AUTO_HANDOFF !== 'false'
-
-  // Only auto-open a single workspace when not dogfooding and not on platform.
-  if (workspaces.length === 1 && autoHandoff && !isPlatformEntryHost(host)) {
-    redirect(publicTenantUrl(workspaces[0]!, '/~general'))
-  }
-
-  if (workspaces.length === 0) {
-    redirect('/account')
+  // Only auto-open a single org when already on a non-platform host.
+  if (
+    workspaces.length === 1 &&
+    !onPlatform &&
+    process.env.BEVEL_PLATFORM_AUTO_HANDOFF !== '0'
+  ) {
+    redirect(publicTenantUrl(workspaces[0]!, BEVEL_HOME_PATH))
   }
 
   return (
@@ -68,21 +70,39 @@ export default async function WorkspacesPage() {
             </span>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                Your workspaces
+                Where do you want to go?
               </h1>
-              <p className="text-xs text-muted">{BEVEL_NAME} apex</p>
+              <p className="text-xs text-muted">{BEVEL_NAME} · choose a space</p>
             </div>
           </div>
           <p className="text-sm leading-relaxed text-muted">
             <span className="text-foreground">{session.user.email}</span>
-            {domain ? <> (@{domain})</> : null} — open a product workspace or
-            manage your platform profile.
+            {domain ? <> (@{domain})</> : null}
+            {workspaces.length > 0
+              ? ' — pick private agents or a product workspace.'
+              : ' — open private agents, or claim a workspace.'}
           </p>
         </div>
         <SuiteNav size="sm" showLabel={false} className="shrink-0" />
       </div>
 
       <ul className="space-y-3">
+        {/* Always offer top-level private (agents only) */}
+        <li>
+          <Link
+            href={BEVEL_PRIVATE_PATH}
+            className="flex items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/5 px-5 py-4 transition hover:border-accent/50 hover:bg-accent/10"
+          >
+            <div>
+              <p className="font-semibold text-foreground">Private</p>
+              <p className="text-xs text-muted">
+                bevel.is · just you and your agents
+              </p>
+            </div>
+            <span className="text-sm font-medium text-accent">Enter</span>
+          </Link>
+        </li>
+
         {workspaces.map((ws) => (
           <li key={ws.slug}>
             <WorkspaceOpenLink
@@ -101,7 +121,7 @@ export default async function WorkspacesPage() {
           <Link href="/account">Platform profile</Link>
         </Button>
         <Button asChild variant="ghost" size="sm">
-          <Link href="/claim">Claim another workspace</Link>
+          <Link href="/claim">Claim workspace</Link>
         </Button>
       </div>
 
@@ -112,7 +132,6 @@ export default async function WorkspacesPage() {
   )
 }
 
-/** Server component: issues handoff when crossing eTLD+1. */
 async function WorkspaceOpenLink({
   ws,
   email,
@@ -127,7 +146,7 @@ async function WorkspaceOpenLink({
   fromHost: string
 }) {
   const orgHost = ws.host.toLowerCase().split(':')[0] || ws.host
-  const callbackPath = '/~general'
+  const callbackPath = BEVEL_HOME_PATH
   let href = publicTenantUrl(ws, callbackPath)
 
   if (fromHost && needsAuthHandoff(fromHost, orgHost)) {
@@ -157,7 +176,7 @@ async function WorkspaceOpenLink({
           {ws.host} · namespace {ws.realtime.namespace}
         </p>
       </div>
-      <span className="text-sm font-medium text-accent">Open</span>
+      <span className="text-sm font-medium text-accent">Enter</span>
     </Link>
   )
 }

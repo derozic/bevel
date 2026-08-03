@@ -26,11 +26,11 @@ export default async function Page() {
     .toLowerCase()
     .split(':')[0]
 
-  // Apex platform entry (bevel.is) — private agents home when signed in.
+  // Apex platform entry (bevel.is) — welcome routes to picker or private.
   if (isPlatformEntryHost(host)) {
     const session = await auth()
-    if (session?.user) redirect('/me')
-    redirect('/login?callbackUrl=%2Fme')
+    if (session?.user) redirect('/welcome')
+    redirect('/login?callbackUrl=%2Fwelcome')
   }
 
   const tenant = await getTenantFromRequest()

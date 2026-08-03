@@ -11,15 +11,22 @@
 
 Logging out returns to **bevel.is/login** so the next sign-in re-resolves memberships (no sticky 2x4m assumption).
 
-### Private top-level (agents only)
+### Private + workspace picker (apex login)
 
-Signed-in users on **bevel.is** land in **`/me`** — personal private shell with fleet agents and DMs only (no org `~channels`). Product workspaces remain optional via `/workspaces` or claim.
+Signed-in users on **bevel.is** hit **`/welcome`**, which:
+
+| Memberships | Destination |
+|-------------|-------------|
+| **≥1 product workspace** (email on allowlists / domains) | **`/workspaces`** — choose **Private** or any org |
+| **0 workspaces** | **`/me`** private agents only |
+
+Example: `scott@derozic.com` on 2x4m + decli allowlists → picker lists Private, 2x4m, Decli.
 
 | Path | Role |
 |------|------|
 | `/me` | Private home — agent roster + primary agent |
 | `/talk/{agent}` | Direct agent thread (session room) |
-| `/workspaces` | Optional org picker |
+| `/workspaces` | **Chooser**: Private + product workspaces |
 | `/account` | Apex profile + primary agent metadata |
 
 ## Email → workspace (closed membership)
