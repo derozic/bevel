@@ -55,6 +55,11 @@ const nextConfig: NextConfig = {
         source: '/timeline',
         destination: '/bevel/timeline',
       },
+      {
+        // Top-level private space on bevel.is (agents only)
+        source: '/me',
+        destination: '/bevel/me',
+      },
     ]
   },
 }

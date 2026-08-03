@@ -78,6 +78,7 @@ export function BevelShell({
   plan,
   featureAccess,
   featureSet,
+  privateAgentsOnly = false,
 }: {
   children: ReactNode
   /** Workspace brand label (rail) — e.g. "2x4m" not "2x4m Agents" */
@@ -90,6 +91,8 @@ export function BevelShell({
   plan?: TenantPlan | string
   featureAccess?: FeatureAccess | string
   featureSet?: ResolvedFeatureSet | null
+  /** Apex private: agents + DMs only (no org ~channels) */
+  privateAgentsOnly?: boolean
 }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -133,8 +136,9 @@ export function BevelShell({
           platformHomeLabel={platformHomeLabel}
           activeSlug={activeSlug}
           activeSessionId={activeSessionId}
-          initialChannels={initialChannels}
+          initialChannels={privateAgentsOnly ? [] : initialChannels}
           initialSessions={initialSessions}
+          privateAgentsOnly={privateAgentsOnly}
           plan={plan}
           featureAccess={featureAccess}
           featureSet={featureSet}

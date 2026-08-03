@@ -4,7 +4,7 @@ import { resolveWorkspacesForEmail } from '@bevel/tenant-config'
 import { Button } from '@bevel/ui'
 import { BevelNavMark } from '@/components/BevelNavMark'
 import { SuiteNav } from '@/components/SuiteNav'
-import { BEVEL_NAME, BEVEL_TRADEMARK_NOTICE } from '@/lib/bevel'
+import { BEVEL_NAME, BEVEL_PRIVATE_PATH, BEVEL_TRADEMARK_NOTICE } from '@/lib/bevel'
 import { auth } from '@/auth'
 
 /**
@@ -69,6 +69,18 @@ export default async function AccountPage() {
             </p>
           </div>
         </dl>
+      </section>
+
+      <section className="rounded-2xl border border-accent/20 bg-accent/5 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Private
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          Top-level space with only your agents — no org channels required.
+        </p>
+        <Button asChild size="sm" className="mt-3">
+          <Link href={BEVEL_PRIVATE_PATH}>Open private agents</Link>
+        </Button>
       </section>
 
       <section className="space-y-3">

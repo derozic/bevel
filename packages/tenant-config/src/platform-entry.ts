@@ -1,7 +1,10 @@
 /**
  * Synthetic tenant for apex platform entry hosts (bevel.is, app.bevel.is, …).
- * Real org tenants resolve from Host; this only powers auth UI and Google/OTP
- * on the platform surface so requireTenant does not 500.
+ *
+ * Powers:
+ * - Auth UI / Google / OTP on the platform surface
+ * - **Private personal space** — signed-in users get agents-only shell
+ *   (no org channels) under /me and /talk/* without joining a workspace
  */
 
 import type { Tenant } from '@bevel/schema'
@@ -13,14 +16,15 @@ export const PLATFORM_ENTRY_TENANT: Tenant = {
   name: 'BEVEL',
   host: 'bevel.is',
   status: 'active',
-  plan: 'free',
-  featureAccess: 'stable',
+  plan: 'pro',
+  featureAccess: 'beta',
   auth: {
     providers: ['google'],
     requireGitHubForWork: false,
   },
   features: {
-    channels: true,
+    // Private apex: agents + DMs, not org channel HQ
+    channels: false,
     directMessages: true,
     agentDispatch: true,
     workMode: false,
@@ -35,7 +39,7 @@ export const PLATFORM_ENTRY_TENANT: Tenant = {
     ssoSaml: false,
     auditLog: false,
     dedicatedSupport: false,
-    agentMemory: false,
+    agentMemory: true,
     voiceRooms: false,
     multiRegion: false,
     matrix: false,
@@ -46,7 +50,7 @@ export const PLATFORM_ENTRY_TENANT: Tenant = {
   },
   theme: {
     accent: '#7c5cff',
-    productName: 'BEVEL',
+    productName: 'Private',
     mode: 'dark',
   },
   realtime: {

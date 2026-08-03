@@ -11,6 +11,17 @@
 
 Logging out returns to **bevel.is/login** so the next sign-in re-resolves memberships (no sticky 2x4m assumption).
 
+### Private top-level (agents only)
+
+Signed-in users on **bevel.is** land in **`/me`** — personal private shell with fleet agents and DMs only (no org `~channels`). Product workspaces remain optional via `/workspaces` or claim.
+
+| Path | Role |
+|------|------|
+| `/me` | Private home — agent roster + primary agent |
+| `/talk/{agent}` | Direct agent thread (session room) |
+| `/workspaces` | Optional org picker |
+| `/account` | Apex profile + primary agent metadata |
+
 ## Email → workspace (closed membership)
 
 | Email | Workspace | Production host |

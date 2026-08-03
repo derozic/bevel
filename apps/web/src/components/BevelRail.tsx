@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { agents } from '@/lib/agent-catalog'
 import {
   BEVEL_COPY,
+  BEVEL_PRIVATE_PATH,
   BEVEL_TRADEMARK_NOTICE,
   bevelChannelPath,
   bevelConversationPath,
@@ -118,6 +119,7 @@ export function BevelRail({
   featureSet,
   onNavigate,
   headerAction,
+  privateAgentsOnly = false,
 }: {
   productName?: string
   platformHomeHref?: string
@@ -131,6 +133,8 @@ export function BevelRail({
   featureSet?: ResolvedFeatureSet | null
   onNavigate?: () => void
   headerAction?: ReactNode
+  /** Apex private: skip org channels (agents + DMs only) */
+  privateAgentsOnly?: boolean
 }) {
   const { status } = useSession()
   const pathname = usePathname()
@@ -146,6 +150,7 @@ export function BevelRail({
   }, [prefs?.prefs.home.escalatedChannels])
   const [propertiesSlug, setPropertiesSlug] = useState<string | null>(null)
   const [channels, setChannels] = useState<FleetChannelSummary[]>(() => {
+    if (privateAgentsOnly) return []
     const cached = readChannelCache()
     if (cached.length > 0) {
       return syncChannelData(cached, initialChannels ?? DEFAULT_CHANNELS)
@@ -247,12 +252,17 @@ export function BevelRail({
     if (status === 'loading') return
     if (status === 'unauthenticated') {
       setLoading(false)
-      setChannels(DEFAULT_CHANNELS)
+      setChannels(privateAgentsOnly ? [] : DEFAULT_CHANNELS)
       return
     }
     if (!channelsBootstrappedRef.current) {
       channelsBootstrappedRef.current = true
-      void load({ silent: true })
+      if (!privateAgentsOnly) {
+        void load({ silent: true })
+      } else {
+        setChannels([])
+        setLoading(false)
+      }
       if (!conversationsFetchedRef.current) {
         conversationsFetchedRef.current = true
         if (!initialSessions?.length) {
@@ -260,7 +270,13 @@ export function BevelRail({
         }
       }
     }
-  }, [load, loadConversations, status, initialSessions?.length])
+  }, [
+    load,
+    loadConversations,
+    status,
+    initialSessions?.length,
+    privateAgentsOnly,
+  ])
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -331,21 +347,23 @@ export function BevelRail({
               showLabel={false}
               productLabel={productName}
             />
-            <button
-              type="button"
-              onClick={() => {
-                setCreatedSlug(null)
-                setShowCreate(true)
-              }}
-              className="bevel-rail-new-channel"
-            >
-              {BEVEL_COPY.newChannel}
-            </button>
+            {!privateAgentsOnly ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatedSlug(null)
+                  setShowCreate(true)
+                }}
+                className="bevel-rail-new-channel"
+              >
+                {BEVEL_COPY.newChannel}
+              </button>
+            ) : null}
             {headerAction}
           </div>
         </div>
         <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
-          {BEVEL_COPY.channelsLabel}
+          {privateAgentsOnly ? 'Private agents' : BEVEL_COPY.channelsLabel}
         </p>
         {status === 'authenticated' ? (
           <div className="mt-2">
@@ -355,6 +373,23 @@ export function BevelRail({
       </div>
 
       <div className="bevel-rail-nav">
+        {privateAgentsOnly ? (
+          <nav aria-label="Private home" className="mb-2">
+            <Link
+              href={BEVEL_PRIVATE_PATH}
+              onClick={onNavigate}
+              className="bevel-rail-channel"
+              data-active={
+                pathname === BEVEL_PRIVATE_PATH || pathname === '/bevel/me'
+                  ? 'true'
+                  : 'false'
+              }
+            >
+              <span className="bevel-rail-channel-slug">me</span>
+              <span className="bevel-rail-channel-name">Agents home</span>
+            </Link>
+          </nav>
+        ) : null}
         <nav aria-label="Timeline" className="mb-2">
           <Link
             href="/timeline"
@@ -370,7 +405,9 @@ export function BevelRail({
           </Link>
         </nav>
         <nav aria-label={BEVEL_COPY.channelsLabel}>
-          {visible.map((ch) => {
+          {privateAgentsOnly
+            ? null
+            : visible.map((ch) => {
             const escalated = escalatedSet.has(ch.slug.toLowerCase())
             const propsOpen = propertiesSlug === ch.slug
             return (
