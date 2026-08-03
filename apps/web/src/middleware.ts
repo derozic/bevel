@@ -28,6 +28,7 @@ const PUBLIC_PATHS = [
   '/workspaces',
   '/account',
   '/me',
+  '/auth/cli',
   '/claim',
   '/onboarding',
   '/about',
