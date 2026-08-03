@@ -6,7 +6,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$ROOT/packages/suite-chrome"
 DEST_DEFAULT="$(cd "$ROOT/../2x4m" 2>/dev/null && pwd)/packages/suite-chrome"
-DEST="${2X4M_SUITE_CHROME_DEST:-$DEST_DEFAULT}"
+# env name must not start with a digit (bash)
+DEST="${SUITE_CHROME_2X4M_DEST:-$DEST_DEFAULT}"
 
 if [[ ! -d "$SRC" ]]; then
   echo "Missing source: $SRC" >&2
@@ -14,7 +15,7 @@ if [[ ! -d "$SRC" ]]; then
 fi
 if [[ ! -d "$(dirname "$DEST")" ]]; then
   echo "Missing 2x4m packages dir: $(dirname "$DEST")" >&2
-  echo "Set 2X4M_SUITE_CHROME_DEST=/path/to/2x4m/packages/suite-chrome" >&2
+  echo "Set SUITE_CHROME_2X4M_DEST=/path/to/2x4m/packages/suite-chrome" >&2
   exit 1
 fi
 
