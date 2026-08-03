@@ -41,7 +41,8 @@ export function SuiteNav({
         )}
         title="BEVEL — platform home"
       >
-        <BevelNavMark className={mark} />
+        {/* Magenta bevel-mark geometry; currentColor tracks chip text */}
+        <BevelNavMark className={cn(mark, 'text-foreground')} />
         {showLabel ? (
           <span className="tracking-wide">BEVEL</span>
         ) : (

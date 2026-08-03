@@ -1,38 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" role="img" aria-label="BEVEL">
-  <!--
-    Suite-nav mark — rich BevelCutMark facets (OpenAI/Slack chip density).
-    Same fold geometry as production header (viewBox 0 0 18 18 scaled).
-    Works from 16px favicon to 2xl marketing. Transparent exterior.
-  -->
-  <defs>
-    <linearGradient id="bevel-nav-top" x1="2" y1="3.5" x2="16" y2="10.5" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F4F7F5"/>
-      <stop offset="0.55" stop-color="#E8ECEA"/>
-      <stop offset="1" stop-color="#C5CCC8"/>
-    </linearGradient>
-    <linearGradient id="bevel-nav-left" x1="2" y1="3.5" x2="7.5" y2="14.5" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#3D4A44"/>
-      <stop offset="1" stop-color="#1A2220"/>
-    </linearGradient>
-    <linearGradient id="bevel-nav-right" x1="9" y1="10.5" x2="16" y2="14.5" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#2A3530"/>
-      <stop offset="1" stop-color="#0F1412"/>
-    </linearGradient>
-    <linearGradient id="bevel-nav-edge" x1="8.5" y1="9" x2="9.5" y2="11" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#4ADE80"/>
-      <stop offset="1" stop-color="#22C55E"/>
-    </linearGradient>
-  </defs>
-  <g transform="translate(2 2) scale(2)">
-    <!-- left facet (depth) -->
-    <path d="M2 14.5V3.5L7.5 9 2 14.5Z" fill="url(#bevel-nav-left)"/>
-    <!-- top plane (face) -->
-    <path d="M2 3.5h14L9 10.5 2 3.5Z" fill="url(#bevel-nav-top)"/>
-    <!-- right facet -->
-    <path d="M16 3.5v11L9 10.5 16 14.5V3.5Z" fill="url(#bevel-nav-right)"/>
-    <!-- green bevel crease (signature edge) -->
-    <path d="M8.55 9.7 L9.45 9.7 L9.15 10.55 L8.85 10.55 Z" fill="url(#bevel-nav-edge)" opacity="0.95"/>
-    <!-- micro highlight on top plane -->
-    <path d="M3.2 4.4 L12.5 4.4 L9.2 8.2 L3.8 5.2 Z" fill="#FFFFFF" opacity="0.18"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" role="img" aria-label="Bevel">
+  <!-- BevelCutMark from bevel.is — scaled from 18x18 for readable delivery -->
+  <g transform="translate(5 5) scale(3)">
+    <path d="M2 14.5V3.5L7.5 9 2 14.5Z" fill="#111827" opacity="0.35"/>
+    <path d="M2 3.5h14L9 10.5 2 3.5Z" fill="#111827"/>
+    <path d="M16 3.5v11L9 10.5 16 14.5V3.5Z" fill="#111827" opacity="0.55"/>
   </g>
 </svg>
