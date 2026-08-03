@@ -15,6 +15,15 @@
 :root {
   --daypart-transition: background-color 0.55s ease, color 0.45s ease,
     border-color 0.45s ease, box-shadow 0.45s ease;
+  /*
+   * Suite cut mark (Magenta bevel-mark geometry).
+   * Embellished per daypart — same three planes; palette + crease only.
+   */
+  --bevel-mark-face: #111827;
+  --bevel-mark-left: color-mix(in srgb, #111827 35%, transparent);
+  --bevel-mark-right: color-mix(in srgb, #111827 55%, transparent);
+  --bevel-mark-crease: var(--bevel-accent, #7c5cff);
+  --bevel-mark-glint: color-mix(in srgb, #ffffff 14%, transparent);
 }
 
 html[data-daypart] body,
@@ -43,6 +52,12 @@ html[data-daypart='morning'] {
   --daypart-mesh-a: oklch(90% 0.08 40 / 0.45);
   --daypart-mesh-b: oklch(92% 0.06 85 / 0.35);
   --daypart-rail-wash: color-mix(in oklch, oklch(88% 0.06 50) 12%, var(--surface));
+  /* Mark: warm ink + peach-amber crease, airy left facet */
+  --bevel-mark-face: oklch(22% 0.03 45);
+  --bevel-mark-left: oklch(32% 0.035 50 / 0.42);
+  --bevel-mark-right: oklch(20% 0.03 40 / 0.58);
+  --bevel-mark-crease: oklch(62% 0.16 42);
+  --bevel-mark-glint: oklch(100% 0.02 70 / 0.16);
 }
 
 /* ── Midday · cool paper, cyan sky ────────────────────────── */
@@ -65,6 +80,12 @@ html[data-daypart='midday'] {
   --daypart-mesh-a: oklch(90% 0.07 210 / 0.4);
   --daypart-mesh-b: oklch(93% 0.05 180 / 0.3);
   --daypart-rail-wash: color-mix(in oklch, oklch(92% 0.04 210) 10%, var(--surface));
+  /* Mark: Magenta-faithful ink + cyan-sky crease */
+  --bevel-mark-face: #111827;
+  --bevel-mark-left: color-mix(in srgb, #111827 35%, transparent);
+  --bevel-mark-right: color-mix(in srgb, #111827 55%, transparent);
+  --bevel-mark-crease: oklch(62% 0.14 210);
+  --bevel-mark-glint: color-mix(in srgb, #ffffff 12%, transparent);
 }
 
 /* ── Afternoon · golden hour honey ────────────────────────── */
@@ -87,6 +108,12 @@ html[data-daypart='afternoon'] {
   --daypart-mesh-a: oklch(88% 0.09 55 / 0.42);
   --daypart-mesh-b: oklch(90% 0.06 30 / 0.28);
   --daypart-rail-wash: color-mix(in oklch, oklch(90% 0.06 70) 14%, var(--surface));
+  /* Mark: honey ink + amber-gold crease */
+  --bevel-mark-face: oklch(21% 0.04 55);
+  --bevel-mark-left: oklch(30% 0.04 55 / 0.4);
+  --bevel-mark-right: oklch(18% 0.035 50 / 0.6);
+  --bevel-mark-crease: oklch(60% 0.15 55);
+  --bevel-mark-glint: oklch(98% 0.04 75 / 0.15);
 }
 
 /* ── Night · deep navy (true blue ~235, no purple cast) ───── */
@@ -110,6 +137,12 @@ html[data-daypart='night'] {
   --daypart-mesh-a: oklch(26% 0.05 235 / 0.42);
   --daypart-mesh-b: oklch(22% 0.04 220 / 0.32);
   --daypart-rail-wash: color-mix(in oklch, oklch(24% 0.035 235) 40%, var(--surface));
+  /* Mark: light facets on navy + sky-blue crease (no pure white) */
+  --bevel-mark-face: oklch(92% 0.015 230);
+  --bevel-mark-left: oklch(78% 0.025 235 / 0.45);
+  --bevel-mark-right: oklch(85% 0.02 230 / 0.62);
+  --bevel-mark-crease: oklch(70% 0.11 235);
+  --bevel-mark-glint: oklch(96% 0.02 230 / 0.12);
 }
 
 @media (color-gamut: p3) {

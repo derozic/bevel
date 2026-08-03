@@ -56,6 +56,13 @@ export const BEVEL_TALK_PATH = '/talk'
 export const BEVEL_SESSION_PATH = '/session'
 /** Personal reverse-chrono feed for @mentions and ^escalations */
 export const BEVEL_TIMELINE_PATH = '/timeline'
+/**
+ * Top-level private space on bevel.is — agents only (no org channels).
+ * Primary post-login home on the platform apex.
+ */
+export const BEVEL_PRIVATE_PATH = '/me'
+/** Default fleet agent when user has no personalAgentId set */
+export const BEVEL_DEFAULT_PERSONAL_AGENT = 'brain'
 
 /** User lookup / connection card for @handle and ^handle */
 export function bevelUserPath(handle: string): string {

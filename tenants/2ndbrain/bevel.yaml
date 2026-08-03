@@ -1,8 +1,14 @@
 tenant: 2ndbrain
 name: 2ndBrain
-domain: bevel.2ndbrain.lvh.me
+domain: bevel.2ndbra.in
 hosts:
+  - bevel.2ndbra.in
+  - bevel.2ndbrain.lvh.me
   - 2ndbrain.lvh.me
+  - 2ndbrain.bevel.lvh.me
+
+plan: pro
+feature_access: beta
 
 brand:
   theme: ./theme.json
@@ -15,21 +21,32 @@ features:
   channels: true
   direct_messages: true
   agent_dispatch: true
-  work_mode: false
+  work_mode: true
+  custom_branding: true
 
 auth:
   mode: google
-  allowed_domains:
-    - derozic.com
+  # Roster: tenants/memberships.yaml
+  allowed_emails: []
+
 
 realtime:
   namespace: 2ndbrain
   presence: true
   url: https://realtime.bevel.lvh.me
 
+transports:
+  asyncStream:
+    kind: async-stream
+    protocol: sse
+  liveBidirectional:
+    kind: live-bidirectional
+    protocol: websocket
+
 deployment:
   preview_url: https://bevel.2ndbrain.lvh.me
-  target: vercel
+  production_url: https://bevel.2ndbra.in
+  target: custom
 
 work_repos:
   - derozic/2ndbrain-mono

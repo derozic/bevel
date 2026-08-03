@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { signIn, signOut, useSession } from 'next-auth/react'
+import { platformLoginUrl } from '@/lib/platform'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import {
   AI_PROVIDER_IDS,
@@ -1381,7 +1382,9 @@ export function AccountSection() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => void signOut({ callbackUrl: '/' })}
+          onClick={() =>
+            void signOut({ callbackUrl: platformLoginUrl() })
+          }
         >
           Sign out
         </Button>
@@ -2185,7 +2188,9 @@ export function SecuritySection() {
       <Button
         type="button"
         variant="outline"
-        onClick={() => void signOut({ callbackUrl: '/' })}
+        onClick={() =>
+          void signOut({ callbackUrl: platformLoginUrl() })
+        }
       >
         Sign out of this browser
       </Button>

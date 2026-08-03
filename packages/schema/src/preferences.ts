@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const PREFERENCES_VERSION = 5 as const
+export const PREFERENCES_VERSION = 6 as const
 
 export const notifyOnSchema = z.enum(['mentions_dms', 'all', 'nothing'])
 export const densitySchema = z.enum(['clean', 'compact'])
@@ -39,6 +39,8 @@ export type DaypartId = Exclude<DaypartPreference, 'auto'>
  * Frontier + research + local Ollama (Mac) + custom OpenAI-compatible endpoints.
  */
 export const AI_PROVIDER_IDS = [
+  /** Google Antigravity — onboard default intelligence (control plane). */
+  'antigravity',
   'claude',
   'openai',
   'gemini',
@@ -257,6 +259,16 @@ export const bevelUserPreferencesSchema = z.object({
      */
     personalAgentId: z.string().default(''),
   }),
+  /**
+   * Agent Trace pane (parallel to chat). Off by default for non-power users.
+   * Server-side preference when prefs are vaulted; also used client-side.
+   */
+  agentTrace: z
+    .object({
+      /** Show third-column / sheet of agent thinking, tools, handoffs. */
+      visible: z.boolean().default(false),
+    })
+    .default({ visible: false }),
   account: z.object({
     displayNameSource: z.enum(['google', 'profile', 'custom']),
   }),
@@ -277,6 +289,7 @@ export const bevelUserPreferencesSchema = z.object({
     streamSummaries: z.boolean(),
     naturalLanguage: z.boolean(),
     providers: z.object({
+      antigravity: aiProviderStateSchema,
       claude: aiProviderStateSchema,
       openai: aiProviderStateSchema,
       gemini: aiProviderStateSchema,
@@ -426,6 +439,12 @@ export const AI_PROVIDER_META: Record<
   AiProviderId,
   { name: string; shortName: string; keyHint: string; description: string }
 > = {
+  antigravity: {
+    name: 'Google Antigravity',
+    shortName: 'Antigravity',
+    keyHint: 'GEMINI_API_KEY / AIza...',
+    description: 'Onboard default intelligence (control plane, finish-only tools).',
+  },
   claude: {
     name: 'Anthropic Claude',
     shortName: 'Claude',
@@ -807,6 +826,9 @@ export const DEFAULT_PREFERENCES: BevelUserPreferences = {
     },
     personalAgentId: '',
   },
+  agentTrace: {
+    visible: false,
+  },
   account: {
     displayNameSource: 'google',
   },
@@ -818,10 +840,12 @@ export const DEFAULT_PREFERENCES: BevelUserPreferences = {
     echoCancellation: true,
   },
   ai: {
-    activeProvider: 'claude',
+    /** Antigravity is the onboard default when GEMINI_API_KEY is configured. */
+    activeProvider: 'antigravity',
     streamSummaries: true,
     naturalLanguage: true,
     providers: {
+      antigravity: { ...emptyProvider, enabled: true },
       claude: { ...emptyProvider },
       openai: { ...emptyProvider },
       gemini: { ...emptyProvider },

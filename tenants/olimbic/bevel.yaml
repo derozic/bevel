@@ -1,0 +1,48 @@
+tenant: olimbic
+name: Olimbic
+domain: bevel.olimbic.games
+hosts:
+  - bevel.olimbic.games
+  - bevel.olimbic.lvh.me
+  - olimbic.bevel.lvh.me
+
+plan: pro
+feature_access: beta
+
+brand:
+  theme: ./theme.json
+  product_name: Olimbic
+
+features:
+  async_streams: true
+  live_sessions: true
+  analytics: true
+  channels: true
+  direct_messages: true
+  agent_dispatch: true
+  work_mode: true
+  custom_branding: true
+
+auth:
+  mode: google
+  # Roster: tenants/memberships.yaml
+  allowed_emails: []
+
+
+realtime:
+  namespace: olimbic
+  presence: true
+  url: https://realtime.bevel.lvh.me
+
+transports:
+  asyncStream:
+    kind: async-stream
+    protocol: sse
+  liveBidirectional:
+    kind: live-bidirectional
+    protocol: websocket
+
+deployment:
+  preview_url: https://bevel.olimbic.lvh.me
+  production_url: https://bevel.olimbic.games
+  target: custom

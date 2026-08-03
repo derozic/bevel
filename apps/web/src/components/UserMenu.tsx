@@ -34,6 +34,7 @@ import {
   DAYPART_ORDER,
   resolveDaypart,
 } from '@/lib/daypart'
+import { platformLoginUrl } from '@/lib/platform'
 
 function initials(name?: string | null, email?: string | null): string {
   if (name?.trim()) {
@@ -213,7 +214,12 @@ export function UserMenu({
 
         <DropdownMenuItem
           destructive
-          onSelect={() => void signOut({ callbackUrl: '/' })}
+          onSelect={() =>
+            void signOut({
+              // Platform apex only — never leave users on a product org host.
+              callbackUrl: platformLoginUrl(),
+            })
+          }
         >
           <ArrowRightEndOnRectangleIcon
             className="size-4 shrink-0 opacity-80"

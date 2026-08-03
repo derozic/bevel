@@ -437,7 +437,7 @@ function CommandPalette() {
           icon: LogOut,
           run: () => {
             setOpen(false);
-            void signOut({ callbackUrl: "/" });
+            void signOut({ callbackUrl: "https://bevel.is/login" });
           },
         });
       } else {

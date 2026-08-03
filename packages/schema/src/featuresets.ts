@@ -123,6 +123,7 @@ export const FEATURE_FLAG_IDS = [
   'dedicatedSupport',
   // Beta / upcoming (still gated by minPlan)
   'agentMemory',
+  'agentTrace',
   'voiceRooms',
   'multiRegion',
   // Matrix fabric (beta → team+ for federation / VoIP)
@@ -272,6 +273,15 @@ export const FEATURE_CATALOG: Record<FeatureFlagId, FeatureFlagDefinition> = {
     id: 'agentMemory',
     label: 'Agent memory (beta)',
     description: 'Long-lived agent memory across sessions',
+    minPlan: 'pro',
+    release: 'beta',
+    paidOnly: true,
+  }),
+  agentTrace: def({
+    id: 'agentTrace',
+    label: 'Agent trace (beta)',
+    description:
+      'Parallel pane of agent thinking, tools, computer-use, and handoffs (toggleable)',
     minPlan: 'pro',
     release: 'beta',
     paidOnly: true,
@@ -541,6 +551,7 @@ export function toLegacyFeaturesObject(
   otpSms: boolean
   presenceSms: boolean
   agentMemory: boolean
+  agentTrace: boolean
   voiceRooms: boolean
   multiRegion: boolean
   matrix: boolean
@@ -563,6 +574,7 @@ export function toLegacyFeaturesObject(
     otpSms: set.otpSms,
     presenceSms: set.presenceSms,
     agentMemory: set.agentMemory,
+    agentTrace: set.agentTrace,
     voiceRooms: set.voiceRooms,
     multiRegion: set.multiRegion,
     matrix: set.matrix,

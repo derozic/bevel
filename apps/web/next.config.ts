@@ -7,6 +7,16 @@ const appDir = path.dirname(fileURLToPath(import.meta.url))
 const nextConfig: NextConfig = {
   // Monorepo: pin tracing root so parent lockfiles do not hijack app discovery.
   outputFileTracingRoot: path.join(appDir, '../..'),
+  // Google / OAuth profile photos (next/image). Console also uses <img> fallback.
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'lh4.googleusercontent.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'lh5.googleusercontent.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'lh6.googleusercontent.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com', pathname: '/**' },
+    ],
+  },
   // Allow Caddy hostnames in dev (HMR / assets).
   allowedDevOrigins: [
     'bevel.lvh.me',
@@ -54,6 +64,11 @@ const nextConfig: NextConfig = {
       {
         source: '/timeline',
         destination: '/bevel/timeline',
+      },
+      {
+        // Top-level private space on bevel.is (agents only)
+        source: '/me',
+        destination: '/bevel/me',
       },
     ]
   },

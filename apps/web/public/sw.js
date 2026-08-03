@@ -1,6 +1,11 @@
 /* BEVEL service worker — install shell + show agent program notifications */
-const CACHE = 'bevel-shell-v3'
+const CACHE = 'bevel-shell-v4'
 const PRECACHE = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png']
+
+function safeResponse(value) {
+  if (value instanceof Response) return value
+  return new Response('', { status: 504, statusText: 'Offline' })
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -25,26 +30,54 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
-  const url = new URL(request.url)
+  let url
+  try {
+    url = new URL(request.url)
+  } catch {
+    return
+  }
   if (url.origin !== self.location.origin) return
-  // Network-first; never cache HTML navigations (avoids stale dual-chrome shells)
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/')) return
+  // Never intercept API / Next internals / auth (avoids broken RSC + opaque errors)
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/_next/') ||
+    url.pathname.startsWith('/auth/')
+  ) {
+    return
+  }
+
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/') || Response.error()),
+      fetch(request)
+        .then((res) => safeResponse(res))
+        .catch(async () => {
+          const hit = await caches.match('/')
+          return safeResponse(hit)
+        }),
     )
     return
   }
+
   event.respondWith(
     fetch(request)
       .then((res) => {
-        const copy = res.clone()
-        if (res.ok && (url.pathname.startsWith('/icons/') || url.pathname === '/manifest.webmanifest')) {
+        if (
+          res &&
+          res.ok &&
+          (url.pathname.startsWith('/icons/') ||
+            url.pathname === '/manifest.webmanifest')
+        ) {
+          const copy = res.clone()
           caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => undefined)
         }
-        return res
+        return safeResponse(res)
       })
-      .catch(() => caches.match(request).then((hit) => hit || caches.match('/'))),
+      .catch(async () => {
+        const hit = await caches.match(request)
+        if (hit) return hit
+        const home = await caches.match('/')
+        return safeResponse(home)
+      }),
   )
 })
 
@@ -58,7 +91,7 @@ self.addEventListener('message', (event) => {
     icon: data.icon || '/icons/icon-192.png',
     badge: data.badge || '/icons/icon-192.png',
     tag: data.tag || 'bevel-agent',
-    data: { url: data.url || '/~general' },
+    data: { url: data.url || '/me' },
     renotify: Boolean(data.renotify),
   }
   event.waitUntil(self.registration.showNotification(title, options))
@@ -66,7 +99,7 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = (event.notification.data && event.notification.data.url) || '/~general'
+  const target = (event.notification.data && event.notification.data.url) || '/me'
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const client of list) {

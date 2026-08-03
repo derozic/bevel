@@ -42,6 +42,7 @@ export {
   lookupTenantsByEmailDomain,
   resolveWorkspacesForEmail,
   resolveHomeTenantForEmail,
+  emailIsMemberOfWorkspace,
   publicTenantUrl,
   registrableDomain,
   needsAuthHandoff,
@@ -49,6 +50,14 @@ export {
   isPlatformEntryHost,
   refreshTenantRegistry,
 } from './registry'
+export {
+  listMembershipsForEmail,
+  membershipSlugsForEmail,
+  refreshMemberships,
+  workspaceHasRoster,
+  type MembershipRole,
+  type WorkspaceMembership,
+} from './memberships'
 export { PLATFORM_ENTRY_HOSTS, PLATFORM_HOSTS } from './constants'
 export {
   PLATFORM_ENTRY_TENANT,
