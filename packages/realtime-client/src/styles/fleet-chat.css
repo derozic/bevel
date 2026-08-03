@@ -667,6 +667,116 @@
   min-width: 0;
 }
 
+/* Dual-layer composer: highlight chips under transparent caret text */
+.fleet-chat-input-shell {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.fleet-chat-input-highlight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  white-space: pre;
+  pointer-events: none;
+  border-radius: 9999px;
+  color: var(--ink);
+}
+
+.fleet-chat-input-plain {
+  white-space: pre;
+}
+
+.fleet-chat-input-token {
+  display: inline;
+  font-weight: 700;
+  border-radius: 0.35rem;
+  padding: 0.05em 0.28em;
+  margin: 0 0.02em;
+  white-space: pre;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.fleet-chat-input-token--agent {
+  color: color-mix(in srgb, var(--bevel-accent, #7c5cff) 55%, var(--ink));
+  background: color-mix(in srgb, var(--bevel-accent, #7c5cff) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bevel-accent, #7c5cff) 35%, transparent);
+}
+
+.fleet-chat-input-token--person {
+  color: color-mix(in srgb, #15803d 70%, var(--ink));
+  background: color-mix(in srgb, #22c55e 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #16a34a 30%, transparent);
+}
+
+.fleet-chat-input-token--escalation {
+  color: color-mix(in srgb, #b45309 75%, var(--ink));
+  background: color-mix(in srgb, #f59e0b 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #d97706 40%, transparent);
+}
+
+.fleet-chat-input-token[data-flash='true'],
+.fleet-chat-mention-pill-badge[data-flash='true'] {
+  animation: fleet-mention-connect 0.85s ease-out 1;
+}
+
+@keyframes fleet-mention-connect {
+  0% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--bevel-accent, #7c5cff) 45%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--bevel-accent, #7c5cff) 40%, transparent);
+    background: color-mix(in srgb, var(--bevel-accent, #7c5cff) 38%, transparent);
+  }
+  55% {
+    box-shadow:
+      0 0 0 6px color-mix(in srgb, var(--bevel-accent, #7c5cff) 0%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--bevel-accent, #7c5cff) 45%, transparent);
+  }
+  100% {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bevel-accent, #7c5cff) 35%, transparent);
+  }
+}
+
+.fleet-chat-input[data-overlay='true'] {
+  position: relative;
+  z-index: 1;
+  color: transparent;
+  caret-color: var(--ink);
+  background: transparent;
+  /* Keep border/padding on the shell via input so focus ring still works */
+  background-color: transparent;
+}
+
+.fleet-chat-input-shell[data-resolved='true'] {
+  border-radius: 9999px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bevel-accent, #7c5cff) 28%, transparent);
+}
+
+.fleet-chat-input-shell[data-resolved='true'] .fleet-chat-input {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.fleet-chat-input-shell[data-resolved='true'] .fleet-chat-input:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.fleet-chat-composer[data-has-resolved='true'] {
+  /* Soft connection cue on the whole composer when a verified token is present */
+  box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--bevel-accent, #7c5cff) 12%, transparent);
+}
+
 .fleet-chat-mention-menu {
   position: absolute;
   left: 0;
@@ -923,6 +1033,21 @@
   background: color-mix(in srgb, var(--msg-accent, #15803d) 12%, transparent);
 }
 
+/* @agent — verified fleet member (obvious connection) */
+.fleet-chat-mention--agent {
+  color: color-mix(in srgb, var(--bevel-accent, #7c5cff) 50%, var(--ink));
+  background: color-mix(in srgb, var(--bevel-accent, #7c5cff) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bevel-accent, #7c5cff) 32%, transparent);
+  font-weight: 700;
+  border-radius: 0.35rem;
+  padding: 0.05em 0.28em;
+}
+
+.fleet-chat-mention--agent:hover {
+  background: color-mix(in srgb, var(--bevel-accent, #7c5cff) 26%, transparent);
+  text-decoration: none;
+}
+
 /* ^username — escalation (full notify + personal agent) */
 .fleet-chat-mention--escalation {
   color: color-mix(in srgb, #b45309 80%, var(--ink));
@@ -932,6 +1057,18 @@
 
 .fleet-chat-mention--escalation:hover {
   background: color-mix(in srgb, #f59e0b 28%, transparent);
+}
+
+.fleet-chat-mention-pill {
+  transition: box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.fleet-chat-mention-pill-badge {
+  letter-spacing: 0.03em;
+}
+
+.fleet-chat-mention-pill-badge[data-flash='true'] {
+  background: color-mix(in srgb, var(--bevel-accent, #7c5cff) 35%, var(--surface));
 }
 
 /* Human + agent avatars — explicit sizes (profile URLs are huge without this) */

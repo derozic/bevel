@@ -21,6 +21,7 @@ import { ChatMessageBody } from '../lib/chat-markdown'
 import {
   applyMention,
   filterMixedMentionCandidates,
+  highlightComposerText,
   mentionDraftAt,
   mentionedAgentIds,
   type MentionCandidate,
@@ -277,6 +278,7 @@ function formatMessageName(
 function MessageRow({
   m,
   agents,
+  agentIdSet,
   selfName,
   focused,
   highlightQuery,
@@ -285,6 +287,7 @@ function MessageRow({
 }: {
   m: ChatMsg
   agents: FleetAgent[]
+  agentIdSet: Set<string>
   selfName: string
   focused?: boolean
   highlightQuery?: string
@@ -332,7 +335,7 @@ function MessageRow({
                 <HighlightedText text={m.body} query={highlightQuery} />
               </p>
             ) : (
-              <ChatMessageBody text={m.body} />
+              <ChatMessageBody text={m.body} agentIds={agentIdSet} />
             )}
           </div>
         </div>
@@ -383,7 +386,7 @@ function MessageRow({
               <HighlightedText text={m.body} query={highlightQuery} />
             </p>
           ) : (
-            <ChatMessageBody text={m.body} />
+            <ChatMessageBody text={m.body} agentIds={agentIdSet} />
           )}
         </div>
       </div>
@@ -445,6 +448,8 @@ export function FleetChat({
   const [input, setInput] = useState('')
   const [caret, setCaret] = useState(0)
   const [mentionHighlight, setMentionHighlight] = useState(0)
+  /** Last accepted mention token for chip flash (Slack/iMessage satisfaction) */
+  const [mentionFlashId, setMentionFlashId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [agentIds, setAgentIds] = useState<string[]>(() =>
     bootSnapshot?.agentIds?.length ? bootSnapshot.agentIds : initialAgents
@@ -969,6 +974,14 @@ export function FleetChat({
     )
     setInput(text)
     setCaret(nextCaret)
+    const flashKey =
+      pick.type === 'agent'
+        ? pick.agent.id.toLowerCase()
+        : `${kind === 'escalation' ? '^' : '@'}${pick.person.handle.toLowerCase()}`
+    setMentionFlashId(flashKey)
+    window.setTimeout(() => {
+      setMentionFlashId((cur) => (cur === flashKey ? null : cur))
+    }, 900)
     requestAnimationFrame(() => {
       const el = inputRef.current
       if (!el) return
@@ -976,6 +989,22 @@ export function FleetChat({
       el.setSelectionRange(nextCaret, nextCaret)
     })
   }
+
+  const catalogAgentIdSet = useMemo(
+    () => new Set(catalog.map((a) => a.id.toLowerCase())),
+    [catalog],
+  )
+  const peopleHandleSet = useMemo(
+    () => peopleDirectory.map((p) => p.handle.toLowerCase()),
+    [peopleDirectory],
+  )
+  const composerSegments = useMemo(
+    () => highlightComposerText(input, catalog, peopleHandleSet),
+    [input, catalog, peopleHandleSet],
+  )
+  const hasResolvedComposerMention = composerSegments.some(
+    (s) => s.kind === 'agent' || s.kind === 'person' || s.kind === 'escalation',
+  )
 
   async function send() {
     const text = input.trim()
@@ -1187,7 +1216,12 @@ export function FleetChat({
                       {agent.tagline ? ` · ${agent.tagline}` : ''}
                     </span>
                   </span>
-                  <span className="fleet-chat-mention-pill-badge">Found</span>
+                  <span
+                    className="fleet-chat-mention-pill-badge"
+                    data-flash={mentionFlashId === id ? 'true' : undefined}
+                  >
+                    Connected
+                  </span>
                 </div>
               )
             })}
@@ -1223,6 +1257,7 @@ export function FleetChat({
               key={`${m.id}:${m.ts}`}
               m={m}
               agents={catalog}
+              agentIdSet={catalogAgentIdSet}
               selfName={displayName}
               focused={focusMessageId === m.id}
               highlightQuery={highlightQuery}
@@ -1265,7 +1300,10 @@ export function FleetChat({
 
         <div
           className="fleet-chat-composer"
-          data-mentioning={liveMentions.length > 0 ? 'true' : 'false'}
+          data-mentioning={
+            liveMentions.length > 0 || hasResolvedComposerMention ? 'true' : 'false'
+          }
+          data-has-resolved={hasResolvedComposerMention ? 'true' : 'false'}
         >
           {fleet.canPutOnWork ? (
             <>
@@ -1379,6 +1417,48 @@ export function FleetChat({
                 })}
               </ul>
             ) : null}
+            <div
+              className="fleet-chat-input-shell"
+              data-resolved={hasResolvedComposerMention ? 'true' : 'false'}
+            >
+              {/* Highlight layer only when a resolved token is present (text is transparent) */}
+              {hasResolvedComposerMention ? (
+                <div className="fleet-chat-input-highlight" aria-hidden>
+                  {composerSegments.map((seg, i) => {
+                    if (seg.kind === 'text') {
+                      return (
+                        <span key={`t-${i}`} className="fleet-chat-input-plain">
+                          {seg.value || '\u200b'}
+                        </span>
+                      )
+                    }
+                    const flashKey =
+                      seg.kind === 'agent'
+                        ? seg.id
+                        : `${seg.kind === 'escalation' ? '^' : '@'}${seg.handle}`
+                    return (
+                      <span
+                        key={`m-${i}-${seg.value}`}
+                        className={
+                          seg.kind === 'agent'
+                            ? 'fleet-chat-input-token fleet-chat-input-token--agent'
+                            : seg.kind === 'escalation'
+                              ? 'fleet-chat-input-token fleet-chat-input-token--escalation'
+                              : 'fleet-chat-input-token fleet-chat-input-token--person'
+                        }
+                        data-flash={
+                          mentionFlashId === flashKey ||
+                          (seg.kind === 'agent' && mentionFlashId === seg.id)
+                            ? 'true'
+                            : undefined
+                        }
+                      >
+                        {seg.value}
+                      </span>
+                    )
+                  })}
+                </div>
+              ) : null}
             <input
               ref={inputRef}
               value={input}
@@ -1446,10 +1526,12 @@ export function FleetChat({
               }
               disabled={!connected || ticketBusy}
               className="fleet-chat-input"
+              data-overlay={hasResolvedComposerMention ? 'true' : 'false'}
               aria-label="Message"
               aria-autocomplete="list"
               aria-expanded={Boolean(mentionDraft && mentionCandidates.length)}
             />
+            </div>
           </div>
           <button
             type="button"

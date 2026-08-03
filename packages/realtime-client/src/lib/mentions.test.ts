@@ -17,6 +17,7 @@ import {
   applyMention,
   filterMentionCandidates,
   filterMixedMentionCandidates,
+  highlightComposerText,
   mentionDraftAt,
   mentionedAgentIds,
   parseResolvedMentions,
@@ -127,6 +128,24 @@ section('mention set is retained when surrounding text is edited', () => {
   const after = mentionedAgentIds(text, catalog)
   assert.deepEqual(before, ['johnny', 'loom'])
   assert.deepEqual(after, ['johnny', 'loom'])
+})
+
+section('highlightComposerText chips catalog agents and people', () => {
+  const segs = highlightComposerText(
+    'hey @tegan and @scott please',
+    [...catalog, { id: 'tegan', name: 'Tegan', category: 'brand' }],
+    ['scott'],
+  )
+  const kinds = segs.map((s) => s.kind)
+  assert.ok(kinds.includes('agent'))
+  assert.ok(kinds.includes('person'))
+  const agent = segs.find((s) => s.kind === 'agent')
+  assert.ok(agent && agent.kind === 'agent' && agent.id === 'tegan')
+  const person = segs.find((s) => s.kind === 'person')
+  assert.ok(person && person.kind === 'person' && person.handle === 'scott')
+  // Unknown token stays plain text
+  const plain = highlightComposerText('hi @nobody', catalog, [])
+  assert.ok(plain.every((s) => s.kind === 'text'))
 })
 
 section('CSS: mentioned chip must not alter geometry (retention)', () => {

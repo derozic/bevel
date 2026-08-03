@@ -7,9 +7,14 @@ const MENTION_LINE_RE = /^[@^][a-zA-Z0-9_-]+/
 /**
  * Split inline text into code, bold, @soft-mentions, and ^escalations.
  * @handle → person soft mention (timeline feed, no full notify)
+ * @agent → verified fleet agent (stronger chip when agentIds provided)
  * ^handle → escalation (full notify + personal agent)
  */
-function inlineFormat(text: string, keyPrefix: string): ReactNode[] {
+function inlineFormat(
+  text: string,
+  keyPrefix: string,
+  agentIds?: Set<string>,
+): ReactNode[] {
   const segments = text.split(
     /(`[^`]+`|\*\*[^*]+\*\*|@[a-zA-Z0-9_-]+|\^[a-zA-Z0-9_-]+)/g,
   )
@@ -32,14 +37,29 @@ function inlineFormat(text: string, keyPrefix: string): ReactNode[] {
       }
       if (seg.startsWith('@') && /^@[a-zA-Z0-9_-]+$/.test(seg)) {
         const handle = seg.slice(1)
+        const lower = handle.toLowerCase()
+        const isAgent = agentIds?.has(lower)
         return (
           <a
             key={`${keyPrefix}-m-${i}`}
-            href={`/u/${encodeURIComponent(handle.toLowerCase())}`}
-            className="fleet-chat-mention fleet-chat-mention--soft"
-            data-mention="soft"
-            data-handle={handle.toLowerCase()}
-            title={`@${handle} — soft mention (timeline)`}
+            href={
+              isAgent
+                ? `#agent-${encodeURIComponent(lower)}`
+                : `/u/${encodeURIComponent(lower)}`
+            }
+            className={
+              isAgent
+                ? 'fleet-chat-mention fleet-chat-mention--agent'
+                : 'fleet-chat-mention fleet-chat-mention--soft'
+            }
+            data-mention={isAgent ? 'agent' : 'soft'}
+            data-handle={lower}
+            title={
+              isAgent
+                ? `@${handle} — fleet agent`
+                : `@${handle} — soft mention (timeline)`
+            }
+            onClick={isAgent ? (e) => e.preventDefault() : undefined}
           >
             {seg}
           </a>
@@ -65,7 +85,14 @@ function inlineFormat(text: string, keyPrefix: string): ReactNode[] {
 }
 
 /** Lightweight chat markdown — lists, bold, code, @mentions, ^escalations. */
-export function ChatMessageBody({ text }: { text: string }) {
+export function ChatMessageBody({
+  text,
+  agentIds,
+}: {
+  text: string
+  /** Lowercase agent ids treated as verified fleet mentions */
+  agentIds?: Set<string>
+}) {
   const lines = text.replace(/\r\n/g, '\n').split('\n')
   const nodes: ReactNode[] = []
   let listItems: ReactNode[] = []
@@ -97,7 +124,7 @@ export function ChatMessageBody({ text }: { text: string }) {
         : trimmed
       listItems.push(
         <li key={`li-${i}`} className="fleet-chat-list-item">
-          {inlineFormat(content, `li-${i}`)}
+          {inlineFormat(content, `li-${i}`, agentIds)}
         </li>,
       )
       continue
@@ -106,7 +133,7 @@ export function ChatMessageBody({ text }: { text: string }) {
     flushList()
     nodes.push(
       <p key={`p-${i}`} className="fleet-chat-paragraph">
-        {inlineFormat(line, `p-${i}`)}
+        {inlineFormat(line, `p-${i}`, agentIds)}
       </p>,
     )
   }

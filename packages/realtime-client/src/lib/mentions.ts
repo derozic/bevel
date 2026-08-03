@@ -181,3 +181,62 @@ export function applyMention(
   const next = text.slice(0, draft.start) + insert + text.slice(draft.end)
   return { text: next, caret: draft.start + insert.length }
 }
+
+/**
+ * Composer highlight segments — resolved tokens become chip spans (Slack/iMessage feel).
+ * Unresolved @words stay plain text until autocomplete accepts a catalog match.
+ */
+export type ComposerHighlightSegment =
+  | { kind: 'text'; value: string }
+  | { kind: 'agent'; value: string; id: string }
+  | { kind: 'person'; value: string; handle: string }
+  | { kind: 'escalation'; value: string; handle: string }
+
+export function highlightComposerText(
+  text: string,
+  catalog: Pick<FleetAgent, 'id' | 'name'>[],
+  peopleHandles: Iterable<string> = [],
+): ComposerHighlightSegment[] {
+  if (!text) return [{ kind: 'text', value: '' }]
+
+  const agentIds = new Set(catalog.map((a) => a.id.toLowerCase()))
+  const agentNames = new Map(
+    catalog.map((a) => [a.name.toLowerCase(), a.id.toLowerCase()] as const),
+  )
+  const people = new Set(
+    [...peopleHandles].map((h) => h.replace(/^[@^]/, '').toLowerCase()),
+  )
+
+  const segments: ComposerHighlightSegment[] = []
+  let cursor = 0
+  const re = /([@^])([a-zA-Z0-9_-]+)\b/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    const start = m.index
+    if (start > cursor) {
+      segments.push({ kind: 'text', value: text.slice(cursor, start) })
+    }
+    const sigil = m[1]!
+    const raw = m[2]!
+    const token = m[0]!
+    const lower = raw.toLowerCase()
+    if (sigil === '^') {
+      segments.push({ kind: 'escalation', value: token, handle: lower })
+    } else {
+      const agentId = agentIds.has(lower) ? lower : agentNames.get(lower)
+      if (agentId) {
+        segments.push({ kind: 'agent', value: token, id: agentId })
+      } else if (people.has(lower)) {
+        segments.push({ kind: 'person', value: token, handle: lower })
+      } else {
+        segments.push({ kind: 'text', value: token })
+      }
+    }
+    cursor = start + token.length
+  }
+  if (cursor < text.length) {
+    segments.push({ kind: 'text', value: text.slice(cursor) })
+  }
+  if (segments.length === 0) segments.push({ kind: 'text', value: text })
+  return segments
+}
