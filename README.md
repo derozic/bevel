@@ -22,11 +22,30 @@ bevel/
     tenant-config/   # Loader + getTenantFromRequest() + doctor
     async-stream/    # SSE — one-way server → client
     realtime-client/ # WebSocket browser client
+    suite-chrome/    # Suite dock mark + hover (upstream to product hosts)
     feature-webrtc/  # Optional A/V module (not general realtime)
     cli/             # bevel doctor, validate, list
     schema/          # Zod contracts
     auth/ ui/ …
 ```
+
+## Product hosts (2x4m, etc.)
+
+**BEVEL features develop in this repo**, then upstream:
+
+| Feature | Lives here | Host app does |
+|---------|------------|---------------|
+| Suite launch API (`/api/suite/launch`) | `apps/web` | `credentials` fetch |
+| Suite dock UX | `packages/suite-chrome` | import + nav placement |
+| Chat embed | `packages/realtime-client` | embed component |
+
+Sync dock package into a sibling 2x4m tree:
+
+```bash
+./scripts/sync-suite-chrome-to-2x4m.sh
+```
+
+Do **not** invent Bevel dock/API logic under `2x4m/packages/ui` — PR here first.
 
 ## Transport layers
 
