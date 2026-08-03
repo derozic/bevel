@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" role="img" aria-label="Bevel">
+  <!-- Magenta geometry · afternoon embellishment (honey ink, gold crease) -->
+  <g transform="translate(5 5) scale(3)">
+    <path d="M2 14.5V3.5L7.5 9 2 14.5Z" fill="#6B4A2A" opacity="0.4"/>
+    <path d="M2 3.5h14L9 10.5 2 3.5Z" fill="#2C1E12"/>
+    <path d="M16 3.5v11L9 10.5 16 14.5V3.5Z" fill="#1C140C" opacity="0.6"/>
+    <path d="M3.2 4.4 L12.2 4.4 L9.1 8.0 L3.9 5.1 Z" fill="#FFF6E8" opacity="0.15"/>
+    <path d="M8.65 9.55 L9.35 9.55 L9.12 10.65 L8.88 10.65 Z" fill="#D97706"/>
+  </g>
+</svg>

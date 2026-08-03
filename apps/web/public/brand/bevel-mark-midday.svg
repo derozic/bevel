@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none" role="img" aria-label="Bevel">
+  <!-- Magenta geometry · midday (ink + cyan crease) — closest to admin.magenta bevel-mark -->
+  <g transform="translate(5 5) scale(3)">
+    <path d="M2 14.5V3.5L7.5 9 2 14.5Z" fill="#111827" opacity="0.35"/>
+    <path d="M2 3.5h14L9 10.5 2 3.5Z" fill="#111827"/>
+    <path d="M16 3.5v11L9 10.5 16 14.5V3.5Z" fill="#111827" opacity="0.55"/>
+    <path d="M3.2 4.4 L12.2 4.4 L9.1 8.0 L3.9 5.1 Z" fill="#FFFFFF" opacity="0.12"/>
+    <path d="M8.65 9.55 L9.35 9.55 L9.12 10.65 L8.88 10.65 Z" fill="#0EA5E9"/>
+  </g>
+</svg>

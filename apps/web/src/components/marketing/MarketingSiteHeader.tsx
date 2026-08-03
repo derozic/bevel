@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { Button } from '@bevel/ui'
-import { BevelCutMark } from '@/components/BevelCutMark'
+import { BevelDaypartMark } from '@/components/BevelDaypartMark'
 import { BevelMark } from '@/components/BevelMark'
 import { SuiteNav } from '@/components/SuiteNav'
 import { BEVEL_HOME_PATH } from '@/lib/bevel'
@@ -27,7 +27,7 @@ function BrandLink() {
       className="flex items-center gap-3 text-foreground transition hover:opacity-90"
     >
       <span className="flex size-9 items-center justify-center rounded-lg border border-border bg-surface">
-        <BevelCutMark />
+        <BevelDaypartMark className="size-[18px]" />
       </span>
       <BevelMark size="md" />
     </Link>
