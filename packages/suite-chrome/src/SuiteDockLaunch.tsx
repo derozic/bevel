@@ -202,7 +202,7 @@ export function SuiteDockLaunch({ className = '', baseUrl }: SuiteDockLaunchProp
 
         {data?.starts && data.starts.length > 0 ? (
           <div className="bevel-nav-launch-starts">
-            {data.starts.map((s) => (
+            {data.starts.map((s: { label: string; href: string }) => (
               <a key={s.href} href={s.href} className="bevel-nav-launch-start">
                 {s.label}
               </a>
