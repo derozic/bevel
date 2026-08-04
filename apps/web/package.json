@@ -13,6 +13,7 @@
     "@bevel/analytics": "workspace:*",
     "@bevel/async-stream": "workspace:*",
     "@bevel/auth": "workspace:*",
+    "@bevel/charts": "workspace:*",
     "@bevel/design-system": "workspace:*",
     "@bevel/matrix": "workspace:*",
     "@bevel/realtime-client": "workspace:*",

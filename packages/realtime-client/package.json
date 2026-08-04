@@ -19,6 +19,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bevel/charts": "workspace:*",
+    "@bevel/schema": "workspace:*",
     "@colyseus/sdk": "^0.17.8",
     "@heroicons/react": "^2.2.0",
     "clsx": "^2.1.1",

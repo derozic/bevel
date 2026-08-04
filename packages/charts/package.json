@@ -1,0 +1,29 @@
+{
+  "name": "@bevel/charts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "D3 chart components for BEVEL — agent-emitted bevel-chart objects in chat and product surfaces",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bevel/schema": "workspace:*",
+    "d3": "^7.9.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5.8.3"
+  }
+}

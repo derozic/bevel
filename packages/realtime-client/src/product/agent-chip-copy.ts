@@ -81,12 +81,24 @@ export const AGENT_CHIP_COPY: Record<string, AgentChipCopy> = {
   tegan: {
     tagline: 'UI craft review',
     summary:
-      'Reviews UI diffs for hierarchy, accessibility, brand tokens, and motion — no templated defaults.',
+      'Reviews UI diffs for hierarchy, accessibility, design-system craft, and motion — not LLM usage tokens (see Mildred).',
     capabilities: [
       'Visual hierarchy',
       'WCAG accessibility',
-      'Design tokens',
+      'Layout & craft',
       'Motion design',
+    ],
+  },
+  mildred: {
+    tagline: 'Token & cost books',
+    summary:
+      'Meters LLM tokens (input/inference/output) across five model lanes plus OpenRouter; QuickBooks-style debit/credit, closes, and 2x4m box calcs. Emits ```bevel-chart``` JSON for inline D3 charts (bar/line/gantt).',
+    capabilities: [
+      'Token metering',
+      'OpenRouter ledger',
+      'Inline charts (bevel-chart)',
+      'Debit/credit journals',
+      '2x4m box calcs',
     ],
   },
   hermes: {

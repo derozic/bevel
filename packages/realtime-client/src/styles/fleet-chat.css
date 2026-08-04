@@ -1431,3 +1431,62 @@
   font-size: 0.6875rem;
   color: color-mix(in srgb, var(--ink) 48%, transparent);
 }
+
+/* ── Bevel charts (agent-emitted D3) ────────────────────── */
+
+.fleet-chat .fleet-chat-chart-block {
+  margin: 0.5rem 0 0.35rem;
+  max-width: min(100%, 28rem);
+}
+
+.fleet-chat .bevel-chart {
+  margin: 0;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, var(--cream));
+}
+
+.fleet-chat .bevel-chart-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.75rem 0.25rem;
+}
+
+.fleet-chat .bevel-chart-title {
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.fleet-chat .bevel-chart-subtitle {
+  font-size: 0.6875rem;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  line-height: 1.35;
+}
+
+.fleet-chat .bevel-chart-canvas {
+  width: 100%;
+  min-height: 8rem;
+  padding: 0.15rem 0.35rem 0.45rem;
+}
+
+.fleet-chat .bevel-chart-error {
+  margin: 0.5rem;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, #ef4444 80%, var(--ink));
+}
+
+.fleet-chat .fleet-chat-code-block {
+  margin: 0.4rem 0;
+  padding: 0.55rem 0.7rem;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  background: color-mix(in srgb, var(--ink) 5%, var(--surface));
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

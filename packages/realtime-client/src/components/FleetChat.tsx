@@ -57,6 +57,7 @@ const KNOWN_AGENT_AVATARS: Record<string, string> = {
   lego: '/avatars/lego.svg',
   northstar: '/avatars/northstar.svg',
   tegan: '/avatars/tegan.svg',
+  mildred: '/avatars/mildred.svg',
   johnny: '/avatars/johnny.svg',
   hermes: '/avatars/hermes.svg',
   terry: '/avatars/terry.svg',

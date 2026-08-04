@@ -14,7 +14,7 @@ export {
 export { AgentChip, type AgentChipProps } from './components/AgentChip'
 export { ChatImage, YouTubeEmbed } from './components/ChatMedia'
 export { FleetChat, type FleetChatProps } from './components/FleetChat'
-export { ChatMessageBody } from './lib/chat-markdown'
+export { ChatMessageBody, splitMessageBlocks } from './lib/chat-markdown'
 export {
   extractYoutubeId,
   isImageUrl,
