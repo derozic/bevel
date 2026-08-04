@@ -105,19 +105,20 @@ sudo -u deploy bash -lc '
       pnpm run build || true
     fi
     test -f dist/runner.js
-    # Ensure Johnny (and other federated souls) resolve:
-    # registerFederatedAgents looks for $AGENTS_FEDERATED_ROOT/agents/<id>/SOUL.md
-    mkdir -p agents/johnny
-    if [[ ! -f agents/johnny/SOUL.md ]]; then
-      if [[ -f src/agents/johnny/SOUL.md ]]; then
-        cp src/agents/johnny/SOUL.md agents/johnny/SOUL.md
-      else
+    # Federated souls: $AGENTS_FEDERATED_ROOT/agents/<id>/SOUL.md
+    for agent_id in johnny mildred tegan hermes brain; do
+      mkdir -p "agents/${agent_id}"
+      if [[ -f "src/agents/${agent_id}/SOUL.md" ]]; then
+        cp "src/agents/${agent_id}/SOUL.md" "agents/${agent_id}/SOUL.md"
+      elif [[ -f "dist/agents/${agent_id}/SOUL.md" ]]; then
+        cp "dist/agents/${agent_id}/SOUL.md" "agents/${agent_id}/SOUL.md"
+      elif [[ ! -f "agents/${agent_id}/SOUL.md" && "${agent_id}" == "johnny" ]]; then
         cat > agents/johnny/SOUL.md <<'"'"'SOUL'"'"'
 # Johnny — Platform Reliability Steward
 You are Johnny, platform reliability steward. Respond briefly and practically in fleet chat.
 SOUL
       fi
-    fi
+    done
   else
     echo "WARN: /opt/bevel/agents missing — fleet @mentions will fail MODULE_NOT_FOUND"
   fi
