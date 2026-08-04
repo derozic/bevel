@@ -400,6 +400,8 @@ export class FleetChannel extends Room {
   /**
    * When the user @mentions a known catalog agent not on the ACL, invite them
    * into the channel (Buzz/Slack “bots as members” pattern) then dispatch.
+   * Also re-syncs membership from the API so long-lived rooms pick up agents
+   * added outside this process (CLI / another room / ops).
    */
   private async autoAddMentionedMembers(text: string, payload: ChatPayload) {
     const tokens = uniqueIds([
@@ -407,10 +409,21 @@ export class FleetChannel extends Room {
       ...(payload.targetAgents ?? []).map((id) => id.toLowerCase()),
       ...(payload.targetAgent ? [payload.targetAgent.toLowerCase()] : []),
     ])
+    if (tokens.length === 0) return
+
+    // Re-hydrate ACL from control plane — room state can lag DB membership.
+    await this.refreshMemberAcl()
+
     for (const token of tokens) {
       const catalogId = this.catalogIdForToken(token) ?? token
-      if (this.memberAgentIds.has(catalogId)) continue
+      if (this.memberAgentIds.has(catalogId)) {
+        this.ensureAgentPresence(catalogId)
+        continue
+      }
       if (!this.isKnownCatalogAgent(catalogId) && !this.isKnownCatalogAgent(token)) {
+        console.warn(
+          `[fleet-channel] @${token} not in catalog — cannot auto-add to ~${this.channelSlug}`,
+        )
         continue
       }
       const ok = await addChannelAgentMember(this.channelSlug, catalogId, 'mention')
@@ -420,7 +433,30 @@ export class FleetChannel extends Room {
         console.log(
           `[fleet-channel] auto-added @${catalogId} to ~${this.channelSlug} via @mention`,
         )
+      } else {
+        console.warn(
+          `[fleet-channel] failed to auto-add @${catalogId} to ~${this.channelSlug}`,
+        )
       }
+    }
+  }
+
+  /** Pull latest channel agentIds into the in-memory ACL set. */
+  private async refreshMemberAcl() {
+    try {
+      const channel = await fetchChannel(this.channelSlug)
+      const ids = (channel?.agentIds ?? channel?.defaultAgentIds ?? []).map((id) =>
+        id.toLowerCase(),
+      )
+      if (ids.length === 0) return
+      for (const id of ids) {
+        this.memberAgentIds.add(id)
+      }
+    } catch (e) {
+      console.warn(
+        `[fleet-channel] refreshMemberAcl failed ~${this.channelSlug}`,
+        e instanceof Error ? e.message : e,
+      )
     }
   }
 
