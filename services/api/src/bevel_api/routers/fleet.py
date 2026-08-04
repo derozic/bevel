@@ -5,13 +5,16 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bevel_api.deps import get_session
 from bevel_api.lib.internal_auth import require_internal
+from bevel_api.repositories import channel_agents as channel_agents_repo
 from bevel_api.repositories import channels as channels_repo
 from bevel_api.repositories import messages as messages_repo
 from bevel_api.repositories import tenants as tenants_repo
+from bevel_api.repositories import workflows as workflows_repo
 
 router = APIRouter(prefix="/v1/fleet", tags=["Fleet"])
 
