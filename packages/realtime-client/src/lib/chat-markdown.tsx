@@ -1,4 +1,10 @@
 import type { ReactNode } from 'react'
+import { ChatImage, YouTubeEmbed } from '../components/ChatMedia'
+import {
+  parseStandaloneMediaLine,
+  splitInlineMedia,
+  type MediaPreviewMeta,
+} from './media-urls'
 
 const FENCE_RE = /^```/
 const LIST_RE = /^[-•*]\s+/
@@ -10,7 +16,7 @@ const MENTION_LINE_RE = /^[@^][a-zA-Z0-9_-]+/
  * @agent → verified fleet agent (stronger chip when agentIds provided)
  * ^handle → escalation (full notify + personal agent)
  */
-function inlineFormat(
+function formatTextSegments(
   text: string,
   keyPrefix: string,
   agentIds?: Set<string>,
@@ -84,14 +90,78 @@ function inlineFormat(
     })
 }
 
-/** Lightweight chat markdown — lists, bold, code, @mentions, ^escalations. */
+function inlineFormat(
+  text: string,
+  keyPrefix: string,
+  agentIds?: Set<string>,
+  mediaPreviews?: Record<string, MediaPreviewMeta>,
+): ReactNode[] {
+  const mediaParts = splitInlineMedia(text)
+  // Pure text path (no URLs) keeps previous behavior
+  if (mediaParts.length === 1 && mediaParts[0]!.type === 'text') {
+    return formatTextSegments(mediaParts[0]!.value, keyPrefix, agentIds)
+  }
+
+  const out: ReactNode[] = []
+  mediaParts.forEach((part, i) => {
+    const k = `${keyPrefix}-mp-${i}`
+    if (part.type === 'text') {
+      out.push(...formatTextSegments(part.value, k, agentIds))
+      return
+    }
+    if (part.type === 'image') {
+      out.push(
+        <span key={k} className="fleet-chat-media-inline">
+          <ChatImage src={part.url} alt={part.alt} />
+        </span>,
+      )
+      return
+    }
+    if (part.type === 'youtube') {
+      out.push(
+        <YouTubeEmbed
+          key={k}
+          videoId={part.videoId}
+          preview={mediaPreviews?.[part.videoId]}
+        />,
+      )
+      return
+    }
+    if (part.type === 'link') {
+      out.push(
+        <a
+          key={k}
+          href={part.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fleet-chat-media-link"
+        >
+          {part.label}
+        </a>,
+      )
+    }
+  })
+  return out
+}
+
+/**
+ * Lightweight chat markdown — lists, bold, code, @mentions, media embeds.
+ * Images: bare https …png/jpg/svg… or ![alt](url)
+ * Video: YouTube URLs → privacy-enhanced embed (2ndbrain previews via mediaPreviews)
+ */
 export function ChatMessageBody({
   text,
   agentIds,
+  mediaPreviews,
 }: {
   text: string
   /** Lowercase agent ids treated as verified fleet mentions */
   agentIds?: Set<string>
+  /**
+   * Optional map of YouTube videoId → title/summary from 2ndbrain
+   * (transcript + summarization pipeline).
+   */
+  mediaPreviews?: Record<string, MediaPreviewMeta>
 }) {
   const lines = text.replace(/\r\n/g, '\n').split('\n')
   const nodes: ReactNode[] = []
@@ -109,12 +179,35 @@ export function ChatMessageBody({
   }
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+    const line = lines[i]!
     const trimmed = line.trim()
 
     if (!trimmed || FENCE_RE.test(trimmed) || trimmed === 'text') {
       if (FENCE_RE.test(trimmed) || trimmed === 'text') continue
       flushList()
+      continue
+    }
+
+    // Standalone media line → full-width embed
+    const standalone = parseStandaloneMediaLine(trimmed)
+    if (standalone) {
+      flushList()
+      if (standalone.kind === 'image') {
+        nodes.push(
+          <div key={`media-${i}`} className="fleet-chat-media-block">
+            <ChatImage src={standalone.url} alt={standalone.alt} />
+          </div>,
+        )
+      } else {
+        nodes.push(
+          <div key={`media-${i}`} className="fleet-chat-media-block">
+            <YouTubeEmbed
+              videoId={standalone.videoId}
+              preview={mediaPreviews?.[standalone.videoId]}
+            />
+          </div>,
+        )
+      }
       continue
     }
 
@@ -124,7 +217,7 @@ export function ChatMessageBody({
         : trimmed
       listItems.push(
         <li key={`li-${i}`} className="fleet-chat-list-item">
-          {inlineFormat(content, `li-${i}`, agentIds)}
+          {inlineFormat(content, `li-${i}`, agentIds, mediaPreviews)}
         </li>,
       )
       continue
@@ -133,7 +226,7 @@ export function ChatMessageBody({
     flushList()
     nodes.push(
       <p key={`p-${i}`} className="fleet-chat-paragraph">
-        {inlineFormat(line, `p-${i}`, agentIds)}
+        {inlineFormat(line, `p-${i}`, agentIds, mediaPreviews)}
       </p>,
     )
   }

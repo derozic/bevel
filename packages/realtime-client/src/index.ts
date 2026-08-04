@@ -12,7 +12,20 @@ export {
   type FleetWorkRepo,
 } from './FleetProvider'
 export { AgentChip, type AgentChipProps } from './components/AgentChip'
+export { ChatImage, YouTubeEmbed } from './components/ChatMedia'
 export { FleetChat, type FleetChatProps } from './components/FleetChat'
+export { ChatMessageBody } from './lib/chat-markdown'
+export {
+  extractYoutubeId,
+  isImageUrl,
+  isYoutubeUrl,
+  parseStandaloneMediaLine,
+  youtubeEmbedUrl,
+  youtubeThumbnailUrl,
+  youtubeWatchUrl,
+  type MediaPreviewMeta,
+  type ParsedMedia,
+} from './lib/media-urls'
 export {
   formatFleetError,
   formatRoomErrorEvent,
