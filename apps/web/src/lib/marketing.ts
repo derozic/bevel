@@ -40,6 +40,10 @@ export const FOOTER_COLUMNS = [
     links: [
       { href: '/privacy', label: 'Privacy' },
       { href: '/terms', label: 'Terms' },
+      { href: '/cookies', label: 'Cookies' },
+      { href: '/ccpa', label: 'CCPA' },
+      { href: '/dpa', label: 'DPA' },
+      { href: '/subprocessors', label: 'Subprocessors' },
       { href: '/security', label: 'Security' },
     ],
   },

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { LegalNav } from '@/components/marketing/LegalNav'
 import { MarketingPage } from '@/components/marketing/MarketingPage'
 import { BEVEL_NAME } from '@/lib/bevel'
 
@@ -8,9 +9,14 @@ export const metadata: Metadata = {
   description: 'How BEVEL isolates tenants, auth, and realtime namespaces.',
 }
 
+const UPDATED = 'August 4, 2026'
+
 export default function SecurityPage() {
   return (
     <MarketingPage title="Security" kicker="Trust">
+      <p>
+        <strong className="text-foreground">Last updated:</strong> {UPDATED}
+      </p>
       <p>
         {BEVEL_NAME} is built multi-tenant from the ground up: host-based resolution,
         declarative tenant config, and realtime namespaces that keep channel history with
@@ -24,14 +30,30 @@ export default function SecurityPage() {
       </p>
       <h2 className="pt-4 text-xl font-semibold text-foreground">Isolation</h2>
       <p>
-        Each workspace is a tenant folder with its own domain, brand, features, and
-        realtime namespace. Sessions mint tokens for the active org — not a shared chat
-        bag. Agents and channels bind to that namespace.
+        Each workspace is a tenant with its own domain, brand, features, and realtime
+        namespace. Sessions mint tokens for the active org — not a shared chat bag. Agents
+        and channels bind to that namespace.
       </p>
       <h2 className="pt-4 text-xl font-semibold text-foreground">Transport</h2>
       <p>
         Live chat over WebSocket, streams over SSE, media only when you enable it. TLS is
         required on public hosts. Local development uses trusted local certificates.
+      </p>
+      <h2 className="pt-4 text-xl font-semibold text-foreground">Data protection</h2>
+      <p>
+        See our{' '}
+        <Link href="/privacy" className="text-accent hover:underline">
+          Privacy Policy
+        </Link>
+        ,{' '}
+        <Link href="/dpa" className="text-accent hover:underline">
+          DPA
+        </Link>
+        , and{' '}
+        <Link href="/subprocessors" className="text-accent hover:underline">
+          Subprocessors
+        </Link>{' '}
+        for how personal data is handled under GDPR and CCPA.
       </p>
       <h2 className="pt-4 text-xl font-semibold text-foreground">Validation</h2>
       <p>
@@ -44,12 +66,10 @@ export default function SecurityPage() {
         <a className="text-accent hover:underline" href="mailto:security@bevel.com">
           security@bevel.com
         </a>
-        . See also our{' '}
-        <Link href="/privacy" className="text-accent hover:underline">
-          privacy policy
-        </Link>
-        .
+        . Please include steps to reproduce and avoid posting secrets in public channels.
       </p>
+
+      <LegalNav current="/security" />
     </MarketingPage>
   )
 }
