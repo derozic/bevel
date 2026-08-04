@@ -86,9 +86,10 @@ def catalog_agents() -> list[dict[str, Any]]:
         {"id": "loom", "name": "Loom", "role": "Fleet brain"},
         {"id": "northstar", "name": "Northstar", "role": "Thread weaver"},
         {"id": "lego", "name": "Lego", "role": "Signal scout"},
-        {"id": "tegan", "name": "Tegan", "role": "Test stack"},
-        {"id": "johnny", "name": "Johnny", "role": "Surface craft"},
-        {"id": "hermes", "name": "Hermes", "role": "Night shift"},
+        {"id": "tegan", "name": "Tegan", "role": "Surface craft"},
+        {"id": "mildred", "name": "Mildred", "role": "Token & cost books"},
+        {"id": "johnny", "name": "Johnny", "role": "Night shift"},
+        {"id": "hermes", "name": "Hermes", "role": "Co-founder"},
         {"id": "terry", "name": "Terry", "role": "Ops"},
         {"id": "forge", "name": "Forge", "role": "Builder"},
     ]

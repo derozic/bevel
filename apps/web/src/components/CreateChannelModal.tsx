@@ -37,6 +37,10 @@ export function CreateChannelModal({
     setSaving(true)
     setError(null)
     try {
+      const tagList = tags
+        .split(',')
+        .map((t) => t.trim().replace(/^[#^]/, ''))
+        .filter(Boolean)
       const res = await fetch('/api/fleet/channels', {
         method: 'POST',
         credentials: 'include',
@@ -46,30 +50,46 @@ export function CreateChannelModal({
         body: JSON.stringify({
           slug: slug.trim(),
           name: name.trim() || undefined,
-          tags: tags
-            .split(',')
-            .map((t) => t.trim().replace(/^[#^]/, ''))
-            .filter(Boolean),
+          tags: tagList,
           defaultAgentIds: ['hermes', 'johnny'],
         }),
       })
-      const data = await res.json().catch(() => ({}))
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string
+        detail?: string
+        slug?: string
+        name?: string
+        tags?: string[]
+        channel?: { slug?: string; name?: string; tags?: string[] }
+      }
       if (!res.ok) {
-        setError((data as { detail?: string }).detail ?? 'Could not create channel')
+        setError(
+          data.error ??
+            (typeof data.detail === 'string' ? data.detail : undefined) ??
+            'Could not create channel',
+        )
         setSaving(false)
         return
       }
-      const createdSlug = String((data as { slug?: string }).slug ?? slug)
+      const nested = data.channel
+      const createdSlug = String(nested?.slug ?? data.slug ?? slug)
         .trim()
         .toLowerCase()
-      const tagList = tags
-        .split(',')
-        .map((t) => t.trim().replace(/^[#^]/, ''))
-        .filter(Boolean)
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/^-|-$/g, '')
+      const displayName =
+        (nested?.name && String(nested.name).trim()) ||
+        (data.name && String(data.name).trim()) ||
+        name.trim() ||
+        createdSlug
       onCreated({
         slug: createdSlug,
-        name: name.trim() || createdSlug,
-        tags: tagList,
+        name: displayName,
+        tags: Array.isArray(nested?.tags)
+          ? nested.tags.map(String)
+          : Array.isArray(data.tags)
+            ? data.tags.map(String)
+            : tagList,
       })
     } catch {
       setError('Could not create channel')

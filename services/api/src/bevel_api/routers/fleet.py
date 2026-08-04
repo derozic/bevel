@@ -40,6 +40,15 @@ async def _resolve_tenant(
     return tenant
 
 
+class CreateChannelBody(BaseModel):
+    slug: str = Field(..., min_length=1, max_length=64)
+    name: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    defaultAgentIds: list[str] | None = None
+    description: str = ""
+    tenant: str | None = None
+
+
 @router.get("/channels")
 async def list_channels(
     _auth: InternalAuth,
@@ -53,6 +62,43 @@ async def list_channels(
     return {
         "tenant": row.slug,
         "channels": [channels_repo.to_api_dict(c) for c in channels],
+    }
+
+
+@router.post("/channels")
+async def create_channel(
+    body: CreateChannelBody,
+    _auth: InternalAuth,
+    session: SessionDep,
+    tenant: str | None = Query(default=None, description="Tenant slug"),
+) -> dict[str, Any]:
+    """Create (or return existing) fleet channel by slug."""
+    row = await _resolve_tenant(session, body.tenant or tenant)
+    key = body.slug.lower().strip()
+    key = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in key).strip("-")
+    if not key:
+        raise HTTPException(400, "Channel slug required")
+
+    existing = await channels_repo.get_by_slug(session, row.id, key)
+    created = existing is None
+    ch = await channels_repo.ensure_channel(
+        session,
+        row.id,
+        key,
+        name=body.name,
+        description=body.description,
+        tags=body.tags or None,
+        default_agent_ids=body.defaultAgentIds,
+    )
+    await session.commit()
+    payload = await channels_repo.to_api_dict_with_members(session, ch)
+    return {
+        "tenant": row.slug,
+        "created": created,
+        "channel": payload,
+        "slug": payload.get("slug"),
+        "name": payload.get("name"),
+        "tags": payload.get("tags") or [],
     }
 
 

@@ -36,7 +36,7 @@ import {
   syncConversationData,
 } from '@/lib/conversation-list'
 import {
-  readChannelCache,
+  hydrateChannelCacheFromStorage,
   seedChannelCache,
   syncChannelData,
 } from '@/lib/channel-list'
@@ -149,12 +149,9 @@ export function BevelRail({
     return new Set(list.map((s) => s.trim().toLowerCase()).filter(Boolean))
   }, [prefs?.prefs.home.escalatedChannels])
   const [propertiesSlug, setPropertiesSlug] = useState<string | null>(null)
+  // SSR-safe initial state only — localStorage is applied in useEffect (React #418).
   const [channels, setChannels] = useState<FleetChannelSummary[]>(() => {
     if (privateAgentsOnly) return []
-    const cached = readChannelCache()
-    if (cached.length > 0) {
-      return syncChannelData(cached, initialChannels ?? DEFAULT_CHANNELS)
-    }
     return seedChannelCache(initialChannels ?? DEFAULT_CHANNELS)
   })
   const [loading, setLoading] = useState(false)
@@ -162,15 +159,11 @@ export function BevelRail({
   const [showCreate, setShowCreate] = useState(false)
 
   const [createdSlug, setCreatedSlug] = useState<string | null>(null)
-  const [conversations, setConversations] = useState<SessionSummary[]>(() => {
-    const cached = readConversationCache()
-    if (cached.length > 0) {
-      return syncConversationData(cached, initialSessions ?? [])
-    }
-    return seedConversationCache(initialSessions ?? [])
-  })
+  const [conversations, setConversations] = useState<SessionSummary[]>(() =>
+    seedConversationCache(initialSessions ?? []),
+  )
   const [conversationsLoading, setConversationsLoading] = useState(
-    () => readConversationCache().length === 0 && !(initialSessions?.length)
+    () => !(initialSessions?.length),
   )
   const [conversationsError, setConversationsError] = useState<string | null>(null)
   const conversationsFetchedRef = useRef(false)
@@ -247,6 +240,15 @@ export function BevelRail({
       if (!opts?.silent) setLoading(false)
     }
   }, [])
+
+  // After mount: merge localStorage + session order (never in useState — React #418)
+  useEffect(() => {
+    if (privateAgentsOnly) return
+    setChannels(
+      hydrateChannelCacheFromStorage(initialChannels ?? DEFAULT_CHANNELS),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once after mount
+  }, [privateAgentsOnly])
 
   useEffect(() => {
     if (status === 'loading') return
