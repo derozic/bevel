@@ -97,8 +97,8 @@ export function readConversationCache(): SessionSummary[] {
   return conversationCache
 }
 
+/** SSR-safe seed — no sessionStorage (avoids React hydration #418). */
 export function seedConversationCache(list: SessionSummary[]): SessionSummary[] {
-  const ordered = applyPersistedOrder(list)
-  conversationCache = ordered
-  return ordered
+  conversationCache = list
+  return list
 }

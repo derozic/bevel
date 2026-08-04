@@ -2,7 +2,12 @@ import type { Session } from 'next-auth'
 import { DEFAULT_CHANNELS, type FleetChannelSummary } from '@/lib/fleet-channels'
 import { resolveFleetApiToken } from '@/lib/fleet-api-auth'
 
-const API_BASE = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:41002'
+// Match bevel-api.server / product-channel defaults (43203), not 2x4m's 41002.
+const API_BASE =
+  process.env.API_INTERNAL_URL ||
+  process.env.BEVEL_API_URL ||
+  process.env.NEXT_PUBLIC_BEVEL_API_URL ||
+  'http://127.0.0.1:43203'
 
 export async function fetchFleetChannels(
   sessionOrToken: Session | string | null | undefined
