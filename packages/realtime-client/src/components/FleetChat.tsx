@@ -1043,13 +1043,26 @@ export function FleetChat({
       }
     }
 
+    const mentionTargets = mentionedAgentIds(message, catalog)
     const directTarget =
       !isChannel && agentIds.length === 1 ? agentIds[0] : undefined
+    // Channel: send every resolved @agent so the room can multi-dispatch.
+    // Session: prefer explicit 1:1 target, else all mentions in the session roster.
+    const targetAgents = isChannel
+      ? mentionTargets.length > 0
+        ? mentionTargets
+        : undefined
+      : mentionTargets.length > 0
+        ? mentionTargets
+        : directTarget
+          ? [directTarget]
+          : undefined
 
     roomRef.current.send('chat', {
       text: message,
       speaker: displayName,
       ...(directTarget ? { targetAgent: directTarget } : {}),
+      ...(targetAgents && targetAgents.length > 0 ? { targetAgents } : {}),
       work,
       workRepo: work ? activeWorkRepo : undefined,
     })

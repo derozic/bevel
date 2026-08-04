@@ -2,7 +2,12 @@ import { Client, Room, ServerError } from 'colyseus'
 import { verifyAuthToken } from '../auth-verify.js'
 import { dispatchAgentChat, dispatchAgentWork, sanitizeAgentError } from '../agent-dispatch.js'
 import { canDispatchWork, normalizeWorkRepo } from '../work-repos.js'
-import { appendChannelMessage, fetchChannel, fetchChannelMessages } from '../fleet-channel-api.js'
+import {
+  addChannelAgentMember,
+  appendChannelMessage,
+  fetchChannel,
+  fetchChannelMessages,
+} from '../fleet-channel-api.js'
 import { logAgentWorkToProduct } from '../product-log.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { recordEvent } from '../recording.js'
@@ -17,6 +22,7 @@ import {
 import { removeHumansByUserId } from '../human-presence.js'
 import {
   SYSTEM_SPEAKER,
+  agentNotInChannel,
   agentThinking,
   askingFleet,
   channelMemberJoined,
@@ -25,6 +31,11 @@ import {
   puttingOnWork,
   workAccessDenied,
 } from '../system-voice.js'
+
+/** Cap live Colyseus state so Encoder never overflows mid-thread. */
+const LIVE_MESSAGE_CAP = 120
+/** History hydrate into shared state (full archive still on REST). */
+const HISTORY_HYDRATE_LIMIT = 40
 
 type JoinOptions = {
   channelSlug?: string
@@ -51,9 +62,39 @@ type SpeakerProfile = {
 type ChatPayload = {
   text: string
   speaker?: string
+  /** Single target (1:1 sessions / legacy). */
   targetAgent?: string
+  /** Multi-target from client @mentions / roster. */
+  targetAgents?: string[]
   work?: boolean
   workRepo?: string
+}
+
+type ResolveTargetsResult = {
+  targets: string[]
+  /** @tokens that look like agents but are not channel members (after auto-add attempt). */
+  blocked: string[]
+}
+
+function uniqueIds(ids: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of ids) {
+    const id = raw.toLowerCase().trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+/** All @tokens in text (lowercase). */
+function parseAtTokens(text: string): string[] {
+  const found: string[] = []
+  for (const m of text.matchAll(/@([a-z0-9_-]+)\b/gi)) {
+    if (m[1]) found.push(m[1].toLowerCase())
+  }
+  return uniqueIds(found)
 }
 
 function uid(): string {
@@ -127,7 +168,7 @@ export class FleetChannel extends Room {
       this.state.agents.push(row)
     }
 
-    const history = await fetchChannelMessages(this.channelSlug, 100)
+    const history = await fetchChannelMessages(this.channelSlug, HISTORY_HYDRATE_LIMIT)
     for (const row of history) {
       const msg = new ChatMessage()
       msg.id = row.id
@@ -226,8 +267,40 @@ export class FleetChannel extends Room {
   }
 
   private pushMessage(msg: ChatMessage) {
-    if (this.state.messages.length > 500) this.state.messages.shift()
+    while (this.state.messages.length >= LIVE_MESSAGE_CAP) {
+      this.state.messages.shift()
+    }
     this.state.messages.push(msg)
+  }
+
+  /** Ensure agent is on live presence roster (after membership auto-add). */
+  private ensureAgentPresence(agentId: string) {
+    const id = agentId.toLowerCase()
+    if (this.state.agentIds.includes(id)) return
+    this.state.agentIds.push(id)
+    const catalog = loadMergedRegistry()
+    const meta = catalog.find((a) => a.id === id)
+    const row = new AgentPresence()
+    row.id = id
+    row.name = meta?.name ?? id
+    row.accent = meta?.accent ?? '#1a1410'
+    row.source = meta?.federated ? 'federated' : 'fleet'
+    this.state.agents.push(row)
+  }
+
+  private isKnownCatalogAgent(id: string): boolean {
+    const key = id.toLowerCase()
+    return loadMergedRegistry().some(
+      (a) => a.id.toLowerCase() === key || a.name.toLowerCase() === key,
+    )
+  }
+
+  private catalogIdForToken(token: string): string | null {
+    const key = token.toLowerCase()
+    const hit = loadMergedRegistry().find(
+      (a) => a.id.toLowerCase() === key || a.name.toLowerCase() === key,
+    )
+    return hit?.id.toLowerCase() ?? null
   }
 
   private removeMessageById(id: string): void {
@@ -288,10 +361,26 @@ export class FleetChannel extends Room {
       tags,
     })
 
-    const targets = this.resolveTargetAgents(text, payload.targetAgent)
+    // Auto-add catalog agents that were @mentioned but not yet channel members.
+    await this.autoAddMentionedMembers(text, payload)
+
+    let { targets, blocked } = this.resolveTargetAgents(text, payload)
     if (targets.length === 0) {
       const names = this.state.agents.map((a) => a.name)
-      this.pushSystemMessage(pickAgent(names), 'final')
+      const memberList = [...this.memberAgentIds]
+      const body =
+        blocked.length > 0
+          ? agentNotInChannel(blocked, memberList)
+          : pickAgent(names)
+      this.pushSystemMessage(body, 'final')
+      void appendChannelMessage(this.channelSlug, {
+        id: uid(),
+        speakerId: 'system',
+        speakerName: SYSTEM_SPEAKER,
+        speakerType: 'system',
+        body,
+        status: 'final',
+      })
       return
     }
 
@@ -306,6 +395,33 @@ export class FleetChannel extends Room {
       work: wantsWork && canDispatchWork(auth, workRepo),
       workRepo,
     })
+  }
+
+  /**
+   * When the user @mentions a known catalog agent not on the ACL, invite them
+   * into the channel (Buzz/Slack “bots as members” pattern) then dispatch.
+   */
+  private async autoAddMentionedMembers(text: string, payload: ChatPayload) {
+    const tokens = uniqueIds([
+      ...parseAtTokens(text),
+      ...(payload.targetAgents ?? []).map((id) => id.toLowerCase()),
+      ...(payload.targetAgent ? [payload.targetAgent.toLowerCase()] : []),
+    ])
+    for (const token of tokens) {
+      const catalogId = this.catalogIdForToken(token) ?? token
+      if (this.memberAgentIds.has(catalogId)) continue
+      if (!this.isKnownCatalogAgent(catalogId) && !this.isKnownCatalogAgent(token)) {
+        continue
+      }
+      const ok = await addChannelAgentMember(this.channelSlug, catalogId, 'mention')
+      if (ok) {
+        this.memberAgentIds.add(catalogId)
+        this.ensureAgentPresence(catalogId)
+        console.log(
+          `[fleet-channel] auto-added @${catalogId} to ~${this.channelSlug} via @mention`,
+        )
+      }
+    }
   }
 
   private chatHistory() {
@@ -533,35 +649,66 @@ export class FleetChannel extends Room {
     }
   }
 
-  private resolveTargetAgents(text: string, explicit?: string): string[] {
+  private resolveTargetAgents(text: string, payload: ChatPayload): ResolveTargetsResult {
     // ACL: must be a channel member. Live session roster may be a subset for UX.
     const allowed = (id: string) => {
       const key = id.toLowerCase()
       if (this.memberAgentIds.size > 0 && !this.memberAgentIds.has(key)) return false
       return this.state.agentIds.includes(key) || this.memberAgentIds.has(key)
     }
-    if (explicit) {
-      const id = explicit.toLowerCase()
-      return allowed(id) ? [id] : []
+
+    const normalizeToken = (token: string): string => {
+      return this.catalogIdForToken(token) ?? token.toLowerCase()
     }
-    const mention = text.match(/@([a-z0-9_-]+)\b/i)
-    if (mention) {
-      const id = mention[1].toLowerCase()
-      return allowed(id) ? [id] : []
+
+    const explicitList = uniqueIds([
+      ...(payload.targetAgents ?? []),
+      ...(payload.targetAgent ? [payload.targetAgent] : []),
+    ]).map(normalizeToken)
+
+    if (explicitList.length > 0) {
+      const targets = explicitList.filter((id) => allowed(id))
+      const blocked = explicitList.filter(
+        (id) => !allowed(id) && this.isKnownCatalogAgent(id),
+      )
+      return { targets, blocked }
     }
+
+    const mentionTokens = parseAtTokens(text).map(normalizeToken)
+    if (mentionTokens.length > 0) {
+      const targets = mentionTokens.filter((id) => allowed(id))
+      const blocked = mentionTokens.filter(
+        (id) => !allowed(id) && this.isKnownCatalogAgent(id),
+      )
+      // Also catch name-only tokens that aren't catalog (people) — ignore as blocked
+      return { targets, blocked }
+    }
+
     if (this.state.agentIds.length === 1 && allowed(this.state.agentIds[0])) {
-      return [this.state.agentIds[0]]
+      return { targets: [this.state.agentIds[0]], blocked: [] }
     }
+
     const lower = text.toLowerCase()
+    const nameHits: string[] = []
     for (const agent of this.state.agents) {
       if (
         allowed(agent.id) &&
-        (lower.includes(`@${agent.id}`) || lower.includes(agent.name.toLowerCase()))
+        (lower.includes(`@${agent.id}`) ||
+          new RegExp(`\\b${agent.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(
+            text,
+          ))
       ) {
-        return [agent.id]
+        nameHits.push(agent.id)
       }
     }
-    // No explicit target: only agents currently in the live roster who are members
-    return this.state.agentIds.filter((id) => allowed(id))
+    if (nameHits.length > 0) {
+      return { targets: uniqueIds(nameHits), blocked: [] }
+    }
+
+    // No explicit target: agents currently in the live roster who are members
+    return {
+      targets: this.state.agentIds.filter((id) => allowed(id)),
+      blocked: [],
+    }
   }
 }

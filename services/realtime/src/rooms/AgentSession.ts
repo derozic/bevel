@@ -48,6 +48,29 @@ type ChatPayload = {
   text: string
   speaker?: string
   targetAgent?: string
+  targetAgents?: string[]
+  work?: boolean
+  workRepo?: string
+}
+
+function uniqueIds(ids: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of ids) {
+    const id = raw.toLowerCase().trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+function parseAtTokens(text: string): string[] {
+  const found: string[] = []
+  for (const m of text.matchAll(/@([a-z0-9_-]+)\b/gi)) {
+    if (m[1]) found.push(m[1].toLowerCase())
+  }
+  return uniqueIds(found)
 }
 
 function uid(): string {
@@ -196,7 +219,7 @@ export class AgentSession extends Room {
   }
 
   private pushMessage(msg: ChatMessage) {
-    if (this.state.messages.length > 200) {
+    if (this.state.messages.length > 120) {
       this.state.messages.shift()
     }
     this.state.messages.push(msg)
@@ -236,7 +259,7 @@ export class AgentSession extends Room {
       meta: { messageId: human.id },
     })
 
-    const targets = this.resolveTargetAgents(text, payload.targetAgent)
+    const targets = this.resolveTargetAgents(text, payload)
     if (targets.length === 0) {
       const names = this.state.agents.map((a) => a.name)
       const body = pickAgent(names)
@@ -356,21 +379,25 @@ export class AgentSession extends Room {
     }
   }
 
-  private resolveTargetAgents(text: string, explicit?: string): string[] {
-    const inSession = (id: string) => this.state.agentIds.includes(id)
+  private resolveTargetAgents(text: string, payload: ChatPayload): string[] {
+    const inSession = (id: string) => this.state.agentIds.includes(id.toLowerCase())
 
-    if (explicit) {
-      const id = explicit.toLowerCase()
-      return inSession(id) ? [id] : []
+    const explicitList = uniqueIds([
+      ...(payload.targetAgents ?? []),
+      ...(payload.targetAgent ? [payload.targetAgent] : []),
+    ])
+    if (explicitList.length > 0) {
+      return explicitList.filter((id) => inSession(id))
     }
 
-    const mention = text.match(/@([a-z0-9_-]+)\b/i)
-    if (mention) {
-      const id = mention[1].toLowerCase()
-      return inSession(id) ? [id] : []
+    const mentions = parseAtTokens(text)
+    if (mentions.length > 0) {
+      const hits = mentions.filter((id) => inSession(id))
+      if (hits.length > 0) return hits
     }
 
     const lower = text.toLowerCase()
+    const nameHits: string[] = []
     for (const agent of this.state.agents) {
       const id = agent.id.toLowerCase()
       const name = agent.name.toLowerCase()
@@ -379,9 +406,10 @@ export class AgentSession extends Room {
         new RegExp(`\\b${id}\\b`, 'i').test(text) ||
         new RegExp(`\\b${name}\\b`, 'i').test(text)
       ) {
-        return [id]
+        nameHits.push(id)
       }
     }
+    if (nameHits.length > 0) return uniqueIds(nameHits)
 
     if (this.state.agentIds.length === 1) return [this.state.agentIds[0]]
 

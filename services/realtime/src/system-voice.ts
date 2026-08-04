@@ -57,6 +57,22 @@ export function pickAgent(agentNames: string[]): string {
   return `Who should answer? @mention ${hint} or pick an agent above.`
 }
 
+/** @mention resolved to a known agent that is not on the channel membership ACL. */
+export function agentNotInChannel(
+  blockedIds: string[],
+  memberIds: string[],
+): string {
+  const blocked = blockedIds.map((id) => `@${id}`).join(', ')
+  const members =
+    memberIds.length > 0
+      ? memberIds.map((id) => `@${id}`).join(', ')
+      : 'add agents from the roster'
+  if (blockedIds.length === 1) {
+    return `${blocked} is not in this channel yet. Members: ${members}. @mention a member or add them on the roster.`
+  }
+  return `${blocked} are not in this channel yet. Members: ${members}. @mention a member or add them on the roster.`
+}
+
 export function handingToAgent(agentName: string): string {
   return `passing your note to ${agentName} with love 💜…`
 }

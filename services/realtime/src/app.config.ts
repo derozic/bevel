@@ -1,3 +1,4 @@
+import { Encoder } from '@colyseus/schema'
 import { defineRoom, defineServer, matchMaker } from 'colyseus'
 import cors from 'cors'
 import express from 'express'
@@ -11,6 +12,11 @@ import {
   conversationSearchIndex,
   rebuildConversationSearchIndex,
 } from './search-index.js'
+
+// Channel rooms hydrate history + long agent replies into shared state.
+// Default schema buffer (~8–16KB) overflows and clients stop receiving patches
+// — agents appear silent even when dispatch succeeds. Raise before any room boots.
+Encoder.BUFFER_SIZE = 256 * 1024
 
 function programEventsAuthorized(req: express.Request): boolean {
   const key = process.env.FLEET_INTERNAL_API_KEY

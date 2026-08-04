@@ -104,6 +104,25 @@ async function withTrace<T extends DispatchResult>(
   }
 }
 
+const DISPATCH_TIMEOUT_MS = Number(process.env.AGENT_DISPATCH_TIMEOUT_MS ?? 60_000)
+
+async function withTimeout<T>(label: string, ms: number, fn: () => Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      fn(),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label} timed out after ${ms}ms`)),
+          ms,
+        )
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 export async function dispatchAgentChat(
   agentId: string,
   message: string,
@@ -111,8 +130,17 @@ export async function dispatchAgentChat(
   opts?: DispatchOptions,
 ): Promise<DispatchResult> {
   return withTrace(agentId, 'chat', opts, async () => {
+    console.log(`[agent-dispatch] start chat @${agentId}`)
     const { runAgentChat } = loadRunner()
-    return runAgentChat(agentId, message, history)
+    const res = await withTimeout(
+      `chat @${agentId}`,
+      DISPATCH_TIMEOUT_MS,
+      () => runAgentChat(agentId, message, history),
+    )
+    console.log(
+      `[agent-dispatch] ok chat @${agentId} model=${res.model ?? '?'} chars=${(res.output || '').length}`,
+    )
+    return res
   })
 }
 
@@ -124,11 +152,21 @@ export async function dispatchAgentWork(
   opts?: DispatchOptions,
 ): Promise<DispatchResult> {
   return withTrace(agentId, 'work', opts, async () => {
+    console.log(`[agent-dispatch] start work @${agentId} repo=${workRepo}`)
     const { runAgentWork } = loadRunner()
-    return runAgentWork(agentId, message, history, {
-      workspaceRoot: resolveWorkspaceForRepo(workRepo),
-      workRepo,
-    })
+    const res = await withTimeout(
+      `work @${agentId}`,
+      DISPATCH_TIMEOUT_MS,
+      () =>
+        runAgentWork(agentId, message, history, {
+          workspaceRoot: resolveWorkspaceForRepo(workRepo),
+          workRepo,
+        }),
+    )
+    console.log(
+      `[agent-dispatch] ok work @${agentId} model=${res.model ?? '?'} chars=${(res.output || '').length}`,
+    )
+    return res
   })
 }
 

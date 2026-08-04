@@ -71,6 +71,48 @@ export async function fetchChannel(slug: string): Promise<FleetChannelRecord | n
   }
 }
 
+/**
+ * Add an agent to the channel membership ACL (agents-as-members).
+ * Used when a user @mentions a catalog agent that is not yet on the channel.
+ */
+export async function addChannelAgentMember(
+  slug: string,
+  agentId: string,
+  addedBy = 'system',
+): Promise<boolean> {
+  const base = apiBase()
+  if (!base) return false
+  const id = agentId.toLowerCase().trim()
+  if (!id) return false
+  try {
+    const res = await fetch(
+      `${base}/api/v1/fleet/channels/${encodeURIComponent(slug)}/agents/${encodeURIComponent(id)}`,
+      {
+        method: 'PUT',
+        headers: internalHeaders(),
+        body: JSON.stringify({ role: 'bot', addedBy }),
+        signal: AbortSignal.timeout(PERSIST_TIMEOUT_MS),
+      },
+    )
+    if (!res.ok) {
+      console.warn('[fleet-channel-api] add member failed', {
+        slug,
+        agentId: id,
+        status: res.status,
+      })
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn('[fleet-channel-api] add member error', {
+      slug,
+      agentId: id,
+      error: e instanceof Error ? e.message : String(e),
+    })
+    return false
+  }
+}
+
 export async function fetchChannelMessages(
   slug: string,
   limit = 100
