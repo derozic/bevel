@@ -1,7 +1,7 @@
 'use client'
 
 import type { CSSProperties, ReactNode } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Client, getStateCallbacks, type Room } from '@colyseus/sdk'
 import { Bars3Icon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import { useFleet } from '../FleetProvider'
@@ -451,6 +451,17 @@ export function FleetChat({
   /** Last accepted mention token for chip flash (Slack/iMessage satisfaction) */
   const [mentionFlashId, setMentionFlashId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const highlightRef = useRef<HTMLDivElement>(null)
+
+  /** Keep highlight layer scrolled with the real input (dual-layer caret precision). */
+  const syncComposerScroll = useCallback(() => {
+    const inputEl = inputRef.current
+    const hi = highlightRef.current
+    if (!inputEl || !hi) return
+    if (hi.scrollLeft !== inputEl.scrollLeft) {
+      hi.scrollLeft = inputEl.scrollLeft
+    }
+  }, [])
   const [agentIds, setAgentIds] = useState<string[]>(() =>
     bootSnapshot?.agentIds?.length ? bootSnapshot.agentIds : initialAgents
   )
@@ -1006,6 +1017,11 @@ export function FleetChat({
     (s) => s.kind === 'agent' || s.kind === 'person' || s.kind === 'escalation',
   )
 
+  // After mention resolve / value change, re-align highlight scroll with the input
+  useEffect(() => {
+    requestAnimationFrame(syncComposerScroll)
+  }, [input, hasResolvedComposerMention, syncComposerScroll])
+
   async function send() {
     const text = input.trim()
     if (!text || !roomRef.current || ticketBusy) return
@@ -1436,12 +1452,17 @@ export function FleetChat({
             >
               {/* Highlight layer only when a resolved token is present (text is transparent) */}
               {hasResolvedComposerMention ? (
-                <div className="fleet-chat-input-highlight" aria-hidden>
+                <div
+                  ref={highlightRef}
+                  className="fleet-chat-input-highlight"
+                  aria-hidden
+                >
                   {composerSegments.map((seg, i) => {
                     if (seg.kind === 'text') {
+                      // Never inject zero-width spaces into mirrored text — they shift caret math
                       return (
                         <span key={`t-${i}`} className="fleet-chat-input-plain">
-                          {seg.value || '\u200b'}
+                          {seg.value}
                         </span>
                       )
                     }
@@ -1479,14 +1500,18 @@ export function FleetChat({
                 setInput(e.target.value)
                 setCaret(e.target.selectionStart ?? e.target.value.length)
                 setMentionHighlight(0)
+                requestAnimationFrame(syncComposerScroll)
               }}
+              onScroll={syncComposerScroll}
               onSelect={(e) => {
                 const t = e.currentTarget
                 setCaret(t.selectionStart ?? t.value.length)
+                syncComposerScroll()
               }}
               onClick={(e) => {
                 const t = e.currentTarget
                 setCaret(t.selectionStart ?? t.value.length)
+                syncComposerScroll()
               }}
               onKeyDown={(e) => {
                 if (mentionDraft && mentionCandidates.length > 0) {
