@@ -1,7 +1,7 @@
 'use client'
 
 import type { CSSProperties, ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Client, getStateCallbacks, type Room } from '@colyseus/sdk'
 import { Bars3Icon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import { useFleet } from '../FleetProvider'
@@ -451,17 +451,6 @@ export function FleetChat({
   /** Last accepted mention token for chip flash (Slack/iMessage satisfaction) */
   const [mentionFlashId, setMentionFlashId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const highlightRef = useRef<HTMLDivElement>(null)
-
-  /** Keep highlight layer scrolled with the real input (dual-layer caret precision). */
-  const syncComposerScroll = useCallback(() => {
-    const inputEl = inputRef.current
-    const hi = highlightRef.current
-    if (!inputEl || !hi) return
-    if (hi.scrollLeft !== inputEl.scrollLeft) {
-      hi.scrollLeft = inputEl.scrollLeft
-    }
-  }, [])
   const [agentIds, setAgentIds] = useState<string[]>(() =>
     bootSnapshot?.agentIds?.length ? bootSnapshot.agentIds : initialAgents
   )
@@ -1016,11 +1005,32 @@ export function FleetChat({
   const hasResolvedComposerMention = composerSegments.some(
     (s) => s.kind === 'agent' || s.kind === 'person' || s.kind === 'escalation',
   )
-
-  // After mention resolve / value change, re-align highlight scroll with the input
-  useEffect(() => {
-    requestAnimationFrame(syncComposerScroll)
-  }, [input, hasResolvedComposerMention, syncComposerScroll])
+  /** Resolved mention chips shown *above* the plain input (never dual-layer). */
+  const resolvedMentionChips = useMemo(() => {
+    const seen = new Set<string>()
+    const chips: Array<{
+      key: string
+      label: string
+      kind: 'agent' | 'person' | 'escalation'
+      flashKey: string
+    }> = []
+    for (const seg of composerSegments) {
+      if (seg.kind === 'text') continue
+      const flashKey =
+        seg.kind === 'agent'
+          ? seg.id
+          : `${seg.kind === 'escalation' ? '^' : '@'}${seg.handle}`
+      if (seen.has(flashKey)) continue
+      seen.add(flashKey)
+      chips.push({
+        key: flashKey,
+        label: seg.value,
+        kind: seg.kind,
+        flashKey,
+      })
+    }
+    return chips
+  }, [composerSegments])
 
   async function send() {
     const text = input.trim()
@@ -1450,125 +1460,106 @@ export function FleetChat({
               className="fleet-chat-input-shell"
               data-resolved={hasResolvedComposerMention ? 'true' : 'false'}
             >
-              {/* Highlight layer only when a resolved token is present (text is transparent) */}
-              {hasResolvedComposerMention ? (
+              {/*
+                Resolved @agents as chips *outside* the text field.
+                Dual-layer (transparent input + painted highlights) always desyncs
+                caret metrics once a token resolves — never paint under the caret.
+              */}
+              {resolvedMentionChips.length > 0 ? (
                 <div
-                  ref={highlightRef}
-                  className="fleet-chat-input-highlight"
-                  aria-hidden
+                  className="fleet-chat-mention-chip-row"
+                  aria-label="Mentioned in this message"
                 >
-                  {composerSegments.map((seg, i) => {
-                    if (seg.kind === 'text') {
-                      // Never inject zero-width spaces into mirrored text — they shift caret math
-                      return (
-                        <span key={`t-${i}`} className="fleet-chat-input-plain">
-                          {seg.value}
-                        </span>
-                      )
-                    }
-                    const flashKey =
-                      seg.kind === 'agent'
-                        ? seg.id
-                        : `${seg.kind === 'escalation' ? '^' : '@'}${seg.handle}`
-                    return (
-                      <span
-                        key={`m-${i}-${seg.value}`}
-                        className={
-                          seg.kind === 'agent'
-                            ? 'fleet-chat-input-token fleet-chat-input-token--agent'
-                            : seg.kind === 'escalation'
-                              ? 'fleet-chat-input-token fleet-chat-input-token--escalation'
-                              : 'fleet-chat-input-token fleet-chat-input-token--person'
-                        }
-                        data-flash={
-                          mentionFlashId === flashKey ||
-                          (seg.kind === 'agent' && mentionFlashId === seg.id)
-                            ? 'true'
-                            : undefined
-                        }
-                      >
-                        {seg.value}
-                      </span>
-                    )
-                  })}
+                  {resolvedMentionChips.map((chip) => (
+                    <span
+                      key={chip.key}
+                      className={
+                        chip.kind === 'agent'
+                          ? 'fleet-chat-mention-chip fleet-chat-mention-chip--agent'
+                          : chip.kind === 'escalation'
+                            ? 'fleet-chat-mention-chip fleet-chat-mention-chip--escalation'
+                            : 'fleet-chat-mention-chip fleet-chat-mention-chip--person'
+                      }
+                      data-flash={
+                        mentionFlashId === chip.flashKey ? 'true' : undefined
+                      }
+                    >
+                      {chip.label}
+                    </span>
+                  ))}
                 </div>
               ) : null}
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value)
-                setCaret(e.target.selectionStart ?? e.target.value.length)
-                setMentionHighlight(0)
-                requestAnimationFrame(syncComposerScroll)
-              }}
-              onScroll={syncComposerScroll}
-              onSelect={(e) => {
-                const t = e.currentTarget
-                setCaret(t.selectionStart ?? t.value.length)
-                syncComposerScroll()
-              }}
-              onClick={(e) => {
-                const t = e.currentTarget
-                setCaret(t.selectionStart ?? t.value.length)
-                syncComposerScroll()
-              }}
-              onKeyDown={(e) => {
-                if (mentionDraft && mentionCandidates.length > 0) {
-                  if (e.key === 'ArrowDown') {
-                    e.preventDefault()
-                    setMentionHighlight(
-                      (h) => (h + 1) % mentionCandidates.length,
-                    )
-                    return
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  setCaret(e.target.selectionStart ?? e.target.value.length)
+                  setMentionHighlight(0)
+                }}
+                onSelect={(e) => {
+                  const t = e.currentTarget
+                  setCaret(t.selectionStart ?? t.value.length)
+                }}
+                onClick={(e) => {
+                  const t = e.currentTarget
+                  setCaret(t.selectionStart ?? t.value.length)
+                }}
+                onKeyDown={(e) => {
+                  if (mentionDraft && mentionCandidates.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault()
+                      setMentionHighlight(
+                        (h) => (h + 1) % mentionCandidates.length,
+                      )
+                      return
+                    }
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault()
+                      setMentionHighlight(
+                        (h) =>
+                          (h - 1 + mentionCandidates.length) %
+                          mentionCandidates.length,
+                      )
+                      return
+                    }
+                    if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                      e.preventDefault()
+                      const pick =
+                        mentionCandidates[mentionHighlight] ??
+                        mentionCandidates[0]
+                      if (pick) insertMentionCandidate(pick)
+                      return
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault()
+                      setCaret(input.length)
+                      setInput((v) =>
+                        v.endsWith('@') || v.endsWith('^') ? v.slice(0, -1) : v,
+                      )
+                      return
+                    }
                   }
-                  if (e.key === 'ArrowUp') {
+                  if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
-                    setMentionHighlight(
-                      (h) =>
-                        (h - 1 + mentionCandidates.length) %
-                        mentionCandidates.length,
-                    )
-                    return
+                    void send()
                   }
-                  if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
-                    e.preventDefault()
-                    const pick =
-                      mentionCandidates[mentionHighlight] ?? mentionCandidates[0]
-                    if (pick) insertMentionCandidate(pick)
-                    return
-                  }
-                  if (e.key === 'Escape') {
-                    e.preventDefault()
-                    setCaret(input.length)
-                    // break draft by dropping trailing incomplete token marker
-                    setInput((v) =>
-                      v.endsWith('@') || v.endsWith('^') ? v.slice(0, -1) : v,
-                    )
-                    return
-                  }
+                }}
+                placeholder={
+                  workMode && fleet.canPutOnWork
+                    ? isChannel
+                      ? BEVEL_COPY.placeholderWork(channelSlug, sampleAgent)
+                      : BEVEL_COPY.placeholderWork('session', sampleAgent)
+                    : isChannel
+                      ? BEVEL_COPY.placeholderChannel(channelSlug, sampleAgent)
+                      : sessionPlaceholder
                 }
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  void send()
-                }
-              }}
-              placeholder={
-                workMode && fleet.canPutOnWork
-                  ? isChannel
-                    ? BEVEL_COPY.placeholderWork(channelSlug, sampleAgent)
-                    : BEVEL_COPY.placeholderWork('session', sampleAgent)
-                  : isChannel
-                    ? BEVEL_COPY.placeholderChannel(channelSlug, sampleAgent)
-                    : sessionPlaceholder
-              }
-              disabled={!connected || ticketBusy}
-              className="fleet-chat-input"
-              data-overlay={hasResolvedComposerMention ? 'true' : 'false'}
-              aria-label="Message"
-              aria-autocomplete="list"
-              aria-expanded={Boolean(mentionDraft && mentionCandidates.length)}
-            />
+                disabled={!connected || ticketBusy}
+                className="fleet-chat-input"
+                aria-label="Message"
+                aria-autocomplete="list"
+                aria-expanded={Boolean(mentionDraft && mentionCandidates.length)}
+              />
             </div>
           </div>
           <button
