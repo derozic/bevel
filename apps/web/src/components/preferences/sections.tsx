@@ -803,6 +803,8 @@ export function ProfileSection() {
         org={p.org}
         jobTitle={p.jobTitle}
         location={p.location}
+        birthDate={p.birthDate}
+        joinedAt={p.joinedAt}
         photoUrl={p.photoUrl || user?.image || undefined}
         tags={tags}
         attributes={attributes}
@@ -880,12 +882,13 @@ export function ProfileSection() {
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block space-y-1 text-sm">
             <span className="font-medium text-foreground">
-              Job title (p-job-title)
+              Occupation / title (p-job-title)
             </span>
             <input
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-accent"
               value={p.jobTitle ?? ''}
               onChange={(e) => setField('jobTitle', e.target.value)}
+              placeholder="Entrepreneur"
             />
           </label>
           <label className="block space-y-1 text-sm">
@@ -908,7 +911,7 @@ export function ProfileSection() {
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-accent"
               value={p.location ?? ''}
               onChange={(e) => setField('location', e.target.value)}
-              placeholder="Portland, OR"
+              placeholder="Spokane, WA"
             />
           </label>
           <label className="block space-y-1 text-sm">
@@ -928,6 +931,32 @@ export function ProfileSection() {
               <option value="UTC" />
               <option value="Europe/London" />
             </datalist>
+          </label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1 text-sm">
+            <span className="font-medium text-foreground">Birthday</span>
+            <input
+              type="date"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-accent"
+              value={(p.birthDate ?? '').slice(0, 10)}
+              onChange={(e) => setField('birthDate', e.target.value)}
+            />
+            <span className="text-[11px] text-muted">
+              Shown as &quot;Born …&quot; on your public card (optional).
+            </span>
+          </label>
+          <label className="block space-y-1 text-sm">
+            <span className="font-medium text-foreground">Joined</span>
+            <input
+              type="date"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-accent"
+              value={(p.joinedAt ?? '').slice(0, 10)}
+              onChange={(e) => setField('joinedAt', e.target.value)}
+            />
+            <span className="text-[11px] text-muted">
+              Shown as &quot;Joined Month Year&quot; (e.g. July 2007).
+            </span>
           </label>
         </div>
         <WebsiteUrlField

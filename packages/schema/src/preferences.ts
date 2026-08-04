@@ -229,6 +229,16 @@ export const bevelUserPreferencesSchema = z.object({
     org: z.string().optional(),
     jobTitle: z.string().optional(),
     location: z.string().optional(),
+    /**
+     * Birthday as ISO date (YYYY-MM-DD). Shown as "Born …" on the public card
+     * (X / LinkedIn-style meta row). Optional; never required.
+     */
+    birthDate: z.string().optional(),
+    /**
+     * Account / community join date as ISO date (YYYY-MM-DD). Shown as "Joined …".
+     * Prefer server account created_at when available; editable for import/migrate.
+     */
+    joinedAt: z.string().optional(),
     photoUrl: z.string().optional(),
     /**
      * Capability / domain / role tags (skills, stacks, focus areas).
@@ -419,6 +429,8 @@ export function formatProfileForAgents(profile: BevelProfile): string {
   }
   if (profile.timezone?.trim()) lines.push(`Timezone: ${profile.timezone.trim()}`)
   if (profile.location?.trim()) lines.push(`Location: ${profile.location.trim()}`)
+  if (profile.birthDate?.trim()) lines.push(`Born: ${profile.birthDate.trim()}`)
+  if (profile.joinedAt?.trim()) lines.push(`Joined: ${profile.joinedAt.trim()}`)
   if (profile.tags?.length) {
     lines.push(`Tags: ${profile.tags.map((t) => t.trim()).filter(Boolean).join(', ')}`)
   }
@@ -815,6 +827,8 @@ export const DEFAULT_PREFERENCES: BevelUserPreferences = {
     org: '',
     jobTitle: '',
     location: '',
+    birthDate: '',
+    joinedAt: '',
     photoUrl: '',
     tags: [],
     attributes: [],

@@ -1,7 +1,15 @@
 'use client'
 
 import {
+  BriefcaseIcon,
+  CalendarDaysIcon,
+  CakeIcon,
+  MapPinIcon,
+} from '@heroicons/react/24/outline'
+import {
   SOCIAL_NETWORKS,
+  formatBornLabel,
+  formatJoinedLabel,
   validateHttpUrl,
   validateSocialUrl,
   type SocialNetworkId,
@@ -11,6 +19,7 @@ import {
  * Visible h-card (microformats2) + schema.org Person for the member profile.
  * Socials use rel=me (IndieWeb). Default networks: X, Instagram, TikTok, YouTube.
  * Tags / attributes surface agent-facing capability context in the card preview.
+ * Meta strip mirrors X profile (role · place · born · joined).
  * Only valid endpoints are rendered (invalid drafts stay out of rel=me).
  * @see https://microformats.org/wiki/h-card
  * @see https://indieweb.org/rel-me
@@ -31,6 +40,8 @@ export function HCardProfile({
   org,
   jobTitle,
   location,
+  birthDate,
+  joinedAt,
   photoUrl,
   tags = [],
   attributes = [],
@@ -51,6 +62,8 @@ export function HCardProfile({
   org?: string
   jobTitle?: string
   location?: string
+  birthDate?: string
+  joinedAt?: string
   photoUrl?: string
   tags?: string[]
   attributes?: { key: string; value: string }[]
@@ -155,37 +168,75 @@ export function HCardProfile({
               </span>
             ) : null}
           </div>
-          {jobTitle || org ? (
+          {org && !jobTitle ? (
             <p className="text-sm text-muted">
-              {jobTitle ? (
-                <span className="p-job-title" itemProp="jobTitle">
-                  {jobTitle}
-                </span>
-              ) : null}
-              {jobTitle && org ? ' · ' : null}
-              {org ? (
-                <span className="p-org org" itemProp="worksFor">
-                  {org}
-                </span>
-              ) : null}
+              <span className="p-org org" itemProp="worksFor">
+                {org}
+              </span>
             </p>
           ) : null}
-          {location || timezone ? (
+          {timezone && !location ? (
             <p className="text-xs text-muted">
-              {location ? (
-                <span
-                  className="p-locality locality"
-                  itemProp="homeLocation"
-                >
-                  {location}
-                </span>
-              ) : null}
-              {location && timezone ? ' · ' : null}
-              {timezone ? <span>{timezone}</span> : null}
+              <span>{timezone}</span>
             </p>
           ) : null}
         </div>
       </div>
+
+      {/* X-style meta row: role · place · born · joined */}
+      {(() => {
+        const born = formatBornLabel(birthDate)
+        const joined = formatJoinedLabel(joinedAt)
+        const roleLabel =
+          jobTitle?.trim() && org?.trim()
+            ? `${jobTitle.trim()} · ${org.trim()}`
+            : jobTitle?.trim() || ''
+        const hasMeta =
+          Boolean(roleLabel) || Boolean(location?.trim()) || Boolean(born) || Boolean(joined)
+        if (!hasMeta) return null
+        return (
+          <ul
+            className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted"
+            aria-label="Profile details"
+          >
+            {roleLabel ? (
+              <li className="inline-flex items-center gap-1.5">
+                <BriefcaseIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+                <span className="p-job-title" itemProp="jobTitle">
+                  {roleLabel}
+                </span>
+              </li>
+            ) : null}
+            {location?.trim() ? (
+              <li className="inline-flex items-center gap-1.5">
+                <MapPinIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+                <span className="p-locality locality" itemProp="homeLocation">
+                  {location.trim()}
+                  {timezone?.trim() ? ` · ${timezone.trim()}` : ''}
+                </span>
+              </li>
+            ) : null}
+            {born ? (
+              <li className="inline-flex items-center gap-1.5">
+                <CakeIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+                <time
+                  className="dt-bday"
+                  dateTime={birthDate?.trim() || undefined}
+                  itemProp="birthDate"
+                >
+                  {born}
+                </time>
+              </li>
+            ) : null}
+            {joined ? (
+              <li className="inline-flex items-center gap-1.5">
+                <CalendarDaysIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+                <time dateTime={joinedAt?.trim() || undefined}>{joined}</time>
+              </li>
+            ) : null}
+          </ul>
+        )
+      })()}
 
       {bio ? (
         <p

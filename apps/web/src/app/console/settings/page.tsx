@@ -5,12 +5,20 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useSession } from "next-auth/react";
 import {
+  formatBornLabel,
+  formatJoinedLabel,
+} from "@bevel/schema";
+import {
   Brain,
+  Briefcase,
+  Cake,
+  CalendarDays,
   Check,
   Eye,
   EyeOff,
   KeyRound,
   Loader2,
+  MapPin,
   Save,
   Settings,
   ShieldCheck,
@@ -18,8 +26,10 @@ import {
   Sparkles,
   Trash2,
   User,
+  X,
   Zap,
 } from "lucide-react";
+import { usePreferencesOptional } from "@/components/preferences/PreferencesProvider";
 
 type ProviderId = "claude" | "openai" | "gemini" | "grok" | "kimi";
 
@@ -111,8 +121,17 @@ function mapProviders(apiProviders: ApiSettings["providers"]): ProviderState {
   return next;
 }
 
+function normalizeTag(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^#+/, "")
+    .replace(/\s+/g, "-")
+    .toLowerCase();
+}
+
 export default function DashboardSettingsPage() {
   const { data: session } = useSession();
+  const prefsCtx = usePreferencesOptional();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [savePhase, setSavePhase] = useState<"idle" | "settings" | "validating">("idle");
@@ -121,6 +140,13 @@ export default function DashboardSettingsPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [profileName, setProfileName] = useState("");
   const [profileHandle, setProfileHandle] = useState("");
+  const [bio, setBio] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [location, setLocation] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [joinedAt, setJoinedAt] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
   const [activeProvider, setActiveProvider] = useState<ProviderId>("claude");
   const [providerState, setProviderState] = useState<ProviderState>(EMPTY_PROVIDERS);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
@@ -145,10 +171,23 @@ export default function DashboardSettingsPage() {
         const data = (await response.json()) as ApiSettings;
         if (cancelled) return;
 
+        const profile = prefsCtx?.prefs.profile;
         setProfileName(
-          data.profile_name || session?.user?.name || session?.user?.email?.split("@")[0] || "",
+          profile?.displayName ||
+            data.profile_name ||
+            session?.user?.name ||
+            session?.user?.email?.split("@")[0] ||
+            "",
         );
-        setProfileHandle(data.profile_handle || session?.user?.email?.split("@")[0] || "");
+        setProfileHandle(
+          profile?.handle || data.profile_handle || session?.user?.email?.split("@")[0] || "",
+        );
+        setBio(profile?.bio ?? "");
+        setJobTitle(profile?.jobTitle ?? "");
+        setLocation(profile?.location ?? "");
+        setBirthDate((profile?.birthDate ?? "").slice(0, 10));
+        setJoinedAt((profile?.joinedAt ?? "").slice(0, 10));
+        setTags(profile?.tags ?? []);
         setActiveProvider(data.active_provider || "claude");
         setProviderState(mapProviders(data.providers || {}));
         setDebugLogs(data.debug_logs ?? true);
@@ -156,8 +195,19 @@ export default function DashboardSettingsPage() {
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error instanceof Error ? error.message : "Failed to load settings.");
-          setProfileName(session?.user?.name || session?.user?.email?.split("@")[0] || "");
-          setProfileHandle(session?.user?.email?.split("@")[0] || "");
+          const profile = prefsCtx?.prefs.profile;
+          setProfileName(
+            profile?.displayName || session?.user?.name || session?.user?.email?.split("@")[0] || "",
+          );
+          setProfileHandle(
+            profile?.handle || session?.user?.email?.split("@")[0] || "",
+          );
+          setBio(profile?.bio ?? "");
+          setJobTitle(profile?.jobTitle ?? "");
+          setLocation(profile?.location ?? "");
+          setBirthDate((profile?.birthDate ?? "").slice(0, 10));
+          setJoinedAt((profile?.joinedAt ?? "").slice(0, 10));
+          setTags(profile?.tags ?? []);
         }
       } finally {
         if (!cancelled) {
@@ -170,7 +220,9 @@ export default function DashboardSettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.email, session?.user?.name]);
+    // Hydrate once when session/prefs become available
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.email, session?.user?.name, Boolean(prefsCtx)]);
 
   const selectedProvider = useMemo(
     () => PROVIDERS.find((provider) => provider.id === activeProvider) || PROVIDERS[0],
@@ -186,6 +238,23 @@ export default function DashboardSettingsPage() {
     setStatusMessage("");
 
     try {
+      // Shared profile vault (bio / tags / meta) — same store as workspace Settings → Profile
+      if (prefsCtx) {
+        prefsCtx.updatePrefs({
+          profile: {
+            displayName: profileName,
+            handle: profileHandle.replace(/^@/, ""),
+            bio,
+            jobTitle,
+            location,
+            birthDate,
+            joinedAt,
+            tags,
+          },
+        });
+        prefsCtx.saveNow();
+      }
+
       const settingsResponse = await fetch("/api/me/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -359,12 +428,146 @@ export default function DashboardSettingsPage() {
                     <input
                       type="text"
                       value={profileHandle}
-                      onChange={(event) => setProfileHandle(event.target.value)}
+                      onChange={(event) => setProfileHandle(event.target.value.replace(/^@/, ""))}
                       className="w-full rounded-lg border border-border bg-background py-2 pl-7 pr-3 font-mono text-sm text-text outline-none focus:border-primary-500"
                       required
                     />
                   </div>
                 </label>
+              </div>
+
+              <label className="mt-4 block space-y-2">
+                <span className="text-xs font-medium text-text-muted">Bio</span>
+                <textarea
+                  value={bio}
+                  onChange={(event) => setBio(event.target.value.slice(0, 280))}
+                  maxLength={280}
+                  rows={3}
+                  placeholder="One or two lines for your public card and agent context."
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary-500"
+                />
+                <span className="text-[11px] text-text-faint">{bio.length}/280</span>
+              </label>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-xs font-medium text-text-muted">Occupation / title</span>
+                  <input
+                    type="text"
+                    value={jobTitle}
+                    onChange={(event) => setJobTitle(event.target.value)}
+                    placeholder="Entrepreneur"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary-500"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-medium text-text-muted">Location</span>
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(event) => setLocation(event.target.value)}
+                    placeholder="Spokane, WA"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary-500"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-medium text-text-muted">Birthday</span>
+                  <input
+                    type="date"
+                    value={birthDate}
+                    onChange={(event) => setBirthDate(event.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary-500"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-medium text-text-muted">Joined</span>
+                  <input
+                    type="date"
+                    value={joinedAt}
+                    onChange={(event) => setJoinedAt(event.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary-500"
+                  />
+                </label>
+              </div>
+
+              {/* X-style live meta preview */}
+              {(jobTitle || location || birthDate || joinedAt) && (
+                <ul
+                  className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-text-muted"
+                  aria-label="Profile meta preview"
+                >
+                  {jobTitle.trim() ? (
+                    <li className="inline-flex items-center gap-1.5">
+                      <Briefcase className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                      <span>{jobTitle.trim()}</span>
+                    </li>
+                  ) : null}
+                  {location.trim() ? (
+                    <li className="inline-flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                      <span>{location.trim()}</span>
+                    </li>
+                  ) : null}
+                  {formatBornLabel(birthDate) ? (
+                    <li className="inline-flex items-center gap-1.5">
+                      <Cake className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                      <span>{formatBornLabel(birthDate)}</span>
+                    </li>
+                  ) : null}
+                  {formatJoinedLabel(joinedAt) ? (
+                    <li className="inline-flex items-center gap-1.5">
+                      <CalendarDays className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                      <span>{formatJoinedLabel(joinedAt)}</span>
+                    </li>
+                  ) : null}
+                </ul>
+              )}
+
+              <div className="mt-4 space-y-2">
+                <span className="text-xs font-medium text-text-muted">Tags</span>
+                <p className="text-[11px] text-text-faint">
+                  Skills, stacks, focus areas. Press Enter or comma to add.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
+                      className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/60 px-2.5 py-1 text-xs font-medium text-text transition hover:border-error/40 hover:bg-error/10"
+                      title={`Remove ${tag}`}
+                    >
+                      {tag}
+                      <X className="h-3 w-3 opacity-70" aria-hidden />
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={tagDraft}
+                  onChange={(event) => setTagDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === ",") {
+                      event.preventDefault();
+                      const next = normalizeTag(tagDraft.replace(/,/g, ""));
+                      if (next && !tags.includes(next)) {
+                        setTags((prev) => [...prev, next]);
+                      }
+                      setTagDraft("");
+                    } else if (event.key === "Backspace" && !tagDraft && tags.length > 0) {
+                      setTags((prev) => prev.slice(0, -1));
+                    }
+                  }}
+                  onBlur={() => {
+                    const next = normalizeTag(tagDraft);
+                    if (next && !tags.includes(next)) {
+                      setTags((prev) => [...prev, next]);
+                    }
+                    setTagDraft("");
+                  }}
+                  placeholder="e.g. typescript, product, founder"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary-500"
+                />
               </div>
             </section>
 
