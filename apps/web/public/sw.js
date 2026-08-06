@@ -1,6 +1,15 @@
-/* BEVEL service worker — install shell + show agent program notifications */
-const CACHE = 'bevel-shell-v4'
-const PRECACHE = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png']
+/* BEVEL service worker — static shell cache + agent program notifications.
+ *
+ * IMPORTANT: Do NOT intercept document navigations. Caching `/` (a 307 to login)
+ * or replaying redirect responses caused ERR_TOO_MANY_REDIRECTS in Chrome when
+ * stale session cookies were present. Navigations always hit the network.
+ */
+const CACHE = 'bevel-shell-v5'
+const PRECACHE = [
+  '/manifest.webmanifest',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+]
 
 function safeResponse(value) {
   if (value instanceof Response) return value
@@ -37,48 +46,40 @@ self.addEventListener('fetch', (event) => {
     return
   }
   if (url.origin !== self.location.origin) return
-  // Never intercept API / Next internals / auth (avoids broken RSC + opaque errors)
+
+  // Never touch API, auth, Next internals, or document navigations.
   if (
+    request.mode === 'navigate' ||
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/_next/') ||
-    url.pathname.startsWith('/auth/')
+    url.pathname.startsWith('/auth/') ||
+    url.pathname.startsWith('/login') ||
+    url.pathname.startsWith('/welcome') ||
+    url.pathname.startsWith('/workspaces')
   ) {
     return
   }
 
-  if (request.mode === 'navigate') {
+  // Icons / manifest only — network-first with cache fill.
+  if (
+    url.pathname.startsWith('/icons/') ||
+    url.pathname === '/manifest.webmanifest'
+  ) {
     event.respondWith(
       fetch(request)
-        .then((res) => safeResponse(res))
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone()
+            caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => undefined)
+          }
+          return safeResponse(res)
+        })
         .catch(async () => {
-          const hit = await caches.match('/')
+          const hit = await caches.match(request)
           return safeResponse(hit)
         }),
     )
-    return
   }
-
-  event.respondWith(
-    fetch(request)
-      .then((res) => {
-        if (
-          res &&
-          res.ok &&
-          (url.pathname.startsWith('/icons/') ||
-            url.pathname === '/manifest.webmanifest')
-        ) {
-          const copy = res.clone()
-          caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => undefined)
-        }
-        return safeResponse(res)
-      })
-      .catch(async () => {
-        const hit = await caches.match(request)
-        if (hit) return hit
-        const home = await caches.match('/')
-        return safeResponse(home)
-      }),
-  )
 })
 
 /** Client → SW: show a desktop notification for agent program events */

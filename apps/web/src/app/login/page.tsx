@@ -56,6 +56,7 @@ export default async function LoginPage({
   const errorMessage = errorKey
     ? (ERROR_COPY[errorKey] ?? ERROR_COPY.Default)
     : null
+  // Surface a clear-session escape when Auth.js reports JWT/session breakage.
 
   const headerStore = await headers()
   const host = (
@@ -77,15 +78,29 @@ export default async function LoginPage({
   const isPlatformTenant = isPlatformEntryTenantSlug(tenant.slug)
   const isPlatform = platformEntry || isPlatformTenant
 
-  const callbackUrl =
+  // Never allow callbackUrl to point back at the auth funnel (redirect loops).
+  const rawCallback =
     params.callbackUrl &&
     params.callbackUrl.startsWith('/') &&
     !params.callbackUrl.startsWith('//')
       ? params.callbackUrl
       : '/welcome'
+  const callbackPathOnly = rawCallback.split('?')[0] || '/welcome'
+  const unsafeCallbacks = new Set([
+    '/login',
+    '/welcome',
+    '/api/auth',
+    '/api/auth/signin',
+    '/api/auth/callback',
+  ])
+  const callbackUrl = unsafeCallbacks.has(callbackPathOnly)
+    ? '/workspaces'
+    : rawCallback
 
-  // Honor callbackUrl when already signed in (e.g. /login?callbackUrl=/claim).
-  if (session?.user) {
+  // Honor callbackUrl only when the session is complete (email present).
+  // A partial session (user without email) used to bounce:
+  // login → /welcome → login (ERR_TOO_MANY_REDIRECTS).
+  if (session?.user?.email) {
     redirect(callbackUrl)
   }
 
@@ -174,9 +189,19 @@ export default async function LoginPage({
       {errorMessage ? (
         <div
           role="alert"
-          className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="mt-6 space-y-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
         >
-          {errorMessage}
+          <p>{errorMessage}</p>
+          <p className="text-xs text-red-700">
+            Stuck in a redirect loop?{' '}
+            <a
+              className="font-semibold underline underline-offset-2"
+              href="/login?clear=1"
+            >
+              Clear session cookies and try again
+            </a>
+            .
+          </p>
         </div>
       ) : null}
 

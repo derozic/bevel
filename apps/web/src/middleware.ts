@@ -116,13 +116,49 @@ function channelTildeRedirect(request: NextRequest, slug: string): NextResponse 
   return NextResponse.redirect(target, 308)
 }
 
+/** Cookie domains to clear (host-only + parent registrable domains). */
+function cookieDomainCandidates(request: NextRequest): (string | undefined)[] {
+  const host = (
+    request.headers.get('x-forwarded-host') ??
+    request.headers.get('host') ??
+    ''
+  )
+    .split(',')[0]
+    ?.trim()
+    .toLowerCase()
+    .split(':')[0]
+  const out: (string | undefined)[] = [undefined]
+  if (host?.endsWith('.2x4m.cc') || host === '2x4m.cc') out.push('.2x4m.cc')
+  if (host?.endsWith('.bevel.is') || host === 'bevel.is') out.push('.bevel.is')
+  const envDomain =
+    process.env.AUTH_COOKIE_DOMAIN || process.env.NEXTAUTH_COOKIE_DOMAIN
+  if (envDomain && !out.includes(envDomain)) out.push(envDomain)
+  return out
+}
+
+function expireCookie(
+  response: NextResponse,
+  name: string,
+  domain: string | undefined,
+): void {
+  response.cookies.set(name, '', {
+    path: '/',
+    maxAge: 0,
+    expires: new Date(0),
+    httpOnly: true,
+    secure: name.startsWith('__Secure-') || name.startsWith('__Host-'),
+    sameSite: 'lax',
+    ...(domain ? { domain } : {}),
+  })
+}
+
 /**
  * Expire Domain-scoped OAuth check cookies left by older deploys.
  */
-function expireStaleDomainOAuthCookies(response: NextResponse): void {
-  const domain =
-    process.env.AUTH_COOKIE_DOMAIN || process.env.NEXTAUTH_COOKIE_DOMAIN
-  if (!domain) return
+function expireStaleDomainOAuthCookies(
+  response: NextResponse,
+  request: NextRequest,
+): void {
   const names = [
     '__Secure-authjs.pkce.code_verifier',
     '__Secure-authjs.state',
@@ -130,19 +166,64 @@ function expireStaleDomainOAuthCookies(response: NextResponse): void {
     'authjs.pkce.code_verifier',
     'authjs.state',
     'authjs.nonce',
+    '__Secure-authjs.state.v2',
+    '__Secure-authjs.nonce.v2',
+    'authjs.state.v2',
+    'authjs.nonce.v2',
   ]
-  for (const name of names) {
-    response.cookies.set(name, '', {
-      path: '/',
-      maxAge: 0,
-      expires: new Date(0),
-      httpOnly: true,
-      secure: name.startsWith('__Secure-') || name.startsWith('__Host-'),
-      sameSite: 'lax',
-      domain,
-    })
+  for (const domain of cookieDomainCandidates(request)) {
+    for (const name of names) {
+      expireCookie(response, name, domain)
+    }
   }
 }
+
+/**
+ * Blow away session tokens (corrupt JWE / secret rotation). Call on /login?clear=1
+ * or auth errors so users escape ERR_TOO_MANY_REDIRECTS without manual cookie UI.
+ */
+function expireSessionCookies(
+  response: NextResponse,
+  request: NextRequest,
+): void {
+  const names = [
+    'authjs.session-token',
+    '__Secure-authjs.session-token',
+    'authjs.session-token.0',
+    'authjs.session-token.1',
+    '__Secure-authjs.session-token.0',
+    '__Secure-authjs.session-token.1',
+    'next-auth.session-token',
+    '__Secure-next-auth.session-token',
+    'next-auth.session-token.0',
+    'next-auth.session-token.1',
+    '__Secure-next-auth.session-token.0',
+    '__Secure-next-auth.session-token.1',
+    'authjs.callback-url',
+    '__Secure-authjs.callback-url',
+    'next-auth.callback-url',
+    '__Secure-next-auth.callback-url',
+    'authjs.csrf-token',
+    '__Host-authjs.csrf-token',
+    'next-auth.csrf-token',
+    '__Host-next-auth.csrf-token',
+  ]
+  for (const domain of cookieDomainCandidates(request)) {
+    for (const name of names) {
+      expireCookie(response, name, domain)
+    }
+  }
+  expireStaleDomainOAuthCookies(response, request)
+}
+
+/** App routes under /bevel/* that must NOT be treated as channel slugs. */
+const BEVEL_RESERVED_SEGMENTS = new Set([
+  'me',
+  'talk',
+  'session',
+  'timeline',
+  'c',
+])
 
 /**
  * Middleware:
@@ -152,11 +233,28 @@ function expireStaleDomainOAuthCookies(response: NextResponse): void {
  * - Stamp tenant host
  */
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, searchParams } = request.nextUrl
 
   if (pathname.startsWith('/api/auth')) {
     const res = NextResponse.next()
-    expireStaleDomainOAuthCookies(res)
+    expireStaleDomainOAuthCookies(res, request)
+    return res
+  }
+
+  // Escape hatch: clear corrupt session JWTs (Invalid Compact JWE) that cause
+  // ERR_TOO_MANY_REDIRECTS when Auth.js partially decrypts old cookies.
+  const clearSession =
+    searchParams.get('clear') === '1' || searchParams.get('clear') === 'session'
+  if (pathname === '/login' && (clearSession || Boolean(searchParams.get('error')))) {
+    const res = NextResponse.next()
+    expireSessionCookies(res, request)
+    return res
+  }
+  if (clearSession) {
+    const clean = request.nextUrl.clone()
+    clean.searchParams.delete('clear')
+    const res = NextResponse.redirect(clean, 302)
+    expireSessionCookies(res, request)
     return res
   }
 
@@ -198,6 +296,14 @@ export function middleware(request: NextRequest) {
         publicOrigin(request),
       )
       return NextResponse.redirect(url, 308)
+    }
+    // Private space / timeline are app routes, not channel slugs
+    const first = rest.split('/')[0] || ''
+    if (BEVEL_RESERVED_SEGMENTS.has(first.toLowerCase()) && first !== 'c') {
+      return withTenantResolution(request, {
+        publicPaths: PUBLIC_PATHS,
+        unknownTenantUrl: process.env.BEVEL_UNKNOWN_TENANT_URL,
+      })
     }
     if (rest.startsWith('c/')) {
       const slug = rest.slice(2).split('/')[0] || 'general'
