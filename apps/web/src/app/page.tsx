@@ -27,9 +27,10 @@ export default async function Page() {
     .split(':')[0]
 
   // Apex platform entry (bevel.is) — welcome routes to picker or private.
+  // Require email so partial JWTs cannot loop login ↔ welcome.
   if (isPlatformEntryHost(host)) {
     const session = await auth()
-    if (session?.user) redirect('/welcome')
+    if (session?.user?.email) redirect('/welcome')
     redirect('/login?callbackUrl=%2Fwelcome')
   }
 
@@ -43,7 +44,7 @@ export default async function Page() {
   const session = await auth()
 
   // Signed-in org host → default channel (tilde path, never encoded)
-  if (session?.user) {
+  if (session?.user?.email) {
     redirect(BEVEL_HOME_PATH)
   }
 

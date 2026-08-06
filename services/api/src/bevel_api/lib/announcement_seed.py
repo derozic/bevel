@@ -61,11 +61,11 @@ SEED: list[dict[str, Any]] = [
         "title": "Action may be required:",
         "body": (
             "Complete your profile so teammates and agents know who you are — "
-            "display name, handle, and socials."
+            "display name, handle, short bio (280 chars), and socials."
         ),
         "icon": "user-group",
         "linkLabel": "Open profile",
-        "linkHref": "/settings?section=profile",
+        "linkHref": "/console/settings?section=profile#profile-bio",
         "linkKind": "app",
         "ctaVariant": "link",
         "placement": "bottom",

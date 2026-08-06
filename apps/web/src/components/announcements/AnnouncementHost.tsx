@@ -81,7 +81,7 @@ function resolveNextStep(input: {
       title: 'Action may be required:',
       body: 'Add your display name and handle so teammates and agents know who you are in this workspace.',
       linkLabel: 'Complete profile',
-      linkHref: '/settings?section=profile',
+      linkHref: '/console/settings?section=profile',
       icon: 'user-group',
     }
   }
@@ -89,9 +89,9 @@ function resolveNextStep(input: {
   if (!bio) {
     return {
       title: 'Action may be required:',
-      body: 'Write a short bio on your profile — it shows on your h-card and helps agents address you correctly.',
-      linkLabel: 'Edit profile',
-      linkHref: '/settings?section=profile',
+      body: 'Write a short bio (X-length, 280 chars) — p-note on your h-card so teammates and agents know who you are.',
+      linkLabel: 'Add bio',
+      linkHref: '/console/settings?section=profile#profile-bio',
       icon: 'user-group',
     }
   }
@@ -101,7 +101,7 @@ function resolveNextStep(input: {
       title: 'Action may be required:',
       body: 'Link at least one social (X, Instagram, TikTok, or YouTube) with rel=me on your profile.',
       linkLabel: 'Add socials',
-      linkHref: '/settings?section=profile',
+      linkHref: '/console/settings?section=profile',
       icon: 'link',
     }
   }

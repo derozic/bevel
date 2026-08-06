@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
+import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   Brain,
@@ -20,6 +21,12 @@ import {
   User,
   Zap,
 } from "lucide-react";
+import { HCardProfile } from "@/components/preferences/HCardProfile";
+import { usePreferencesOptional } from "@/components/preferences/PreferencesProvider";
+import {
+  loadPreferences,
+  savePreferences,
+} from "@/lib/preferences/storage";
 
 type ProviderId = "claude" | "openai" | "gemini" | "grok" | "kimi";
 
@@ -111,8 +118,13 @@ function mapProviders(apiProviders: ApiSettings["providers"]): ProviderState {
   return next;
 }
 
+/** X / Twitter bio length — same limit as h-card p-note in preferences. */
+const BIO_MAX = 280;
+
 export default function DashboardSettingsPage() {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const prefs = usePreferencesOptional();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [savePhase, setSavePhase] = useState<"idle" | "settings" | "validating">("idle");
@@ -121,6 +133,7 @@ export default function DashboardSettingsPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [profileName, setProfileName] = useState("");
   const [profileHandle, setProfileHandle] = useState("");
+  const [profileBio, setProfileBio] = useState("");
   const [activeProvider, setActiveProvider] = useState<ProviderId>("claude");
   const [providerState, setProviderState] = useState<ProviderState>(EMPTY_PROVIDERS);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
@@ -129,6 +142,24 @@ export default function DashboardSettingsPage() {
   const [naturalLanguage, setNaturalLanguage] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+
+  const section = (searchParams.get("section") || "").toLowerCase();
+  const tenantSlug = session?.tenantSlug || "2x4m";
+  const userId = session?.user?.id || session?.user?.email || "anon";
+
+  // Deep-link from announcements: open full prefs profile when available, and
+  // scroll to the on-page bio field.
+  useEffect(() => {
+    if (section !== "profile") return;
+    prefs?.openSection("profile");
+    const t = window.setTimeout(() => {
+      document.getElementById("profile-bio")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [section, prefs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,10 +176,23 @@ export default function DashboardSettingsPage() {
         const data = (await response.json()) as ApiSettings;
         if (cancelled) return;
 
+        const local = loadPreferences(tenantSlug, userId);
+        const fromPrefs = local.profile;
+
         setProfileName(
-          data.profile_name || session?.user?.name || session?.user?.email?.split("@")[0] || "",
+          fromPrefs.displayName ||
+            data.profile_name ||
+            session?.user?.name ||
+            session?.user?.email?.split("@")[0] ||
+            "",
         );
-        setProfileHandle(data.profile_handle || session?.user?.email?.split("@")[0] || "");
+        setProfileHandle(
+          (fromPrefs.handle || data.profile_handle || session?.user?.email?.split("@")[0] || "").replace(
+            /^@/,
+            "",
+          ),
+        );
+        setProfileBio((fromPrefs.bio || "").slice(0, BIO_MAX));
         setActiveProvider(data.active_provider || "claude");
         setProviderState(mapProviders(data.providers || {}));
         setDebugLogs(data.debug_logs ?? true);
@@ -156,8 +200,17 @@ export default function DashboardSettingsPage() {
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error instanceof Error ? error.message : "Failed to load settings.");
-          setProfileName(session?.user?.name || session?.user?.email?.split("@")[0] || "");
-          setProfileHandle(session?.user?.email?.split("@")[0] || "");
+          const local = loadPreferences(tenantSlug, userId);
+          setProfileName(
+            local.profile.displayName ||
+              session?.user?.name ||
+              session?.user?.email?.split("@")[0] ||
+              "",
+          );
+          setProfileHandle(
+            (local.profile.handle || session?.user?.email?.split("@")[0] || "").replace(/^@/, ""),
+          );
+          setProfileBio((local.profile.bio || "").slice(0, BIO_MAX));
         }
       } finally {
         if (!cancelled) {
@@ -170,7 +223,7 @@ export default function DashboardSettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.email, session?.user?.name]);
+  }, [session?.user?.email, session?.user?.name, session?.user?.id, tenantSlug, userId]);
 
   const selectedProvider = useMemo(
     () => PROVIDERS.find((provider) => provider.id === activeProvider) || PROVIDERS[0],
@@ -186,12 +239,46 @@ export default function DashboardSettingsPage() {
     setStatusMessage("");
 
     try {
+      const bio = profileBio.trim().slice(0, BIO_MAX);
+      const handle = profileHandle.trim().replace(/^@/, "");
+
+      // Persist h-card profile (bio = p-note) into the same prefs store the
+      // announcement banner and Preferences panel read.
+      const current = loadPreferences(tenantSlug, userId);
+      const nextPrefs = {
+        ...current,
+        profile: {
+          ...current.profile,
+          displayName: profileName.trim(),
+          handle,
+          bio,
+        },
+      };
+      savePreferences(tenantSlug, userId, nextPrefs);
+      if (prefs?.setPrefs) {
+        prefs.setPrefs(nextPrefs);
+      }
+
+      void fetch("/api/me/profile", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          handle: handle || undefined,
+          name: profileName.trim() || undefined,
+          tenantId: tenantSlug || undefined,
+        }),
+      }).catch(() => {
+        /* local prefs still saved */
+      });
+
       const settingsResponse = await fetch("/api/me/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile_name: profileName,
           profile_handle: profileHandle,
+          profile_bio: bio,
           active_provider: activeProvider,
           debug_logs: debugLogs,
           natural_language: naturalLanguage,
@@ -335,36 +422,112 @@ export default function DashboardSettingsPage() {
       ) : (
         <form onSubmit={handleSaveSettings} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
-            <section className="rounded-lg border border-border/80 bg-surface/30 p-5">
+            <section
+              id="profile"
+              className="rounded-lg border border-border/80 bg-surface/30 p-5"
+            >
               <h2 className="flex items-center gap-2 border-b border-border/40 pb-3 text-sm font-bold text-text">
                 <User className="h-5 w-5 text-primary-400" />
-                Developer profile
+                Profile
+                <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-text-faint">
+                  h-card · schema.org/Person
+                </span>
               </h2>
+
+              <p className="mt-3 text-xs leading-5 text-text-muted">
+                Public identity for teammates and agents. Short bio uses the same length as X
+                (Twitter) — 280 characters — and is published as microformats2{" "}
+                <code className="font-mono text-primary-300">p-note</code> / schema.org{" "}
+                <code className="font-mono text-primary-300">description</code>.
+              </p>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-xs font-medium text-text-muted">Display name</span>
+                  <span className="text-xs font-medium text-text-muted">
+                    Display name{" "}
+                    <span className="font-mono text-text-faint">(p-name)</span>
+                  </span>
                   <input
                     type="text"
                     value={profileName}
                     onChange={(event) => setProfileName(event.target.value)}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary-500"
                     required
+                    autoComplete="name"
                   />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs font-medium text-text-muted">CLI handle</span>
+                  <span className="text-xs font-medium text-text-muted">
+                    Handle{" "}
+                    <span className="font-mono text-text-faint">(p-nickname)</span>
+                  </span>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs text-text-faint">@</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs text-text-faint">
+                      @
+                    </span>
                     <input
                       type="text"
                       value={profileHandle}
-                      onChange={(event) => setProfileHandle(event.target.value)}
+                      onChange={(event) =>
+                        setProfileHandle(event.target.value.replace(/^@/, ""))
+                      }
                       className="w-full rounded-lg border border-border bg-background py-2 pl-7 pr-3 font-mono text-sm text-text outline-none focus:border-primary-500"
                       required
+                      autoComplete="username"
                     />
                   </div>
                 </label>
+              </div>
+
+              <label id="profile-bio" className="mt-4 block space-y-2 scroll-mt-24">
+                <span className="flex items-center justify-between text-xs font-medium text-text-muted">
+                  <span>
+                    Bio{" "}
+                    <span className="font-mono text-text-faint">(p-note)</span>
+                  </span>
+                  <span
+                    className={
+                      profileBio.length >= BIO_MAX
+                        ? "font-mono text-amber-400"
+                        : "font-mono text-text-faint"
+                    }
+                  >
+                    {profileBio.length}/{BIO_MAX}
+                  </span>
+                </span>
+                <textarea
+                  value={profileBio}
+                  onChange={(event) =>
+                    setProfileBio(event.target.value.slice(0, BIO_MAX))
+                  }
+                  maxLength={BIO_MAX}
+                  rows={3}
+                  placeholder="One or two lines — who you are, what you ship, how agents should address you."
+                  className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed text-text outline-none focus:border-primary-500"
+                />
+                <span className="block text-[11px] leading-4 text-text-faint">
+                  Same length as an X bio. Shows on your public h-card and feeds agent context.
+                </span>
+              </label>
+
+              <div className="mt-5">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-text-faint">
+                  Live h-card preview
+                </p>
+                <HCardProfile
+                  displayName={profileName}
+                  handle={profileHandle}
+                  bio={profileBio}
+                  email={session?.user?.email}
+                  emailPublic={false}
+                  photoUrl={session?.user?.image || undefined}
+                  socials={{
+                    x: "",
+                    instagram: "",
+                    tiktok: "",
+                    youtube: "",
+                  }}
+                />
               </div>
             </section>
 
