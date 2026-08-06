@@ -68,7 +68,10 @@ See [docs/NATIVE_RELEASE.md](../../docs/NATIVE_RELEASE.md).
 
 Override to local Caddy with `BEVEL_ENV=local` or `pnpm mobile:run:macos:local`.
 
-First login uses system browser Google OAuth (`bevel://auth/complete` return). Full cookie inject into WKWebView is the next reliability milestone.
+First login uses system browser Google OAuth → `/api/auth/native-complete` mints a
+one-time handoff code → `bevel://auth/complete?code=…` → the in-app WebView redeems
+`/api/auth/handoff` on the **workspace host** so Auth.js cookies land in the WebView
+jar (Safari cookies are never shared with WKWebView).
 
 ## Version
 

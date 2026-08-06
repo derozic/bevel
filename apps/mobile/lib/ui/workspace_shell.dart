@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,6 +9,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../config.dart';
 import '../native/hermes_bridge.dart';
 import '../native/oauth_browser.dart';
+import '../native/session_bridge.dart';
 import '../native/sharing_service.dart';
 import 'layout/bevel_breakpoints.dart';
 import 'layout/workspace_rail.dart';
@@ -13,17 +17,32 @@ import 'layout/workspace_rail.dart';
 /// In-app workspace browser (WKWebView on macOS / iOS, WebView on Android).
 ///
 /// Expanded layouts (iPad Pro, Fold inner, tablets) show a native rail + WebView.
+///
+/// Auth: when [handoffCode] is set, loads workspace `/api/auth/handoff` first so
+/// Auth.js cookies land in the WebView jar (Safari cookies are never shared).
 class WorkspaceShellPage extends StatefulWidget {
   const WorkspaceShellPage({
     super.key,
-    this.initialPath = '/',
+    this.initialPath = '/~general',
+    this.handoffCode,
+    this.workspaceHost,
     this.hermes,
     this.onOpenNativeHub,
+    this.onSessionState,
+    this.onPathChanged,
   });
 
   final String initialPath;
+  /// One-time handoff code from `bevel://auth/complete?code=…`.
+  final String? handoffCode;
+  /// Optional host override (e.g. bevel.2x4m.cc) from native-complete.
+  final String? workspaceHost;
   final HermesBridge? hermes;
   final VoidCallback? onOpenNativeHub;
+  /// Called after session probe (authenticated or not).
+  final void Function(bool healthy, String? email)? onSessionState;
+  /// Persist last workspace path for relaunch restore.
+  final void Function(String path)? onPathChanged;
 
   @override
   State<WorkspaceShellPage> createState() => _WorkspaceShellPageState();
@@ -38,11 +57,49 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   String? _title;
   String? _error;
   Uri? _currentUri;
+  var _sessionChecked = false;
+  var _sessionHealthy = false;
+  var _authRetryUsed = false;
+  List<(String, String)> _channels = const [
+    ('general', 'General'),
+    ('ops', 'Ops'),
+    ('product', 'Product'),
+  ];
+
+  String get _callbackPath {
+    final p = widget.initialPath.trim();
+    if (p.isEmpty) return '/~general';
+    if (p.startsWith('/') && !p.startsWith('//')) return p;
+    return '/$p';
+  }
+
+  String? get _workspaceOrigin {
+    final host = widget.workspaceHost?.trim();
+    if (host == null || host.isEmpty) return null;
+    return 'https://$host';
+  }
+
+  Uri _startUri() {
+    final code = widget.handoffCode?.trim();
+    if (code != null && code.isNotEmpty) {
+      return SessionBridge.handoffRedeemUri(
+        code: code,
+        callbackPath: _callbackPath,
+        workspaceOrigin: _workspaceOrigin,
+      );
+    }
+    final origin = _workspaceOrigin;
+    if (origin != null) {
+      final base = Uri.parse(origin);
+      return base.replace(path: _callbackPath);
+    }
+    return BevelConfig.workspaceUri(_callbackPath);
+  }
 
   @override
   void initState() {
     super.initState();
-    final start = BevelConfig.workspaceUri(widget.initialPath);
+    final start = _startUri();
     _currentUri = start;
 
     _controller = WebViewController()
@@ -64,11 +121,25 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           onPageFinished: (url) async {
             final title = await _controller.getTitle();
             if (!mounted) return;
+            final uri = Uri.tryParse(url) ?? _currentUri;
             setState(() {
               _loading = false;
               _title = title;
-              _currentUri = Uri.tryParse(url) ?? _currentUri;
+              _currentUri = uri;
             });
+            if (uri != null) {
+              final path = uri.path.isEmpty ? '/' : uri.path;
+              // Don't persist the handoff intermediate path
+              if (!path.contains('/api/auth/handoff')) {
+                widget.onPathChanged?.call(path);
+              }
+            }
+            // After leaving handoff (or direct load), probe session once.
+            if (!_sessionChecked &&
+                uri != null &&
+                !uri.path.contains('/api/auth/handoff')) {
+              unawaited(_probeSessionAndChannels());
+            }
           },
           onWebResourceError: (err) {
             if (!mounted) return;
@@ -80,12 +151,16 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           onNavigationRequest: (request) {
             final uri = Uri.tryParse(request.url);
             if (uri == null) return NavigationDecision.prevent;
-            // Google/GitHub/Auth.js must leave the WebView (IdP policy + reliability).
+            // Handoff redeem must stay in WebView (plants cookies).
+            final path = uri.path.toLowerCase();
+            if (path.contains('/api/auth/handoff')) {
+              return NavigationDecision.navigate;
+            }
+            // Google/GitHub/Auth.js IdP hops leave the WebView.
             if (BevelConfig.isOAuthNavigation(uri)) {
               _oauth.open(uri);
               return NavigationDecision.prevent;
             }
-            // Workspace hosts stay in-app; other origins open outside.
             if (BevelConfig.isAllowedInAppUri(uri)) {
               return NavigationDecision.navigate;
             }
@@ -97,12 +172,98 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       ..loadRequest(start);
   }
 
+  Future<void> _probeSessionAndChannels() async {
+    _sessionChecked = true;
+    try {
+      final raw = await _controller.runJavaScriptReturningResult(
+        SessionBridge.sessionProbeJs,
+      );
+      final jsonStr = SessionBridge.unwrapJsString(raw);
+      var healthy = false;
+      String? email;
+      if (jsonStr.isNotEmpty && jsonStr != 'null') {
+        try {
+          final map = jsonDecode(jsonStr) as Map<String, dynamic>?;
+          final user = map?['user'] as Map<String, dynamic>?;
+          email = user?['email'] as String?;
+          healthy = email != null && email.isNotEmpty;
+        } catch (_) {
+          healthy = false;
+        }
+      }
+
+      if (!mounted) return;
+      setState(() => _sessionHealthy = healthy);
+      widget.onSessionState?.call(healthy, email);
+
+      if (!healthy && !_authRetryUsed) {
+        _authRetryUsed = true;
+        // One guided recovery: open system login (user may still be signed in there).
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Workspace session missing — opening Google sign-in. '
+                'We will return you here with a handoff code.',
+              ),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        await _oauth.openSystemLogin();
+        return;
+      }
+
+      if (healthy) {
+        await _refreshChannelsFromWebView();
+      }
+    } catch (_) {
+      widget.onSessionState?.call(false, null);
+    }
+  }
+
+  Future<void> _refreshChannelsFromWebView() async {
+    try {
+      final raw = await _controller.runJavaScriptReturningResult(
+        SessionBridge.listChannelsJs,
+      );
+      final jsonStr = SessionBridge.unwrapJsString(raw);
+      if (jsonStr.isEmpty) return;
+      final list = jsonDecode(jsonStr);
+      if (list is! List || list.isEmpty) return;
+      final next = <(String, String)>[];
+      for (final item in list) {
+        if (item is Map) {
+          final slug = (item['slug'] ?? item['id'] ?? '').toString();
+          final name = (item['name'] ?? slug).toString();
+          if (slug.isNotEmpty) next.add((slug, name));
+        }
+      }
+      if (next.isNotEmpty && mounted) {
+        setState(() => _channels = next);
+      }
+    } catch (_) {
+      /* keep defaults */
+    }
+  }
+
   Future<void> _reload() => _controller.reload();
 
-  Future<void> _goHome() =>
-      _controller.loadRequest(BevelConfig.workspaceUri('/'));
+  Future<void> _goHome() {
+    final origin = _workspaceOrigin;
+    if (origin != null) {
+      return _controller
+          .loadRequest(Uri.parse(origin).replace(path: _callbackPath));
+    }
+    return _controller.loadRequest(BevelConfig.workspaceUri(_callbackPath));
+  }
 
   Future<void> _navigatePath(String path) {
+    final origin = _workspaceOrigin;
+    if (origin != null) {
+      final base = Uri.parse(origin);
+      return _controller.loadRequest(base.replace(path: path));
+    }
     return _controller.loadRequest(BevelConfig.workspaceUri(path));
   }
 
@@ -132,7 +293,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       tenant: tenant,
       mode: 'build',
       surface: 'desktop',
-      projectPath: null, // resolved by bridge from env / ~/dev
+      projectPath: null,
       prompt:
           'Continue work from BEVEL workspace: ${uri.toString()}'
           '${channel != null ? ' (channel ~$channel)' : ''}'
@@ -155,16 +316,17 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     final path = uri.path;
     if (path.startsWith('/bevel/c/')) {
       final rest = path.substring('/bevel/c/'.length);
-      final slug = rest.split('/').firstWhere((s) => s.isNotEmpty, orElse: () => '');
+      final slug =
+          rest.split('/').firstWhere((s) => s.isNotEmpty, orElse: () => '');
       return slug.isEmpty ? null : slug;
     }
     if (path.startsWith('/bevel/')) {
       final rest = path.substring('/bevel/'.length);
-      final slug = rest.split('/').firstWhere((s) => s.isNotEmpty, orElse: () => '');
+      final slug =
+          rest.split('/').firstWhere((s) => s.isNotEmpty, orElse: () => '');
       if (slug.isEmpty || slug == 'talk' || slug == 'session') return null;
       return slug;
     }
-    // Public short path: /~general (legacy /^general still accepted)
     final segs = path.split('/').where((s) => s.isNotEmpty).toList();
     if (segs.isNotEmpty) {
       final first = segs.first;
@@ -181,7 +343,6 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
 
   static String? _tenantFromHost(String host) {
     final h = host.toLowerCase();
-    // bevel.2x4m.cc / 2x4m.bevel.lvh.me / 2x4m.lvh.me
     if (h.contains('2x4m')) return '2x4m';
     if (h.startsWith('bevel.') && h.endsWith('.lvh.me')) {
       final mid = h.substring('bevel.'.length, h.length - '.lvh.me'.length);
@@ -201,7 +362,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     final layout = BevelLayoutInfo.of(context);
     final path = _currentUri?.path ?? widget.initialPath;
     final showRail = layout.prefersSplit ||
-        (layout.isFoldInner && layout.isLandscape && layout.size.width >= 700);
+        (layout.isFoldInner &&
+            layout.isLandscape &&
+            layout.size.width >= 700);
 
     final webBody = Stack(
       children: [
@@ -210,6 +373,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             message: _error!,
             onRetry: _reload,
             onExternal: _openExternal,
+            onSignIn: () => _oauth.openSystemLogin(),
           )
         else
           WebViewWidget(controller: _controller),
@@ -227,12 +391,12 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 child: Text(
-                  showRail
-                      ? 'dual-pane · ${layout.layoutClass.name}'
-                      : layout.isFoldCover
-                          ? 'cover · compact'
-                          : '${layout.layoutClass.name}'
-                              '${defaultTargetPlatform == TargetPlatform.macOS ? ' · Silicon' : ''}',
+                  [
+                    if (showRail) 'dual-pane',
+                    layout.layoutClass.name,
+                    if (_sessionHealthy) 'session-ok' else 'session-?',
+                    if (widget.handoffCode != null) 'handoff',
+                  ].join(' · '),
                   style: const TextStyle(
                     fontSize: 11,
                     color: Color(0xFF9AA8B5),
@@ -338,6 +502,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                     color: const Color(0xFF0F1419),
                     child: WorkspaceRail(
                       activePath: path,
+                      channels: _channels,
                       onNavigate: _navigatePath,
                       onOpenTimeline: () => _navigatePath('/timeline'),
                       onOpenNativeHub: widget.onOpenNativeHub,
@@ -362,62 +527,48 @@ class _ErrorPane extends StatelessWidget {
     required this.message,
     required this.onRetry,
     required this.onExternal,
+    this.onSignIn,
   });
 
   final String message;
   final VoidCallback onRetry;
   final VoidCallback onExternal;
+  final VoidCallback? onSignIn;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.wifi_off_rounded, size: 40, color: Color(0xFF9AA8B5)),
-              const SizedBox(height: 16),
-              const Text(
-                'Could not load workspace',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFF9AA8B5), height: 1.4),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                BevelConfig.isProduction
-                    ? 'Check network access, then Retry. Production hosts: '
-                        'bevel.is and bevel.2x4m.cc.'
-                    : 'On macOS, ensure the app has network client entitlement '
-                        'and Caddy is serving your .lvh.me tenant.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF6B7A88),
-                  fontSize: 12,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  FilledButton(onPressed: onRetry, child: const Text('Retry')),
-                  const SizedBox(width: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off_rounded, size: 40, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFFCBD5E1)),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                FilledButton(onPressed: onRetry, child: const Text('Retry')),
+                if (onSignIn != null)
                   OutlinedButton(
-                    onPressed: onExternal,
-                    child: const Text('Open in browser'),
+                    onPressed: onSignIn,
+                    child: const Text('Sign in with Google'),
                   ),
-                ],
-              ),
-            ],
-          ),
+                TextButton(
+                  onPressed: onExternal,
+                  child: const Text('Open in browser'),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

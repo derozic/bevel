@@ -149,7 +149,22 @@ When release artifacts are published, update that page’s store / direct-downlo
 2. **Done:** In-app WebView shell, OAuth via system browser, deep links
 3. **Done:** Push token registration API + `firebase_messaging` client (needs 1Password config files)
 4. **Done:** Adaptive dual-pane (iPad / Fold inner), Google Workspace onboarding, escalation inbox
-5. **Next:** Signed TestFlight + Play internal track + notarized macOS zip + store screenshots
-6. **Then:** Live store URLs on `/download#ios` / `#android`
+5. **Done:** Native session bridge — `native-complete` mints handoff code → WebView redeems on workspace host (Safari cookies never shared with WKWebView)
+6. **Next:** Signed TestFlight + Play internal track + notarized macOS zip + store screenshots
+7. **Then:** Live store URLs on `/download#ios` / `#android`
+
+### Native Google Workspace auth (production)
+
+```
+System browser  https://bevel.is/login?native=1
+  → Google OAuth
+  → /api/auth/native-complete  (issues FastAPI handoff code)
+  → bevel://auth/complete?code=…&email=…&path=/~general
+  → Flutter WebView loads https://bevel.2x4m.cc/api/auth/handoff?code=…
+  → Auth.js host-local cookies in WebView jar
+  → /~general signed in
+```
+
+Requires `FLEET_INTERNAL_API_KEY` on the web process (same as browser handoff).
 
 See also: [NATIVE_PUSH.md](./NATIVE_PUSH.md), [STORE_SCREENSHOTS.md](./STORE_SCREENSHOTS.md).

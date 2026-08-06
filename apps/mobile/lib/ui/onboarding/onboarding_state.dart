@@ -13,6 +13,8 @@ class OnboardingState {
     this.userEmail = '',
     this.userId = '',
     this.userName = '',
+    this.lastWorkspacePath = '/~general',
+    this.sessionHealthy = false,
   });
 
   final bool completedGoogleSignIn;
@@ -26,6 +28,10 @@ class OnboardingState {
   final String userEmail;
   final String userId;
   final String userName;
+  /// Last path opened in the workspace WebView (restored on relaunch).
+  final String lastWorkspacePath;
+  /// Last session probe reported an authenticated user in the WebView jar.
+  final bool sessionHealthy;
 
   bool get needsOnboarding => !completedGoogleSignIn;
 
@@ -44,6 +50,8 @@ class OnboardingState {
     String? userEmail,
     String? userId,
     String? userName,
+    String? lastWorkspacePath,
+    bool? sessionHealthy,
   }) {
     return OnboardingState(
       completedGoogleSignIn:
@@ -60,6 +68,8 @@ class OnboardingState {
       userEmail: userEmail ?? this.userEmail,
       userId: userId ?? this.userId,
       userName: userName ?? this.userName,
+      lastWorkspacePath: lastWorkspacePath ?? this.lastWorkspacePath,
+      sessionHealthy: sessionHealthy ?? this.sessionHealthy,
     );
   }
 
@@ -79,6 +89,9 @@ class OnboardingState {
       userEmail: p.getString('${_prefix}email') ?? '',
       userId: p.getString('${_prefix}user_id') ?? '',
       userName: p.getString('${_prefix}user_name') ?? '',
+      lastWorkspacePath:
+          p.getString('${_prefix}last_path') ?? '/~general',
+      sessionHealthy: p.getBool('${_prefix}session_ok') ?? false,
     );
   }
 
@@ -94,5 +107,7 @@ class OnboardingState {
     await p.setString('${_prefix}email', userEmail);
     await p.setString('${_prefix}user_id', userId);
     await p.setString('${_prefix}user_name', userName);
+    await p.setString('${_prefix}last_path', lastWorkspacePath);
+    await p.setBool('${_prefix}session_ok', sessionHealthy);
   }
 }

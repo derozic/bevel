@@ -50,11 +50,21 @@ class BevelLayoutInfo {
   bool get isFoldInner => surfaceMode == BevelSurfaceMode.foldInner;
 
   /// Dual-pane (native rail + workspace) when width and surface allow it.
-  bool get prefersSplit =>
-      isExpanded &&
-      isLandscape &&
-      size.width >= 900 &&
-      surfaceMode != BevelSurfaceMode.foldCover;
+  ///
+  /// Tablets (iPad Pro, Pixel Tablet) get a rail in landscape always, and in
+  /// portrait when short side is tablet-class (≥600) and width ≥ 720.
+  bool get prefersSplit {
+    if (surfaceMode == BevelSurfaceMode.foldCover) return false;
+    if (surfaceMode == BevelSurfaceMode.foldInner && size.width >= 700) {
+      return true;
+    }
+    if (isExpanded && isLandscape && size.width >= 840) return true;
+    // Portrait iPad / large tablet — collapsible dual-pane at 720+
+    if ((isExpanded || isMedium) && size.width >= 720 && shortestSide >= 600) {
+      return true;
+    }
+    return false;
+  }
 
   /// Large touch targets for cover screens and compact phones.
   double get minTouchTarget => isFoldCover || isCompact ? 48 : 44;

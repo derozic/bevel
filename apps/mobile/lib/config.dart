@@ -144,10 +144,16 @@ class BevelConfig {
       return true;
     }
 
+    // Handoff redeem must stay in the WebView (plants host-local cookies).
+    if (path.contains('/api/auth/handoff')) {
+      return false;
+    }
+
     // Auth.js provider start + callback — complete outside WKWebView
     if (path.contains('/api/auth/signin') ||
         path.contains('/api/auth/callback') ||
-        path.contains('/api/auth/signout')) {
+        path.contains('/api/auth/signout') ||
+        path.contains('/api/auth/native-complete')) {
       return true;
     }
     return false;

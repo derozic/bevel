@@ -16,6 +16,9 @@ class BevelDeepLinkAction {
     this.email,
     this.userId,
     this.userName,
+    this.handoffCode,
+    this.workspaceHost,
+    this.tenantSlug,
     required this.raw,
   });
 
@@ -29,6 +32,11 @@ class BevelDeepLinkAction {
   final String? email;
   final String? userId;
   final String? userName;
+  /// One-time FastAPI handoff code — redeem in WebView on workspace host.
+  final String? handoffCode;
+  /// Optional workspace host hint from native-complete (e.g. bevel.2x4m.cc).
+  final String? workspaceHost;
+  final String? tenantSlug;
   final Uri raw;
 }
 
@@ -154,12 +162,16 @@ class DeepLinkService {
         if (action == 'complete' || action == 'callback') {
           final q = uri.queryParameters;
           final path = q['path'];
+          final code = q['code']?.trim();
           return BevelDeepLinkAction(
             kind: 'auth_complete',
-            route: (path != null && path.isNotEmpty) ? path : '/',
+            route: (path != null && path.isNotEmpty) ? path : '/~general',
             email: q['email'],
             userId: q['userId'] ?? q['user_id'],
             userName: q['name'],
+            handoffCode: (code != null && code.isNotEmpty) ? code : null,
+            workspaceHost: q['workspaceHost'] ?? q['workspace_host'],
+            tenantSlug: q['tenant'],
             raw: uri,
           );
         }

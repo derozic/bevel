@@ -37,10 +37,11 @@ void main() {
     );
     expect(
       DeepLinkService.routeFor(Uri.parse('bevel://auth/complete')),
-      '/',
+      '/~general',
     );
     final auth = DeepLinkService.parse(Uri.parse('bevel://auth/complete?code=x'));
     expect(auth.kind, 'auth_complete');
+    expect(auth.handoffCode, 'x');
   });
 
   test('OAuth hosts are detected for system browser', () {
@@ -59,6 +60,13 @@ void main() {
     expect(
       BevelConfig.isOAuthNavigation(
         Uri.parse('https://bevel.2x4m.lvh.me/bevel'),
+      ),
+      isFalse,
+    );
+    // Handoff redeem must stay inside WebView (cookie plant).
+    expect(
+      BevelConfig.isOAuthNavigation(
+        Uri.parse('https://bevel.2x4m.cc/api/auth/handoff?code=x'),
       ),
       isFalse,
     );

@@ -11,6 +11,7 @@ class WorkspaceRail extends StatelessWidget {
     this.onOpenTimeline,
     this.onOpenNativeHub,
     this.escalatedSlugs = const {},
+    this.channels,
   });
 
   final String activePath;
@@ -18,8 +19,10 @@ class WorkspaceRail extends StatelessWidget {
   final VoidCallback? onOpenTimeline;
   final VoidCallback? onOpenNativeHub;
   final Set<String> escalatedSlugs;
+  /// Live channel list `(slug, displayName)` from the workspace BFF when available.
+  final List<(String, String)>? channels;
 
-  static const _defaultChannels = [
+  static const _defaultChannels = <(String, String)>[
     ('general', 'General'),
     ('ops', 'Ops'),
     ('product', 'Product'),
@@ -109,7 +112,10 @@ class WorkspaceRail extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               children: [
-                for (final (slug, name) in _defaultChannels)
+                for (final (slug, name)
+                    in (channels != null && channels!.isNotEmpty)
+                        ? channels!
+                        : _defaultChannels)
                   _NavTile(
                     icon: escalatedSlugs.contains(slug)
                         ? Icons.priority_high_rounded

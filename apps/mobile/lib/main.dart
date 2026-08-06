@@ -143,14 +143,15 @@ class _BevelHomePageState extends State<BevelHomePage> {
 
     switch (action.kind) {
       case 'auth_complete':
-        // System-browser OAuth finished → land in workspace shell.
-        // Cookie hop Safari→WKWebView may still need a refresh; user can Retry.
+        // System-browser OAuth finished → redeem handoff code in WebView jar.
         unawaited(
           _onAuthComplete(
-            action.route ?? '/',
+            action.route ?? _onboarding.lastWorkspacePath,
             email: action.email,
             userId: action.userId,
             userName: action.userName,
+            handoffCode: action.handoffCode,
+            workspaceHost: action.workspaceHost,
           ),
         );
         break;
@@ -211,23 +212,36 @@ class _BevelHomePageState extends State<BevelHomePage> {
     String? email,
     String? userId,
     String? userName,
+    String? handoffCode,
+    String? workspaceHost,
   }) async {
+    final safePath = (path.isEmpty || path == '/')
+        ? (_onboarding.lastWorkspacePath.isNotEmpty
+            ? _onboarding.lastWorkspacePath
+            : '/~general')
+        : path;
     final next = _onboarding.copyWith(
       completedGoogleSignIn: true,
       userEmail: email?.trim().isNotEmpty == true ? email!.trim() : null,
       userId: userId?.trim().isNotEmpty == true ? userId!.trim() : null,
       userName: userName?.trim().isNotEmpty == true ? userName!.trim() : null,
+      lastWorkspacePath: safePath,
     );
     await next.save();
     if (!mounted) return;
     setState(() {
       _onboarding = next;
-      _status =
-          'Signed in — opening workspace. If you still see login, tap Retry.';
+      _status = handoffCode != null && handoffCode.isNotEmpty
+          ? 'Signed in — planting workspace session…'
+          : 'Signed in — opening workspace…';
     });
     await _maybeShowEscalationInbox();
     if (!mounted) return;
-    _openWorkspace(path: path);
+    _openWorkspace(
+      path: safePath,
+      handoffCode: handoffCode,
+      workspaceHost: workspaceHost,
+    );
   }
 
   Future<void> _maybeShowEscalationInbox() async {
@@ -311,14 +325,48 @@ class _BevelHomePageState extends State<BevelHomePage> {
     if (mounted) setState(() => _onboarding = next);
   }
 
-  void _openWorkspace({String path = '/'}) {
+  void _openWorkspace({
+    String path = '/~general',
+    String? handoffCode,
+    String? workspaceHost,
+  }) {
+    final openPath = path.isEmpty || path == '/'
+        ? (_onboarding.lastWorkspacePath.isNotEmpty
+            ? _onboarding.lastWorkspacePath
+            : '/~general')
+        : path;
     Navigator.of(context)
         .push(
       MaterialPageRoute<void>(
         builder: (_) => WorkspaceShellPage(
-          initialPath: path,
+          initialPath: openPath,
+          handoffCode: handoffCode,
+          workspaceHost: workspaceHost,
           hermes: _hermes,
           onOpenNativeHub: () => _openNativeHub(),
+          onPathChanged: (p) async {
+            final next = _onboarding.copyWith(lastWorkspacePath: p);
+            await next.save();
+            if (mounted) setState(() => _onboarding = next);
+          },
+          onSessionState: (healthy, email) async {
+            final next = _onboarding.copyWith(
+              sessionHealthy: healthy,
+              userEmail: email != null && email.isNotEmpty
+                  ? email
+                  : null,
+              completedGoogleSignIn:
+                  healthy ? true : _onboarding.completedGoogleSignIn,
+            );
+            await next.save();
+            if (!mounted) return;
+            setState(() {
+              _onboarding = next;
+              _status = healthy
+                  ? 'Workspace session ready'
+                  : 'Workspace needs sign-in — use the login button if stuck';
+            });
+          },
         ),
       ),
     )
