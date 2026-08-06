@@ -662,7 +662,10 @@ export class FleetChannel extends Room {
         const agentName = this.state.agents.find((a) => a.id === target)?.name ?? target
         const res = opts.work
           ? await dispatchAgentWork(target, text, history, workRepo)
-          : await dispatchAgentChat(target, text, history)
+          : await dispatchAgentChat(target, text, history, {
+              personalAgent: false,
+              channelSlug: this.channelSlug,
+            })
         return { target, agentName, res }
       }),
     )

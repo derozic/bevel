@@ -61,8 +61,8 @@ export const BEVEL_TIMELINE_PATH = '/timeline'
  * Primary post-login home on the platform apex.
  */
 export const BEVEL_PRIVATE_PATH = '/me'
-/** Default fleet agent when user has no personalAgentId set */
-export const BEVEL_DEFAULT_PERSONAL_AGENT = 'brain'
+/** Default personal agent when user has no personalAgentId set */
+export const BEVEL_DEFAULT_PERSONAL_AGENT = 'hermes'
 
 /** User lookup / connection card for @handle and ^handle */
 export function bevelUserPath(handle: string): string {

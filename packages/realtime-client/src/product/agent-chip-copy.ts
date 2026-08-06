@@ -101,14 +101,15 @@ export const AGENT_CHIP_COPY: Record<string, AgentChipCopy> = {
     ],
   },
   hermes: {
-    tagline: 'Code and handoffs',
+    tagline: 'Co-founder peer',
     summary:
-      'Generalist messenger — clear answers, OpenRouter routing, and specialist handoffs when depth matters.',
+      'Primary personal agent and fleet co-founder — owns outcomes, ships code via OpenRouter, convenes specialists, and partners with Hermes Desktop.',
     capabilities: [
-      'Multi-language coding',
-      'Debugging',
-      'Architecture sketches',
+      'Personal agent',
+      'Co-founder stewardship',
+      'Pareto coding',
       'Fleet handoffs',
+      'Desktop interop',
     ],
   },
 }

@@ -39,7 +39,7 @@ Rules:
 ONBOARD_SYSTEM = """You are BEVEL's onboard guide for new members.
 
 Help them:
-1. Pick a handle and personal agent (e.g. hermes)
+1. Pick a handle — personal agent defaults to hermes (change anytime)
 2. Understand ~channels vs @mentions vs ^escalations
 3. Find Timeline, preferences, and how agents show up in chat
 4. Optionally enable Agent Trace for power users

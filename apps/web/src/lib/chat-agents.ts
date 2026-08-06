@@ -1,6 +1,13 @@
 import { agents } from '@/lib/agent-catalog'
 
-const DEFAULT_CHAT_AGENTS = ['brain', 'johnny', 'loom', 'northstar'] as const
+/** Default roster for new direct threads — Hermes first as fleet co-founder. */
+const DEFAULT_CHAT_AGENTS = [
+  'hermes',
+  'johnny',
+  'brain',
+  'loom',
+  'northstar',
+] as const
 
 const catalogIds = new Set(agents.map((a) => a.id.toLowerCase()))
 

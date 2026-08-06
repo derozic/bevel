@@ -319,7 +319,11 @@ export class AgentSession extends Room {
     const results = await Promise.allSettled(
       targets.map(async (target) => {
         const agentName = this.state.agents.find((a) => a.id === target)?.name ?? target
-        const res = await dispatchAgentChat(target, text, history)
+        // Solo direct thread (/talk/hermes) → personal agent mode for Hermes.
+        const solo = this.state.agentIds.length === 1
+        const res = await dispatchAgentChat(target, text, history, {
+          personalAgent: solo && target.toLowerCase() === 'hermes',
+        })
         return { target, agentName, res }
       })
     )

@@ -188,8 +188,9 @@ async def upsert_identity(
         role=role,
         is_active=True,
         handle=derived_handle,
-        personal_agent_id=None,
-        personal_agent_config={},
+        # Hermes is the default personal agent (fleet co-founder + desktop partner).
+        personal_agent_id="hermes",
+        personal_agent_config={"role": "personal", "source": "default"},
         created_at=_utcnow(),
         updated_at=_utcnow(),
     )

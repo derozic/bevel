@@ -5,20 +5,43 @@ import { resolveWorkspaceForRepo } from './work-repos.js'
 
 const require = createRequire(import.meta.url)
 
+export type DispatchChatOpts = {
+  /** Solo personal-agent session (e.g. /talk/hermes). */
+  personalAgent?: boolean
+  /** Multi-agent fleet channel slug when applicable. */
+  channelSlug?: string
+  /** Tenant slug when known. */
+  tenant?: string
+}
+
 export async function dispatchAgentChat(
   agentId: string,
   message: string,
-  history: { role: string; content: string }[] = []
+  history: { role: string; content: string }[] = [],
+  opts: DispatchChatOpts = {},
 ): Promise<{ output: string; model?: string; confidence?: number }> {
   const runnerPath = join(config.repoRoot, 'dist', 'runner.js')
   const { runAgentChat } = require(runnerPath) as {
     runAgentChat: (
       name: string,
       message: string,
-      history?: { role: string; content: string }[]
+      history?: { role: string; content: string }[],
+      runOpts?: {
+        metadata?: Record<string, unknown>
+        mode?: string
+      },
     ) => Promise<{ output: string; model: string; confidence: number }>
   }
-  const res = await runAgentChat(agentId, message, history)
+  const res = await runAgentChat(agentId, message, history, {
+    metadata: {
+      personalAgent: opts.personalAgent === true,
+      solo: opts.personalAgent === true,
+      role: opts.personalAgent ? 'personal' : 'fleet',
+      channelSlug: opts.channelSlug,
+      tenant: opts.tenant,
+      fleet: opts.personalAgent !== true,
+    },
+  })
   return res
 }
 
