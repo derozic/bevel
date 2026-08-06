@@ -27,12 +27,45 @@ export default function ConsoleStatusPage() {
 
   const run = useCallback(async () => {
     setIsRefreshing(true)
+    // Same-origin first so console on bevel.2x4m.cc never depends on CORS for
+    // the primary "is this web process up?" check. Cross-host probes still run
+    // when CORS is enabled on /api/health.
+    const thisOrigin =
+      typeof window !== 'undefined' ? window.location.origin : bevelUrls.web()
+    const workspaceOrigin = 'https://bevel.2x4m.cc'
+    const platformOrigin = bevelUrls.web()
+
     const targets: { name: string; url: string; ok: (s: number, b: string) => boolean }[] = [
       {
         name: 'Workspace web',
-        url: `${bevelUrls.web()}/api/health`,
+        url: `${thisOrigin}/api/health`,
         ok: (s, b) => s === 200 && b.includes('bevel-web'),
       },
+    ]
+
+    // When viewing console on a non-workspace host (e.g. bevel.is), also probe
+    // the production workspace origin explicitly.
+    if (thisOrigin.replace(/\/$/, '') !== workspaceOrigin) {
+      targets.push({
+        name: 'Workspace host (2x4m)',
+        url: `${workspaceOrigin}/api/health`,
+        ok: (s, b) => s === 200 && b.includes('bevel-web'),
+      })
+    }
+
+    // When on workspace, also probe platform apex (optional multi-host view).
+    if (
+      thisOrigin.replace(/\/$/, '') !== platformOrigin.replace(/\/$/, '') &&
+      platformOrigin.includes('bevel.is')
+    ) {
+      targets.push({
+        name: 'Platform web (bevel.is)',
+        url: `${platformOrigin.replace(/\/$/, '')}/api/health`,
+        ok: (s, b) => s === 200 && b.includes('bevel-web'),
+      })
+    }
+
+    targets.push(
       {
         name: 'Control plane API',
         url: `${bevelUrls.api()}/health`,
@@ -53,7 +86,7 @@ export default function ConsoleStatusPage() {
         url: bevelUrls.docs(),
         ok: (s) => s === 200,
       },
-    ]
+    )
 
     const next: Probe[] = []
     for (const t of targets) {

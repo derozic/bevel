@@ -147,6 +147,22 @@ export async function GET() {
     status: 200,
     headers: {
       'Cache-Control': 'no-store',
+      // Public probe — allow console status / multi-host dashboards to fetch
+      // from bevel.2x4m.cc, status.bevel.is, etc. (no secrets in this body).
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+    },
+  })
+}
+
+/** CORS preflight for browser status probes on other bevel hosts. */
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Max-Age': '86400',
     },
   })
 }
