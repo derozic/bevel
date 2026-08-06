@@ -56,8 +56,8 @@ Manual steps (same order the script uses):
 1. `git fetch && git reset --hard <ref>` as `deploy` in `/opt/bevel`
 2. API: `source services/api/.env` → `uv sync` → `alembic upgrade head` → `systemctl restart bevel-api`
 3. Realtime: `pnpm run build` → `systemctl restart bevel-realtime`
-4. Web: `NODE_OPTIONS=--max-old-space-size=1536 pnpm run build` in `apps/web` → `systemctl restart 2x4m-bevel`
-5. Smoke the four curls above
+4. Web: stamp `NEXT_PUBLIC_GIT_SHA` / `BEVEL_GIT_SHA` from `git rev-parse --short HEAD` into `apps/web/.env.production`, then `NODE_OPTIONS=--max-old-space-size=1536 pnpm run build` → `systemctl restart 2x4m-bevel`
+5. Smoke the four curls above — expect `https://bevel.2x4m.cc/api/health` → `version` matches the deployed short SHA
 
 **Never** `pkill caddy` — reload only (`caddy reload --config /etc/caddy/Caddyfile`).
 

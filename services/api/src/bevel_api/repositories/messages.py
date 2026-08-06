@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bevel_api.db.models.message import Message
@@ -108,26 +108,52 @@ def to_api_dict(row: Message) -> dict[str, Any]:
     }
 
 
+def page_limit(limit: int, *, default: int = 100, hard_max: int = 500) -> int:
+    """Clamp a page size for channel history queries."""
+    try:
+        n = int(limit)
+    except (TypeError, ValueError):
+        n = default
+    return max(1, min(n, hard_max))
+
+
 async def list_for_channel(
     session: AsyncSession,
     *,
     tenant_id: str,
     channel_id: str,
     limit: int = 100,
-) -> list[Message]:
-    lim = max(1, min(limit, 500))
-    result = await session.execute(
-        select(Message)
-        .where(
-            Message.tenant_id == tenant_id,
-            Message.channel_id == channel_id,
-        )
-        .order_by(Message.created_at.desc())
-        .limit(lim)
+    before: datetime | None = None,
+    before_id: str | None = None,
+) -> tuple[list[Message], bool]:
+    """Return a chronological page of messages and whether older rows remain.
+
+    Cursor is ``(before, before_id)`` on the oldest message from the previous
+    page (exclusive). Fetches ``limit + 1`` to compute ``has_more``.
+    """
+    lim = page_limit(limit)
+    q = select(Message).where(
+        Message.tenant_id == tenant_id,
+        Message.channel_id == channel_id,
     )
+    if before is not None:
+        if before_id:
+            q = q.where(
+                or_(
+                    Message.created_at < before,
+                    and_(Message.created_at == before, Message.id < before_id),
+                )
+            )
+        else:
+            q = q.where(Message.created_at < before)
+    q = q.order_by(Message.created_at.desc(), Message.id.desc()).limit(lim + 1)
+    result = await session.execute(q)
     rows = list(result.scalars().all())
+    has_more = len(rows) > lim
+    if has_more:
+        rows = rows[:lim]
     rows.reverse()  # chronological
-    return rows
+    return rows, has_more
 
 
 async def list_for_channel_slug(
@@ -136,21 +162,44 @@ async def list_for_channel_slug(
     tenant_id: str,
     channel_slug: str,
     limit: int = 100,
-) -> list[Message]:
-    lim = max(1, min(limit, 500))
+    before: datetime | None = None,
+    before_id: str | None = None,
+) -> tuple[list[Message], bool]:
+    lim = page_limit(limit)
     key = channel_slug.lower().strip()
-    result = await session.execute(
-        select(Message)
-        .where(
-            Message.tenant_id == tenant_id,
-            Message.channel_slug == key,
-        )
-        .order_by(Message.created_at.desc())
-        .limit(lim)
+    q = select(Message).where(
+        Message.tenant_id == tenant_id,
+        Message.channel_slug == key,
     )
+    if before is not None:
+        if before_id:
+            q = q.where(
+                or_(
+                    Message.created_at < before,
+                    and_(Message.created_at == before, Message.id < before_id),
+                )
+            )
+        else:
+            q = q.where(Message.created_at < before)
+    q = q.order_by(Message.created_at.desc(), Message.id.desc()).limit(lim + 1)
+    result = await session.execute(q)
     rows = list(result.scalars().all())
+    has_more = len(rows) > lim
+    if has_more:
+        rows = rows[:lim]
     rows.reverse()
-    return rows
+    return rows, has_more
+
+
+def pagination_cursors(msgs: list[Message]) -> dict[str, Any]:
+    """Build next-page cursors from the oldest message in a page."""
+    if not msgs:
+        return {"nextBefore": None, "nextBeforeId": None}
+    oldest = msgs[0]
+    return {
+        "nextBefore": oldest.created_at.isoformat() if oldest.created_at else None,
+        "nextBeforeId": oldest.id,
+    }
 
 
 async def get_by_id(session: AsyncSession, message_id: str) -> Message | None:

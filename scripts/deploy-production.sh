@@ -110,9 +110,28 @@ systemctl is-active bevel-realtime
 echo "==> Web (next build + restart 2x4m-bevel)"
 # Next can OOM on 4GB hosts — drop page cache pressure best-effort
 sync || true
-sudo -u deploy bash -lc '
+# Stamp git SHA into build-time env so /api/health reports the real deploy.
+# NEXT_PUBLIC_* is inlined at next build; also keep .env.production in sync.
+sudo -u deploy env FULL_REF="$FULL_REF" bash -lc '
   set -euo pipefail
   cd /opt/bevel
+  GIT_SHA="$(git rev-parse --short HEAD)"
+  export NEXT_PUBLIC_GIT_SHA="$GIT_SHA"
+  export BEVEL_GIT_SHA="$GIT_SHA"
+  echo "    web build version $GIT_SHA"
+  WEB_ENV="apps/web/.env.production"
+  if [[ -f "$WEB_ENV" ]]; then
+    if grep -q "^NEXT_PUBLIC_GIT_SHA=" "$WEB_ENV"; then
+      sed -i "s/^NEXT_PUBLIC_GIT_SHA=.*/NEXT_PUBLIC_GIT_SHA=${GIT_SHA}/" "$WEB_ENV"
+    else
+      printf "\nNEXT_PUBLIC_GIT_SHA=%s\n" "$GIT_SHA" >> "$WEB_ENV"
+    fi
+    if grep -q "^BEVEL_GIT_SHA=" "$WEB_ENV"; then
+      sed -i "s/^BEVEL_GIT_SHA=.*/BEVEL_GIT_SHA=${GIT_SHA}/" "$WEB_ENV"
+    else
+      printf "BEVEL_GIT_SHA=%s\n" "$GIT_SHA" >> "$WEB_ENV"
+    fi
+  fi
   export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}"
   pnpm install --frozen-lockfile || pnpm install
   cd apps/web

@@ -46,21 +46,38 @@ async def list_workspace_messages(
     channel: str,
     session: SessionDep,
     limit: int = Query(default=100, ge=1, le=500),
+    before: str | None = Query(default=None),
+    before_id: str | None = Query(default=None),
 ) -> dict[str, Any]:
+    from datetime import datetime
+
     tenant = await _tenant_or_404(session, slug)
     ch = await channels_repo.get_by_slug(session, tenant.id, channel)
     if ch is None:
         ch = await channels_repo.ensure_channel(session, tenant.id, channel)
-    msgs = await messages_repo.list_for_channel(
+    before_dt: datetime | None = None
+    if before:
+        try:
+            before_dt = datetime.fromisoformat(before.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(400, "before must be ISO datetime") from exc
+    msgs, has_more = await messages_repo.list_for_channel(
         session,
         tenant_id=tenant.id,
         channel_id=ch.id,
         limit=limit,
+        before=before_dt,
+        before_id=(before_id or None),
     )
+    cursors = messages_repo.pagination_cursors(msgs)
     return {
         "workspace": tenant.slug,
         "channel": ch.slug,
         "messages": [messages_repo.to_api_dict(m) for m in msgs],
+        "hasMore": has_more,
+        "nextBefore": cursors["nextBefore"],
+        "nextBeforeId": cursors["nextBeforeId"],
+        "limit": limit,
     }
 
 

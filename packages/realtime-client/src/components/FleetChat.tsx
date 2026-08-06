@@ -427,6 +427,14 @@ export function FleetChat({
   const [connected, setConnected] = useState(false)
   const [uiLive, setUiLive] = useState(bootHasThread)
   const [messages, setMessages] = useState<ChatMsg[]>(() => bootSnapshot?.messages ?? [])
+  /** Older pages exist beyond the shared Colyseus room window. */
+  const [historyHasMore, setHistoryHasMore] = useState(false)
+  const [historyCursor, setHistoryCursor] = useState<{
+    before: string | null
+    beforeId: string | null
+  }>({ before: null, beforeId: null })
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const threadRef = useRef<HTMLDivElement>(null)
   const notifiedProgramIds = useRef<Set<string>>(new Set())
   const [participants, setParticipants] = useState<HumanParticipant[]>(
     () => bootSnapshot?.participants ?? []
@@ -465,7 +473,6 @@ export function FleetChat({
   const joinedRoomKeyRef = useRef<string | null>(null)
   const priorRoomKeyRef = useRef<string | undefined>(undefined)
   const connectGenRef = useRef(0)
-  const threadRef = useRef<HTMLDivElement>(null)
   const tokenReady = Boolean(realtimeToken)
   // People currently in the room. When a userMenu (account avatar) is mounted,
   // drop the current user from presence so we do not show two identical faces —
@@ -612,6 +619,9 @@ export function FleetChat({
       if (cached?.agentIds?.length) {
         setAgentIds(cached.agentIds)
       }
+      setHistoryHasMore(false)
+      setHistoryCursor({ before: null, beforeId: null })
+      setHistoryLoading(false)
       joinedRoomKeyRef.current = null
     }
     setIssue(null)
@@ -796,6 +806,72 @@ export function FleetChat({
             setIssue(resolveBevelConnectionIssue(raw, { isChannel, realtimeUrl }))
             setConnected(false)
           })
+
+          room.onMessage(
+            'history_meta',
+            (meta: {
+              hasMore?: boolean
+              nextBefore?: string | null
+              nextBeforeId?: string | null
+            }) => {
+              if (cancelled) return
+              setHistoryHasMore(Boolean(meta.hasMore))
+              setHistoryCursor({
+                before: meta.nextBefore ?? null,
+                beforeId: meta.nextBeforeId ?? null,
+              })
+            },
+          )
+
+          room.onMessage(
+            'history',
+            (page: {
+              messages?: Array<{
+                id: string
+                speaker: string
+                speakerId?: string
+                speakerAvatar?: string
+                speakerType: string
+                agentId?: string
+                body: string
+                status: string
+                ts: number
+              }>
+              hasMore?: boolean
+              nextBefore?: string | null
+              nextBeforeId?: string | null
+            }) => {
+              if (cancelled) return
+              setHistoryLoading(false)
+              setHistoryHasMore(Boolean(page.hasMore))
+              setHistoryCursor({
+                before: page.nextBefore ?? null,
+                beforeId: page.nextBeforeId ?? null,
+              })
+              const older = (page.messages ?? []).map((m) => ({
+                id: m.id,
+                speaker: m.speaker,
+                speakerId: m.speakerId,
+                speakerAvatar: m.speakerAvatar,
+                speakerType: m.speakerType,
+                agentId: m.agentId,
+                body: m.body,
+                status: m.status,
+                ts: m.ts,
+              }))
+              if (older.length === 0) return
+              const el = threadRef.current
+              const prevHeight = el?.scrollHeight ?? 0
+              const prevTop = el?.scrollTop ?? 0
+              setMessages((prev) => dedupeMessagesById([...older, ...prev]))
+              // Keep viewport anchored when prepending older history.
+              requestAnimationFrame(() => {
+                const node = threadRef.current
+                if (!node) return
+                node.scrollTop = node.scrollHeight - prevHeight + prevTop
+              })
+            },
+          )
 
           room.onLeave(() => {
             if (cancelled || connectGenRef.current !== gen) return
@@ -1016,6 +1092,19 @@ export function FleetChat({
     setInput('')
   }
 
+  const loadEarlierHistory = () => {
+    if (!isChannel || !connected || historyLoading || !historyHasMore) return
+    if (!historyCursor.before) return
+    const room = roomRef.current
+    if (!room) return
+    setHistoryLoading(true)
+    room.send('load_history', {
+      before: historyCursor.before,
+      beforeId: historyCursor.beforeId ?? undefined,
+      limit: 50,
+    })
+  }
+
   const sessionsPath = fleet.sessionsPath
   const headerLabel = isChannel
     ? channelTag(channelSlug, { escalated: channelEscalated })
@@ -1194,6 +1283,23 @@ export function FleetChat({
         </div>
 
         <div ref={threadRef} className="fleet-chat-thread">
+          {isChannel && connected && (historyHasMore || historyLoading) ? (
+            <div className="fleet-chat-history-bar">
+              <button
+                type="button"
+                className="fleet-chat-history-btn"
+                onClick={loadEarlierHistory}
+                disabled={historyLoading || !historyHasMore}
+              >
+                {historyLoading
+                  ? BEVEL_COPY.loadingEarlier
+                  : BEVEL_COPY.loadEarlier}
+              </button>
+            </div>
+          ) : null}
+          {isChannel && connected && !historyHasMore && threadMessages.length > 0 ? (
+            <p className="fleet-chat-history-end">{BEVEL_COPY.historyCaughtUp}</p>
+          ) : null}
           {visible.length === 0 && connected && !issue && (
             <div className="fleet-chat-empty">
               <span className="fleet-chat-empty-emoji" aria-hidden>

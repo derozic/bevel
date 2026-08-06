@@ -33,6 +33,10 @@ export const BEVEL_COPY = {
 
   emptyEmoji: '✦',
 
+  loadEarlier: 'Load earlier messages',
+  loadingEarlier: 'Loading earlier messages…',
+  historyCaughtUp: 'Beginning of channel',
+
   placeholderChannel: (slug: string, sampleAgent?: string) =>
     sampleAgent
       ? `Say something in ~${slug}… or @${sampleAgent}`

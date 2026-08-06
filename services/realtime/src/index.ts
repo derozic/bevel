@@ -1,5 +1,8 @@
 import { server } from './app.config.js'
 import { config } from './config.js'
+import { installPersistShutdownHooks } from './persist-queue.js'
+
+installPersistShutdownHooks()
 
 server.listen(config.port)
 

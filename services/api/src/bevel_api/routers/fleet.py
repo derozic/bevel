@@ -121,20 +121,48 @@ async def get_messages(
     _auth: InternalAuth,
     session: SessionDep,
     limit: int = Query(default=100, ge=1, le=500),
+    before: str | None = Query(
+        default=None,
+        description="ISO datetime cursor — return messages strictly older than this",
+    ),
+    before_id: str | None = Query(
+        default=None,
+        description="Message id tie-breaker when created_at matches before",
+    ),
     tenant: str | None = Query(default=None),
 ) -> dict[str, Any]:
+    """Paginated channel history (newest page when before is omitted).
+
+    Pass ``nextBefore`` / ``nextBeforeId`` from the previous response to walk
+    older pages. Pages are chronological within the payload.
+    """
+    from datetime import datetime
+
     row = await _resolve_tenant(session, tenant)
     ch = await channels_repo.ensure_channel(session, row.id, slug)
-    msgs = await messages_repo.list_for_channel(
+    before_dt: datetime | None = None
+    if before:
+        try:
+            before_dt = datetime.fromisoformat(before.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(400, "before must be ISO datetime") from exc
+    msgs, has_more = await messages_repo.list_for_channel(
         session,
         tenant_id=row.id,
         channel_id=ch.id,
         limit=limit,
+        before=before_dt,
+        before_id=(before_id or None),
     )
+    cursors = messages_repo.pagination_cursors(msgs)
     return {
         "tenant": row.slug,
         "channel": ch.slug,
         "messages": [messages_repo.to_api_dict(m) for m in msgs],
+        "hasMore": has_more,
+        "nextBefore": cursors["nextBefore"],
+        "nextBeforeId": cursors["nextBeforeId"],
+        "limit": limit,
     }
 
 

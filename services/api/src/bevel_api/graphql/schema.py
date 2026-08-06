@@ -220,7 +220,7 @@ class Query:
             if not row:
                 return []
             ch = await channels_repo.ensure_channel(session, row.id, channel_slug)
-            msgs = await messages_repo.list_for_channel(
+            msgs, _has_more = await messages_repo.list_for_channel(
                 session,
                 tenant_id=row.id,
                 channel_id=ch.id,

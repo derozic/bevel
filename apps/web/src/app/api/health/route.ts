@@ -112,6 +112,7 @@ export async function GET() {
     degraded: !depsOk,
     service: 'bevel-web',
     version:
+      process.env.BEVEL_GIT_SHA ||
       process.env.NEXT_PUBLIC_GIT_SHA ||
       process.env.npm_package_version ||
       '0.1.0',

@@ -2,7 +2,13 @@ import { Client, Room, ServerError } from 'colyseus'
 import { verifyAuthToken } from '../auth-verify.js'
 import { dispatchAgentChat, dispatchAgentWork } from '../agent-dispatch.js'
 import { canDispatchWork, normalizeWorkRepo } from '../work-repos.js'
-import { appendChannelMessage, fetchChannel, fetchChannelMessages } from '../fleet-channel-api.js'
+import {
+  appendChannelMessage,
+  fetchChannel,
+  fetchChannelMessagesPage,
+  type FleetChannelMessageRecord,
+} from '../fleet-channel-api.js'
+import { enqueuePersist, flushPersistQueue } from '../persist-queue.js'
 import { logAgentWorkToProduct } from '../product-log.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { recordEvent } from '../recording.js'
@@ -57,6 +63,16 @@ type ChatPayload = {
   workRepo?: string
 }
 
+type LoadHistoryPayload = {
+  before?: string
+  beforeId?: string
+  limit?: number
+}
+
+/** Initial room hydrate size (Colyseus shared state). Older history is paged per-client. */
+const ROOM_HISTORY_LIMIT = 100
+const PAGE_HISTORY_LIMIT = 50
+
 function uid(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
@@ -70,12 +86,31 @@ function parseMessageTags(text: string): string[] {
   return [...tags]
 }
 
+function recordToChatMessage(row: FleetChannelMessageRecord, channelSlug: string): ChatMessage {
+  const msg = new ChatMessage()
+  msg.id = row.id
+  msg.sessionId = channelSlug
+  msg.speaker = row.speakerName
+  msg.speakerId = row.speakerId
+  msg.speakerAvatar = row.speakerAvatar ?? ''
+  msg.speakerType = row.speakerType
+  msg.agentId = row.agentId ?? ''
+  msg.body = row.body
+  msg.status = row.status
+  msg.ts = new Date(row.createdAt).getTime() || Date.now()
+  return msg
+}
+
 export class FleetChannel extends Room {
   maxClients = 32
   declare state: FleetChannelState
   private channelSlug = 'general'
   private speakerNames = new Map<string, string>()
   private speakerProfiles = new Map<string, SpeakerProfile>()
+  /** True when Postgres has messages older than the shared room state window. */
+  private historyHasMore = false
+  private historyNextBefore: string | null = null
+  private historyNextBeforeId: string | null = null
 
   static async onAuth(token: string, options: JoinOptions): Promise<AuthPayload> {
     const authToken = token || options.authToken
@@ -117,19 +152,15 @@ export class FleetChannel extends Room {
       this.state.agents.push(row)
     }
 
-    const history = await fetchChannelMessages(this.channelSlug, 100)
-    for (const row of history) {
-      const msg = new ChatMessage()
-      msg.id = row.id
-      msg.sessionId = this.channelSlug
-      msg.speaker = row.speakerName
-      msg.speakerId = row.speakerId
-      msg.speakerAvatar = row.speakerAvatar ?? ''
-      msg.speakerType = row.speakerType
-      msg.agentId = row.agentId ?? ''
-      msg.body = row.body
-      msg.status = row.status
-      msg.ts = new Date(row.createdAt).getTime() || Date.now()
+    const page = await fetchChannelMessagesPage(this.channelSlug, {
+      limit: ROOM_HISTORY_LIMIT,
+    })
+    this.historyHasMore = page.hasMore
+    this.historyNextBefore = page.nextBefore
+    this.historyNextBeforeId = page.nextBeforeId
+
+    for (const row of page.messages) {
+      const msg = recordToChatMessage(row, this.channelSlug)
       this.pushMessage(msg)
       // Seed search index only (do not re-append history into JSONL)
       if (row.speakerType !== 'system' && row.body?.trim()) {
@@ -154,6 +185,19 @@ export class FleetChannel extends Room {
     this.onMessage('chat', (client, payload: ChatPayload) => {
       void this.handleChat(client, payload)
     })
+
+    this.onMessage('load_history', (client, payload: LoadHistoryPayload) => {
+      void this.handleLoadHistory(client, payload)
+    })
+  }
+
+  async onDispose() {
+    const n = await flushPersistQueue(10_000)
+    if (n > 0) {
+      console.log(
+        `[fleet_channel] ~${this.channelSlug} disposed after draining ${n} persist(s)`,
+      )
+    }
   }
 
   onJoin(client: Client, options: JoinOptions) {
@@ -187,6 +231,14 @@ export class FleetChannel extends Room {
       speaker: SYSTEM_SPEAKER,
       speakerType: 'system',
       body: channelMemberJoined(name, this.channelSlug),
+    })
+
+    // Tell the joiner whether older history exists beyond shared room state.
+    client.send('history_meta', {
+      hasMore: this.historyHasMore,
+      nextBefore: this.historyNextBefore,
+      nextBeforeId: this.historyNextBeforeId,
+      channelSlug: this.channelSlug,
     })
   }
 
@@ -229,6 +281,77 @@ export class FleetChannel extends Room {
     }
   }
 
+  /** Durable write tracked for shutdown drain. Keyed by message id. */
+  private persistMessage(
+    msg: {
+      id: string
+      speakerId: string
+      speakerName: string
+      speakerAvatar?: string
+      speakerType: string
+      agentId?: string
+      body: string
+      status: string
+      tags?: string[]
+      createdAt?: string
+    },
+  ): Promise<boolean> {
+    return enqueuePersist(msg.id, () =>
+      appendChannelMessage(this.channelSlug, {
+        id: msg.id,
+        speakerId: msg.speakerId,
+        speakerName: msg.speakerName,
+        speakerAvatar: msg.speakerAvatar,
+        speakerType: msg.speakerType,
+        agentId: msg.agentId,
+        body: msg.body,
+        status: msg.status,
+        tags: msg.tags,
+        createdAt: msg.createdAt,
+      }),
+    )
+  }
+
+  private async handleLoadHistory(client: Client, payload: LoadHistoryPayload) {
+    const limit = Math.max(1, Math.min(payload.limit ?? PAGE_HISTORY_LIMIT, 100))
+    const before = payload.before ?? this.historyNextBefore ?? undefined
+    const beforeId = payload.beforeId ?? this.historyNextBeforeId ?? undefined
+    if (!before) {
+      client.send('history', {
+        messages: [],
+        hasMore: false,
+        nextBefore: null,
+        nextBeforeId: null,
+        channelSlug: this.channelSlug,
+      })
+      return
+    }
+
+    const page = await fetchChannelMessagesPage(this.channelSlug, {
+      limit,
+      before,
+      beforeId,
+    })
+
+    client.send('history', {
+      messages: page.messages.map((m) => ({
+        id: m.id,
+        speaker: m.speakerName,
+        speakerId: m.speakerId,
+        speakerAvatar: m.speakerAvatar ?? '',
+        speakerType: m.speakerType,
+        agentId: m.agentId ?? '',
+        body: m.body,
+        status: m.status,
+        ts: new Date(m.createdAt).getTime() || Date.now(),
+      })),
+      hasMore: page.hasMore,
+      nextBefore: page.nextBefore,
+      nextBeforeId: page.nextBeforeId,
+      channelSlug: this.channelSlug,
+    })
+  }
+
   private async handleChat(client: Client, payload: ChatPayload) {
     const text = payload.text?.trim()
     if (!text) return
@@ -267,7 +390,8 @@ export class FleetChannel extends Room {
       meta: { messageId: human.id, channelSlug: this.channelSlug, tags },
     })
 
-    void appendChannelMessage(this.channelSlug, {
+    // Await human turn durability before agent dispatch — survives mid-flight restart.
+    const humanOk = await this.persistMessage({
       id: human.id,
       speakerId: human.speakerId,
       speakerName: human.speaker,
@@ -276,7 +400,14 @@ export class FleetChannel extends Room {
       body: text,
       status: 'final',
       tags,
+      createdAt: new Date(human.ts).toISOString(),
     })
+    if (!humanOk) {
+      console.error('[fleet_channel] human message not durable', {
+        channel: this.channelSlug,
+        id: human.id,
+      })
+    }
 
     const targets = this.resolveTargetAgents(text, payload.targetAgent)
     if (targets.length === 0) {
@@ -308,22 +439,43 @@ export class FleetChannel extends Room {
       }))
   }
 
-  private pushAgentReply(
+  private async pushAgentReply(
     target: string,
     agentName: string,
     output: string,
-    opts: { work?: boolean; workRepo?: string } = {},
+    opts: {
+      work?: boolean
+      workRepo?: string
+      /** Reuse id from early pending write so upserts are idempotent across restart. */
+      messageId?: string
+      status?: ChatMessage['status']
+    } = {},
   ) {
-    const reply = new ChatMessage()
-    reply.id = uid()
-    reply.sessionId = this.channelSlug
+    const existingId = opts.messageId
+    let reply: ChatMessage | undefined
+    if (existingId) {
+      for (let i = 0; i < this.state.messages.length; i++) {
+        if (this.state.messages[i]?.id === existingId) {
+          reply = this.state.messages[i]
+          break
+        }
+      }
+    }
+    if (!reply) {
+      reply = new ChatMessage()
+      reply.id = existingId || uid()
+      reply.sessionId = this.channelSlug
+      reply.speaker = agentName
+      reply.speakerType = 'agent'
+      reply.agentId = target
+      this.pushMessage(reply)
+    }
     reply.speaker = agentName
     reply.speakerType = 'agent'
     reply.agentId = target
     reply.body = output
-    reply.status = 'final'
+    reply.status = opts.status ?? 'final'
     reply.ts = Date.now()
-    this.pushMessage(reply)
 
     recordEvent({
       ts: reply.ts,
@@ -338,25 +490,27 @@ export class FleetChannel extends Room {
         channelSlug: this.channelSlug,
         work: opts.work === true,
         workRepo: opts.workRepo,
+        status: reply.status,
       },
     })
 
-    void appendChannelMessage(this.channelSlug, {
+    // Tracked persist — drainable on dispose/SIGTERM. Await final writes so
+    // mid-flight process death still has pending row when status was pending.
+    await this.persistMessage({
       id: reply.id,
       speakerId: target,
       speakerName: agentName,
       speakerType: 'agent',
       agentId: target,
       body: output,
-      status: 'final',
+      status: reply.status,
       tags: opts.work ? ['work', 'github'] : undefined,
+      createdAt: new Date(reply.ts).toISOString(),
     })
 
     // Accountability: every work-mode agent move lands in ^product with repo context
-    if (opts.work) {
-      const ghMatch = output.match(
-        /https:\/\/github\.com\/[^\s)]+/i,
-      )
+    if (opts.work && reply.status === 'final') {
+      const ghMatch = output.match(/https:\/\/github\.com\/[^\s)]+/i)
       void logAgentWorkToProduct({
         agentId: target,
         agentName,
@@ -366,6 +520,8 @@ export class FleetChannel extends Room {
         url: ghMatch?.[0],
       })
     }
+
+    return reply
   }
 
   /**
@@ -413,7 +569,7 @@ export class FleetChannel extends Room {
     })
 
     if (payload.persist !== false) {
-      void appendChannelMessage(this.channelSlug, {
+      void this.persistMessage({
         id: msg.id,
         speakerId: msg.speakerId,
         speakerName,
@@ -422,6 +578,7 @@ export class FleetChannel extends Room {
         body: payload.body,
         status: 'final',
         tags: payload.tags ?? ['program'],
+        createdAt: new Date(msg.ts).toISOString(),
       })
     }
 
@@ -447,7 +604,7 @@ export class FleetChannel extends Room {
   private async dispatchToAgents(
     targets: string[],
     text: string,
-    opts: { work?: boolean; workRepo?: string } = {}
+    opts: { work?: boolean; workRepo?: string } = {},
   ) {
     const workRepo = opts.workRepo ?? normalizeWorkRepo()
     const agentNames = targets.map((t) => this.state.agents.find((a) => a.id === t)?.name ?? t)
@@ -457,7 +614,7 @@ export class FleetChannel extends Room {
         : targets.length === 1
           ? handingToAgent(agentNames[0])
           : askingFleet(agentNames),
-      'pending'
+      'pending',
     )
 
     const history = this.chatHistory()
@@ -469,6 +626,37 @@ export class FleetChannel extends Room {
       if (agentRow) agentRow.status = 'thinking'
     }
 
+    // Early pending rows in Postgres so a restart mid-dispatch still shows the turn.
+    const pendingIds = new Map<string, string>()
+    await Promise.all(
+      targets.map(async (target) => {
+        const agentName = this.state.agents.find((a) => a.id === target)?.name ?? target
+        const id = uid()
+        pendingIds.set(target, id)
+        const pending = new ChatMessage()
+        pending.id = id
+        pending.sessionId = this.channelSlug
+        pending.speaker = agentName
+        pending.speakerType = 'agent'
+        pending.agentId = target
+        pending.body = '…'
+        pending.status = 'pending'
+        pending.ts = Date.now()
+        this.pushMessage(pending)
+        await this.persistMessage({
+          id,
+          speakerId: target,
+          speakerName: agentName,
+          speakerType: 'agent',
+          agentId: target,
+          body: '…',
+          status: 'pending',
+          tags: opts.work ? ['work', 'github'] : undefined,
+          createdAt: new Date(pending.ts).toISOString(),
+        })
+      }),
+    )
+
     const results = await Promise.allSettled(
       targets.map(async (target) => {
         const agentName = this.state.agents.find((a) => a.id === target)?.name ?? target
@@ -476,7 +664,7 @@ export class FleetChannel extends Room {
           ? await dispatchAgentWork(target, text, history, workRepo)
           : await dispatchAgentChat(target, text, history)
         return { target, agentName, res }
-      })
+      }),
     )
 
     this.removeMessageById(statusMsg.id)
@@ -487,13 +675,17 @@ export class FleetChannel extends Room {
       if (agentRow) agentRow.status = 'idle'
 
       const result = results[i]
-      const workMeta = { work: opts.work === true, workRepo }
+      const workMeta = {
+        work: opts.work === true,
+        workRepo,
+        messageId: pendingIds.get(target),
+      }
       if (result.status === 'fulfilled') {
-        this.pushAgentReply(
+        await this.pushAgentReply(
           target,
           result.value.agentName,
           result.value.res.output,
-          workMeta,
+          { ...workMeta, status: 'final' },
         )
       } else {
         const agentName = agentRow?.name ?? target
@@ -501,7 +693,7 @@ export class FleetChannel extends Room {
         const is429 =
           reason instanceof Error &&
           (reason.message.includes('429') || reason.name === 'OpenRouterRateLimitError')
-        this.pushAgentReply(
+        await this.pushAgentReply(
           target,
           agentName,
           is429
@@ -509,7 +701,7 @@ export class FleetChannel extends Room {
             : reason instanceof Error
               ? reason.message
               : 'Agent failed',
-          workMeta,
+          { ...workMeta, status: 'error' },
         )
       }
     }

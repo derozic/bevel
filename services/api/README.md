@@ -25,10 +25,13 @@ Postgres `messages` is the source of truth. Realtime (Colyseus) is the live fan-
 |---------|----------|
 | Write path | `POST /api/v1/fleet/channels/{slug}/messages` **upserts by `id`** |
 | Retries | Same message id re-POST is safe (no duplicate rows) |
-| Streaming | Clients may re-POST `status: pending\|streaming\|final` with the same id |
+| Streaming | Clients may re-POST `status: pending\|streaming\|final\|error` with the same id |
+| Early write | Human turns are **awaited** before agent dispatch; agent replies get a **pending** row before the model returns |
+| Mid-flight restart | Realtime tracks in-flight persists and drains them on room dispose / SIGTERM |
 | Recovery | `GET /api/v1/fleet/channels/{slug}/messages/in-progress` |
+| Pagination | `GET .../messages?limit=&before=&before_id=` → `{ messages, hasMore, nextBefore, nextBeforeId }` |
 | Pool | `pool_pre_ping`, recycle, configurable `DB_POOL_*` env vars |
-| Realtime client | Retries persist up to 3× with timeout (see `fleet-channel-api.ts`) |
+| Realtime client | Retries persist up to 5× with timeout (see `fleet-channel-api.ts`) |
 
 ## Ports / hosts
 

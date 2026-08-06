@@ -22,8 +22,22 @@ export type FleetChannelMessageRecord = {
   createdAt: string
 }
 
+export type ChannelMessagesPage = {
+  messages: FleetChannelMessageRecord[]
+  hasMore: boolean
+  nextBefore: string | null
+  nextBeforeId: string | null
+  limit: number
+}
+
+export type FetchMessagesOpts = {
+  limit?: number
+  before?: string | null
+  beforeId?: string | null
+}
+
 const PERSIST_TIMEOUT_MS = 8_000
-const PERSIST_RETRIES = 3
+const PERSIST_RETRIES = 5
 
 function apiBase(): string | null {
   return process.env.API_INTERNAL_URL ?? process.env.FLEET_CHANNEL_API_URL ?? null
@@ -62,26 +76,63 @@ export async function fetchChannel(slug: string): Promise<FleetChannelRecord | n
   }
 }
 
-export async function fetchChannelMessages(
+/** Fetch one page of channel history (newest page when before is omitted). */
+export async function fetchChannelMessagesPage(
   slug: string,
-  limit = 100
-): Promise<FleetChannelMessageRecord[]> {
+  opts: FetchMessagesOpts = {},
+): Promise<ChannelMessagesPage> {
   const base = apiBase()
-  if (!base) return []
+  const limit = Math.max(1, Math.min(opts.limit ?? 100, 500))
+  const empty: ChannelMessagesPage = {
+    messages: [],
+    hasMore: false,
+    nextBefore: null,
+    nextBeforeId: null,
+    limit,
+  }
+  if (!base) return empty
   try {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (opts.before) params.set('before', opts.before)
+    if (opts.beforeId) params.set('before_id', opts.beforeId)
     const res = await fetch(
-      `${base}/api/v1/fleet/channels/${encodeURIComponent(slug)}/messages?limit=${limit}`,
+      `${base}/api/v1/fleet/channels/${encodeURIComponent(slug)}/messages?${params}`,
       {
         headers: internalHeaders(),
         signal: AbortSignal.timeout(PERSIST_TIMEOUT_MS),
-      }
+      },
     )
-    if (!res.ok) return []
-    const data = (await res.json()) as { messages?: FleetChannelMessageRecord[] }
-    return data.messages ?? []
+    if (!res.ok) return empty
+    const data = (await res.json()) as {
+      messages?: FleetChannelMessageRecord[]
+      hasMore?: boolean
+      nextBefore?: string | null
+      nextBeforeId?: string | null
+      limit?: number
+    }
+    const messages = data.messages ?? []
+    return {
+      messages,
+      hasMore: Boolean(data.hasMore),
+      nextBefore: data.nextBefore ?? messages[0]?.createdAt ?? null,
+      nextBeforeId: data.nextBeforeId ?? messages[0]?.id ?? null,
+      limit: data.limit ?? limit,
+    }
   } catch {
-    return []
+    return empty
   }
+}
+
+/**
+ * Convenience: messages only (newest page). Prefer fetchChannelMessagesPage when
+ * the caller needs hasMore / cursors.
+ */
+export async function fetchChannelMessages(
+  slug: string,
+  limit = 100,
+): Promise<FleetChannelMessageRecord[]> {
+  const page = await fetchChannelMessagesPage(slug, { limit })
+  return page.messages
 }
 
 /**
@@ -91,7 +142,7 @@ export async function fetchChannelMessages(
  */
 export async function appendChannelMessage(
   slug: string,
-  msg: Omit<FleetChannelMessageRecord, 'createdAt'> & { createdAt?: string }
+  msg: Omit<FleetChannelMessageRecord, 'createdAt'> & { createdAt?: string },
 ): Promise<boolean> {
   const base = apiBase()
   if (!base) {
