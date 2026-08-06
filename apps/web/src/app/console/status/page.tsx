@@ -33,7 +33,7 @@ export default function ConsoleStatusPage() {
     const thisOrigin =
       typeof window !== 'undefined' ? window.location.origin : bevelUrls.web()
     const workspaceOrigin = 'https://bevel.2x4m.cc'
-    const platformOrigin = bevelUrls.web()
+    const platformOrigin = bevelUrls.platformWeb()
 
     const targets: { name: string; url: string; ok: (s: number, b: string) => boolean }[] = [
       {
