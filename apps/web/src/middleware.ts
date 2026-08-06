@@ -251,9 +251,12 @@ export function middleware(request: NextRequest) {
     return res
   }
   if (clearSession) {
-    const clean = request.nextUrl.clone()
-    clean.searchParams.delete('clear')
-    const res = NextResponse.redirect(clean, 302)
+    // Never redirect via nextUrl (bind host is 127.0.0.1:41009 behind Caddy).
+    const qs = new URLSearchParams(searchParams)
+    qs.delete('clear')
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    const target = `${publicOrigin(request)}${pathname}${suffix}`
+    const res = NextResponse.redirect(target, 302)
     expireSessionCookies(res, request)
     return res
   }
