@@ -23,7 +23,9 @@ import 'ui/native_hub_page.dart';
 import 'ui/onboarding/google_workspace_onboarding.dart';
 import 'ui/onboarding/onboarding_state.dart';
 import 'ui/settings/notification_settings_page.dart';
+import 'ui/workspace_picker_page.dart';
 import 'ui/workspace_shell.dart';
+import 'workspace/workspace_target.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -140,14 +142,18 @@ class _BevelHomePageState extends State<BevelHomePage> {
         _hermesStatus = hermesStatus;
       });
 
-      // Consumer default: signed-in users land in chat, not a developer hub.
+      // Signed-in: open last selected space, or the chooser (Private + orgs).
       if (!_didAutoOpenWorkspace &&
           (onboarding.completedGoogleSignIn || onboarding.sessionHealthy) &&
           !onboarding.needsOnboarding) {
         _didAutoOpenWorkspace = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || _workspaceOpen) return;
-          _openWorkspace(path: onboarding.lastWorkspacePath);
+          if (onboarding.selectedWorkspace != null) {
+            _openSelectedSpace();
+          } else {
+            _openWorkspacePicker(autoEnterIfSingle: false);
+          }
         });
       }
     } catch (e) {
@@ -281,11 +287,41 @@ class _BevelHomePageState extends State<BevelHomePage> {
     });
     await _maybeShowEscalationInbox();
     if (!mounted) return;
-    _openWorkspace(
-      path: safePath,
-      handoffCode: handoffCode,
-      workspaceHost: workspaceHost,
-    );
+
+    // Prefer host from OAuth (org) when present; else selected space / chooser.
+    if (workspaceHost != null && workspaceHost.trim().isNotEmpty) {
+      final host = workspaceHost.trim().toLowerCase();
+      final isApex = host == 'bevel.is' ||
+          host == 'www.bevel.is' ||
+          host == 'app.bevel.is';
+      final target = isApex
+          ? WorkspaceTarget.private(platformHost: host)
+          : WorkspaceTarget.org(
+              slug: host.split('.').firstWhere(
+                    (s) => s != 'bevel' && s.isNotEmpty,
+                    orElse: () => host,
+                  ),
+              name: host,
+              host: host,
+              homePath: safePath.startsWith('/me') ? '/me' : safePath,
+            );
+      final nextWs = _onboarding.copyWith(selectedWorkspace: target);
+      await nextWs.save();
+      if (!mounted) return;
+      setState(() => _onboarding = nextWs);
+      _openWorkspace(
+        path: safePath,
+        handoffCode: handoffCode,
+        workspaceHost: host,
+      );
+      return;
+    }
+
+    if (_onboarding.selectedWorkspace != null) {
+      _openSelectedSpace(handoffCode: handoffCode);
+    } else {
+      _openWorkspacePicker(autoEnterIfSingle: true);
+    }
   }
 
   Future<void> _maybeShowEscalationInbox() async {
@@ -377,15 +413,97 @@ class _BevelHomePageState extends State<BevelHomePage> {
     if (mounted) setState(() => _onboarding = next);
   }
 
+  void _openWorkspacePicker({bool autoEnterIfSingle = false}) {
+    Navigator.of(context)
+        .push(
+      MaterialPageRoute<void>(
+        builder: (_) => WorkspacePickerPage(
+          email: _onboarding.userEmail.isNotEmpty
+              ? _onboarding.userEmail
+              : null,
+          selectedId: _onboarding.selectedWorkspace?.id,
+          onSelect: (target) async {
+            Navigator.of(context).pop(); // close picker
+            await _selectAndOpenSpace(target);
+          },
+        ),
+      ),
+    )
+        .then((_) {
+      // no-op
+    });
+    // autoEnterIfSingle reserved for future single-membership UX
+    if (autoEnterIfSingle) {
+      // Keep chooser — always let user pick Private vs org explicitly.
+    }
+  }
+
+  Future<void> _selectAndOpenSpace(WorkspaceTarget target) async {
+    final home = target.homePath;
+    final next = _onboarding.copyWith(
+      selectedWorkspace: target,
+      lastWorkspacePath: home,
+    );
+    await next.save();
+    if (!mounted) return;
+    setState(() {
+      _onboarding = next;
+      _status = 'Opening ${target.name}…';
+    });
+    // Pop shell if already open, then open new host
+    if (_workspaceOpen && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
+    if (!mounted) return;
+    _openWorkspace(
+      path: home,
+      workspaceHost: target.host,
+    );
+  }
+
+  void _openSelectedSpace({String? handoffCode, String? pathOverride}) {
+    final ws = _onboarding.selectedWorkspace;
+    if (ws == null) {
+      _openWorkspacePicker();
+      return;
+    }
+    final path = pathOverride ??
+        (_onboarding.lastWorkspacePath.isNotEmpty &&
+                _pathMatchesSpace(_onboarding.lastWorkspacePath, ws)
+            ? _onboarding.lastWorkspacePath
+            : ws.homePath);
+    _openWorkspace(
+      path: path,
+      handoffCode: handoffCode,
+      workspaceHost: ws.host,
+    );
+  }
+
+  bool _pathMatchesSpace(String path, WorkspaceTarget ws) {
+    if (ws.isPrivate) {
+      return path == '/me' || path.startsWith('/me/') || path.startsWith('/talk');
+    }
+    return path.startsWith('/~') ||
+        path.startsWith('/bevel') ||
+        path.startsWith('/timeline') ||
+        path.startsWith('/talk');
+  }
+
   void _openWorkspace({
     String path = '/~general',
     String? handoffCode,
     String? workspaceHost,
   }) {
+    final selected = _onboarding.selectedWorkspace;
+    final host = (workspaceHost != null && workspaceHost.isNotEmpty)
+        ? workspaceHost
+        : selected?.host;
     final openPath = path.isEmpty || path == '/'
-        ? (_onboarding.lastWorkspacePath.isNotEmpty
-            ? _onboarding.lastWorkspacePath
-            : '/~general')
+        ? (selected?.homePath ??
+            (_onboarding.lastWorkspacePath.isNotEmpty
+                ? _onboarding.lastWorkspacePath
+                : '/~general'))
         : path;
     _workspaceOpen = true;
     Navigator.of(context)
@@ -394,11 +512,16 @@ class _BevelHomePageState extends State<BevelHomePage> {
         builder: (_) => WorkspaceShellPage(
           initialPath: openPath,
           handoffCode: handoffCode,
-          workspaceHost: workspaceHost,
+          workspaceHost: host,
+          workspaceLabel: selected?.name,
           hermes: _hermes,
           consumerMode: true,
           onOpenNativeHub: () => _openNativeHub(),
           onOpenNotifications: _openNotificationSettings,
+          onSwitchWorkspace: () {
+            Navigator.of(context).pop(); // leave shell
+            _openWorkspacePicker();
+          },
           onPathChanged: (p) async {
             final next = _onboarding.copyWith(lastWorkspacePath: p);
             await next.save();
@@ -418,8 +541,8 @@ class _BevelHomePageState extends State<BevelHomePage> {
             setState(() {
               _onboarding = next;
               _status = healthy
-                  ? 'Workspace session ready'
-                  : 'Workspace needs sign-in — use the login button if stuck';
+                  ? 'Session ready · ${selected?.name ?? host ?? 'chat'}'
+                  : 'Needs sign-in — use the login button if stuck';
             });
             // Bind push token to this identity for server fan-out
             if (healthy) {
@@ -579,9 +702,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
     final signedIn = _onboarding.completedGoogleSignIn ||
         _onboarding.sessionHealthy ||
         _onboarding.userEmail.isNotEmpty;
-    final lastPath = _onboarding.lastWorkspacePath.isNotEmpty
-        ? _onboarding.lastWorkspacePath
-        : '/~general';
+    final selected = _onboarding.selectedWorkspace;
 
     return AdaptiveScaffold(
       appBar: AppBar(
@@ -610,6 +731,11 @@ class _BevelHomePageState extends State<BevelHomePage> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Choose workspace',
+            onPressed: () => _openWorkspacePicker(),
+            icon: const Icon(Icons.workspaces_outlined),
+          ),
+          IconButton(
             tooltip: 'Notification settings',
             onPressed: _openNotificationSettings,
             icon: const Icon(Icons.notifications_outlined),
@@ -619,24 +745,27 @@ class _BevelHomePageState extends State<BevelHomePage> {
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (value) async {
               switch (value) {
+                case 'spaces':
+                  _openWorkspacePicker();
                 case 'hub':
                   _openNativeHub();
                 case 'hermes':
                   await _openHermes();
                 case 'copy':
-                  await Clipboard.setData(
-                    ClipboardData(text: BevelConfig.workspaceUrl),
-                  );
+                  final url = selected?.origin ?? BevelConfig.workspaceUrl;
+                  await Clipboard.setData(ClipboardData(text: url));
                   if (mounted) {
-                    setState(
-                      () => _status = 'Copied ${BevelConfig.workspaceUrl}',
-                    );
+                    setState(() => _status = 'Copied $url');
                   }
                 case 'browser':
                   await _openExternal(BevelConfig.entryUri());
               }
             },
             itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'spaces',
+                child: Text('Switch workspace'),
+              ),
               if (caps?.supportsHermesBridge == true)
                 const PopupMenuItem(
                   value: 'hermes',
@@ -671,7 +800,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
             ),
             children: [
               Text(
-                signedIn ? 'Your workspace' : BevelConfig.appTagline,
+                signedIn ? 'Your spaces' : BevelConfig.appTagline,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: const Color(0xFFF4F7F5),
@@ -680,13 +809,11 @@ class _BevelHomePageState extends State<BevelHomePage> {
               const SizedBox(height: 8),
               Text(
                 signedIn
-                    ? 'Continue where you left off in chat. Channels, agents, and '
-                        'live conversation match the web app.'
+                    ? 'Pick Private (top-level agents) or a product workspace — '
+                        'same chooser as the web.'
                     : isMac
-                        ? 'Sign in with Google, then chat opens in this window — '
-                            'no browser tabs, no cookie confusion.'
-                        : 'Sign in with Google Workspace. Chat, channels, and '
-                            'your agents — same experience as the web.',
+                        ? 'Sign in with Google, then choose Private or a workspace.'
+                        : 'Sign in with Google Workspace, then choose Private or an org.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF9AA8B5),
                       height: 1.45,
@@ -701,6 +828,23 @@ class _BevelHomePageState extends State<BevelHomePage> {
                   style: const TextStyle(
                     color: Color(0xFF94A3B8),
                     fontSize: 13,
+                  ),
+                ),
+              ],
+              if (selected != null) ...[
+                const SizedBox(height: 16),
+                Card(
+                  child: ListTile(
+                    leading: Icon(
+                      selected.isPrivate
+                          ? Icons.lock_outline_rounded
+                          : Icons.workspaces_outlined,
+                      color: scheme.primary,
+                    ),
+                    title: Text(selected.name),
+                    subtitle: Text(selected.subtitle ?? selected.host),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: _openSelectedSpace,
                   ),
                 ),
               ],
@@ -726,14 +870,28 @@ class _BevelHomePageState extends State<BevelHomePage> {
               Semantics(
                 identifier: 'bevel.home.open_workspace',
                 button: true,
-                label: signedIn ? 'Continue to chat' : 'Open chat',
+                label: selected != null
+                    ? 'Continue to ${selected.name}'
+                    : 'Choose workspace',
                 child: FilledButton.icon(
-                  onPressed: () => _openWorkspace(path: lastPath),
-                  icon: const Icon(Icons.forum_outlined),
+                  onPressed: () {
+                    if (selected != null) {
+                      _openSelectedSpace();
+                    } else if (signedIn) {
+                      _openWorkspacePicker();
+                    } else {
+                      _openWorkspacePicker();
+                    }
+                  },
+                  icon: Icon(
+                    selected != null
+                        ? Icons.forum_outlined
+                        : Icons.workspaces_outlined,
+                  ),
                   label: Text(
-                    signedIn
-                        ? 'Continue to chat'
-                        : (isMac ? 'Open chat window' : 'Open chat'),
+                    selected != null
+                        ? 'Continue to ${selected.name}'
+                        : 'Choose workspace',
                   ),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
@@ -746,9 +904,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
               if (signedIn) ...[
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: () => _openWorkspace(path: '/~general'),
-                  icon: const Icon(Icons.tag_rounded, size: 18),
-                  label: const Text('Open ~general'),
+                  onPressed: () => _openWorkspacePicker(),
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                  label: const Text('Switch workspace'),
                 ),
                 const SizedBox(height: 8),
                 TextButton.icon(
@@ -759,13 +917,15 @@ class _BevelHomePageState extends State<BevelHomePage> {
               ],
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: () => _openExternal(BevelConfig.entryUri()),
+                onPressed: () =>
+                    _openExternal(BevelConfig.entryUri('/workspaces')),
                 icon: const Icon(Icons.open_in_browser_rounded, size: 18),
-                label: const Text('Open in browser (recovery)'),
+                label: const Text('Open chooser in browser'),
               ),
               const SizedBox(height: 24),
               Text(
-                'Chat lives here. Console, integrations, and API keys stay on the web.',
+                'Private = bevel.is agents. Orgs = product hosts (e.g. bevel.2x4m.cc). '
+                'Console stays on the web.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: const Color(0xFF64748B),
                       height: 1.4,

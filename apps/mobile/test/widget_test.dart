@@ -20,7 +20,7 @@ void main() {
     expect(find.text('BEVEL'), findsWidgets);
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(
-      find.textContaining('Open chat'),
+      find.textContaining('Choose workspace'),
       findsWidgets,
     );
     // Power-user hub is under the More menu — not a primary home CTA.

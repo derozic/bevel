@@ -75,7 +75,13 @@ jar (Safari cookies are never shared with WKWebView).
 
 ## Version
 
-`pubspec.yaml` → `0.4.1+6` (name + build). Bump for each store submission.
+`pubspec.yaml` → `0.4.2+7` (name + build). Bump for each store submission.
+
+### Workspace chooser (parity with web)
+
+After Google sign-in the app shows **Private** (bevel.is agents) plus product
+orgs from `GET /api/v1/tenants`. Selection is persisted; switch anytime from
+home, shell app bar, or **More → Switch workspace**.
 
 Store / push / device QA:
 

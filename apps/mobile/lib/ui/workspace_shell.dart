@@ -29,9 +29,11 @@ class WorkspaceShellPage extends StatefulWidget {
     this.initialPath = '/~general',
     this.handoffCode,
     this.workspaceHost,
+    this.workspaceLabel,
     this.hermes,
     this.onOpenNativeHub,
     this.onOpenNotifications,
+    this.onSwitchWorkspace,
     this.onSessionState,
     this.onPathChanged,
     this.consumerMode = true,
@@ -42,9 +44,13 @@ class WorkspaceShellPage extends StatefulWidget {
   final String? handoffCode;
   /// Optional host override (e.g. bevel.2x4m.cc) from native-complete.
   final String? workspaceHost;
+  /// Display name for app bar (Private / 2x4m).
+  final String? workspaceLabel;
   final HermesBridge? hermes;
   final VoidCallback? onOpenNativeHub;
   final VoidCallback? onOpenNotifications;
+  /// Open chooser to switch Private vs product workspace.
+  final VoidCallback? onSwitchWorkspace;
   /// Called after session probe (authenticated or not).
   final void Function(bool healthy, String? email)? onSessionState;
   /// Persist last workspace path for relaunch restore.
@@ -485,12 +491,16 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
             Text(
-              showRail
-                  ? '${_currentUri?.host ?? Uri.parse(BevelConfig.workspaceUrl).host} · dual-pane'
-                  : (_sessionHealthy
-                      ? 'Signed in · chat'
-                      : (_currentUri?.host ??
-                          Uri.parse(BevelConfig.workspaceUrl).host)),
+              [
+                if (widget.workspaceLabel != null &&
+                    widget.workspaceLabel!.isNotEmpty)
+                  widget.workspaceLabel!,
+                _currentUri?.host ??
+                    widget.workspaceHost ??
+                    Uri.parse(BevelConfig.workspaceUrl).host,
+                if (showRail) 'dual-pane',
+                if (_sessionHealthy) 'signed in',
+              ].join(' · '),
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(0xFF9AA8B5),
@@ -500,6 +510,12 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           ],
         ),
         actions: [
+          if (widget.onSwitchWorkspace != null)
+            IconButton(
+              tooltip: 'Switch workspace',
+              onPressed: widget.onSwitchWorkspace,
+              icon: const Icon(Icons.workspaces_outlined),
+            ),
           if (showPhonePicker)
             IconButton(
               tooltip: 'Channels',
@@ -533,6 +549,8 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (value) {
               switch (value) {
+                case 'switch':
+                  widget.onSwitchWorkspace?.call();
                 case 'share':
                   unawaited(_share());
                 case 'browser':
@@ -548,6 +566,16 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               }
             },
             itemBuilder: (ctx) => [
+              if (widget.onSwitchWorkspace != null)
+                const PopupMenuItem(
+                  value: 'switch',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.workspaces_outlined),
+                    title: Text('Switch workspace'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
               const PopupMenuItem(
                 value: 'share',
                 child: ListTile(
