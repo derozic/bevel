@@ -19,6 +19,7 @@ dependencies = [
   "alembic>=1.14.0",
   "greenlet>=3.0.0",
   "google-antigravity>=0.1.5",
+  "google-auth>=2.37.0",
 ]
 
 [project.scripts]

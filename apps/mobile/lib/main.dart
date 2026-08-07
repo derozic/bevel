@@ -15,7 +15,7 @@ import 'native/native_capabilities.dart';
 import 'native/notification_service.dart';
 import 'native/oauth_browser.dart';
 import 'native/sharing_service.dart';
-import 'native/push_bootstrap.dart';
+import 'native/push_handlers.dart';
 import 'ui/escalation/escalation_inbox.dart';
 import 'ui/layout/adaptive_scaffold.dart';
 import 'ui/layout/bevel_breakpoints.dart';
@@ -109,7 +109,13 @@ class _BevelHomePageState extends State<BevelHomePage> {
         await _notifications.initialize();
         _notifications.onNotificationTap = _onNotificationPayload;
         // Best-effort Firebase/FCM when platform config is present
-        unawaited(PushBootstrap.ensureInitialized());
+        unawaited(
+          PushHandlers.install(
+            notifications: _notifications,
+            userId: onboarding.userId.isNotEmpty ? onboarding.userId : null,
+            onOpenPayload: _onNotificationPayload,
+          ),
+        );
         final launchPayload = await _notifications.consumeLaunchPayload();
         if (launchPayload != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -352,8 +358,16 @@ class _BevelHomePageState extends State<BevelHomePage> {
     );
     final granted = go == true ? await _notifications.requestPermission() : false;
     if (granted) {
-      await PushBootstrap.ensureInitialized();
-      await _notifications.syncPushToken();
+      await PushHandlers.install(
+        notifications: _notifications,
+        userId: _onboarding.userId.isNotEmpty ? _onboarding.userId : null,
+        onOpenPayload: _onNotificationPayload,
+      );
+      await _notifications.syncPushToken(
+        userId: _onboarding.userId.isNotEmpty
+            ? _onboarding.userId
+            : (_onboarding.userEmail.isNotEmpty ? _onboarding.userEmail : null),
+      );
     }
     final next = _onboarding.copyWith(
       askedNotificationPermission: true,
@@ -407,6 +421,25 @@ class _BevelHomePageState extends State<BevelHomePage> {
                   ? 'Workspace session ready'
                   : 'Workspace needs sign-in — use the login button if stuck';
             });
+            // Bind push token to this identity for server fan-out
+            if (healthy) {
+              unawaited(
+                _notifications.syncPushToken(
+                  userId: next.userId.isNotEmpty
+                      ? next.userId
+                      : (email?.isNotEmpty == true ? email : null),
+                ),
+              );
+              unawaited(
+                PushHandlers.install(
+                  notifications: _notifications,
+                  userId: next.userId.isNotEmpty
+                      ? next.userId
+                      : (email?.isNotEmpty == true ? email : null),
+                  onOpenPayload: _onNotificationPayload,
+                ),
+              );
+            }
           },
         ),
       ),
@@ -432,8 +465,20 @@ class _BevelHomePageState extends State<BevelHomePage> {
           onRequestPermission: () async {
             final ok = await _notifications.requestPermission();
             if (ok) {
-              await PushBootstrap.ensureInitialized();
-              await _notifications.syncPushToken();
+              await PushHandlers.install(
+                notifications: _notifications,
+                userId: _onboarding.userId.isNotEmpty
+                    ? _onboarding.userId
+                    : null,
+                onOpenPayload: _onNotificationPayload,
+              );
+              await _notifications.syncPushToken(
+                userId: _onboarding.userId.isNotEmpty
+                    ? _onboarding.userId
+                    : (_onboarding.userEmail.isNotEmpty
+                        ? _onboarding.userEmail
+                        : null),
+              );
             }
             return ok;
           },

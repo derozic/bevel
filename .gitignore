@@ -19,6 +19,8 @@ services/api/data/
 data/secrets/
 data/sms/
 data/otp/
+# Firebase service account + local pull-firebase-config output
+secrets/
 
 # TypeScript incremental build caches
 *.tsbuildinfo

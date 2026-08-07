@@ -255,6 +255,31 @@ async def fan_out_from_message(
             created_at=message.created_at,
         )
         created.append(item)
+        push_result: dict[str, Any] | None = None
+        # Soft mentions: optional low-priority push (client may still filter)
+        try:
+            from bevel_api.lib import fcm as fcm_lib
+
+            channel = message.channel_slug or "general"
+            push_result = await fcm_lib.send_to_user_tokens(
+                session,
+                user_id=user.id,
+                email=user.email,
+                title=f"@{handle} · ~{channel}",
+                body=f"{actor_label}: {body_preview}"[:200],
+                data={
+                    "kind": "mention",
+                    "channelSlug": channel,
+                    "deepLink": f"bevel://channel/{channel}",
+                    "payload": f"bevel://channel/{channel}",
+                    "itemId": item.id,
+                    "messageId": message.id,
+                },
+                high_priority=False,
+                android_channel="bevel_workspace",
+            )
+        except Exception:
+            push_result = {"ok": False, "error": "push_failed"}
         notified.append(
             {
                 "handle": handle,
@@ -262,6 +287,7 @@ async def fan_out_from_message(
                 "resolved": True,
                 "userId": user.id,
                 "itemId": item.id,
+                "push": push_result,
             }
         )
 
@@ -328,6 +354,38 @@ async def fan_out_from_message(
             except Exception:
                 email_result = {"ok": False, "error": "email_failed"}
 
+        push_result: dict[str, Any] | None = None
+        try:
+            from bevel_api.lib import fcm as fcm_lib
+
+            channel = message.channel_slug or "general"
+            push_result = await fcm_lib.send_to_user_tokens(
+                session,
+                user_id=user.id,
+                email=user.email,
+                title=f"^{handle} escalation · ~{channel}",
+                body=f"{actor_label}: {body_preview}"[:200],
+                data={
+                    "kind": "escalation",
+                    "channelSlug": channel,
+                    "deepLink": f"bevel://channel/{channel}",
+                    "payload": f"bevel://channel/{channel}",
+                    "itemId": item.id,
+                    "messageId": message.id,
+                    "timeline": "bevel://timeline",
+                },
+                high_priority=True,
+                android_channel="bevel_escalation",
+            )
+            if push_result.get("sent"):
+                payload = dict(item.payload or {})
+                payload["pushedAt"] = _utcnow().isoformat()
+                payload["pushProvider"] = "fcm"
+                item.payload = payload
+                await session.flush()
+        except Exception:
+            push_result = {"ok": False, "error": "push_failed"}
+
         notified.append(
             {
                 "handle": handle,
@@ -337,6 +395,7 @@ async def fan_out_from_message(
                 "itemId": item.id,
                 "personalAgentId": user.personal_agent_id,
                 "email": email_result,
+                "push": push_result,
             }
         )
 

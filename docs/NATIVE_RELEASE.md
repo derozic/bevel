@@ -150,8 +150,21 @@ When release artifacts are published, update that page’s store / direct-downlo
 3. **Done:** Push token registration API + `firebase_messaging` client (needs 1Password config files)
 4. **Done:** Adaptive dual-pane (iPad / Fold inner), Google Workspace onboarding, escalation inbox
 5. **Done:** Native session bridge — `native-complete` mints handoff code → WebView redeems on workspace host (Safari cookies never shared with WKWebView)
-6. **Next:** Signed TestFlight + Play internal track + notarized macOS zip + store screenshots
-7. **Then:** Live store URLs on `/download#ios` / `#android`
+6. **Done:** FCM HTTP v1 fan-out on API (`^` escalations + `@` mentions), push-send test endpoint, Android release signing from `key.properties`
+7. **Next:** Firebase 1Password item + APNs key → pull-firebase-config → signed TestFlight + Play internal track
+8. **Then:** Live store URLs on `/download#ios` / `#android` + notarized macOS zip
+
+### Store track commands
+
+```bash
+./scripts/mobile/pull-firebase-config.sh   # client plists + service account
+./scripts/mobile/store-checklist.sh
+./scripts/mobile/device-qa.sh
+BEVEL_ENV=production ./scripts/mobile/release.sh android
+BEVEL_ENV=production ./scripts/mobile/release.sh ios
+# iOS: open ios/Runner.xcworkspace → Product → Archive → TestFlight
+# Android: upload dist/native/<ver>/BEVEL-android-release.aab to Play internal
+```
 
 ### Native Google Workspace auth (production)
 

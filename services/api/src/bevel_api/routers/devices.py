@@ -74,3 +74,72 @@ async def delete_push_token(
     if not ok:
         raise HTTPException(404, "Token not found")
     return {"status": "deleted"}
+
+
+class PushSendIn(BaseModel):
+    """Internal test / operator push to a user or raw FCM token."""
+
+    userId: str = ""
+    token: str = ""
+    title: str = "BEVEL"
+    body: str = "Test notification"
+    deepLink: str = "bevel://timeline"
+    highPriority: bool = False
+    kind: str = "test"
+
+
+@router.post("/push-send")
+async def send_push(
+    body: PushSendIn,
+    _auth: InternalAuth,
+    session: SessionDep,
+) -> dict[str, Any]:
+    """Fan-out a test push via FCM HTTP v1 (requires Firebase service account)."""
+    from bevel_api.lib import fcm as fcm_lib
+
+    if not fcm_lib.fcm_configured():
+        raise HTTPException(
+            503,
+            "FCM not configured — set FIREBASE_SERVICE_ACCOUNT_JSON or PATH",
+        )
+    data = {
+        "kind": body.kind or "test",
+        "deepLink": body.deepLink or "bevel://timeline",
+        "payload": body.deepLink or "bevel://timeline",
+    }
+    channel = (
+        "bevel_escalation" if body.highPriority else "bevel_workspace"
+    )
+    if body.token.strip():
+        result = await fcm_lib.send_to_token(
+            token=body.token.strip(),
+            title=body.title,
+            body=body.body,
+            data=data,
+            high_priority=body.highPriority,
+            android_channel=channel,
+        )
+        return {"ok": bool(result.get("ok")), "mode": "token", "result": result}
+    if not body.userId.strip():
+        raise HTTPException(400, "userId or token required")
+    result = await fcm_lib.send_to_user_tokens(
+        session,
+        user_id=body.userId.strip(),
+        title=body.title,
+        body=body.body,
+        data=data,
+        high_priority=body.highPriority,
+        android_channel=channel,
+    )
+    return {"ok": True, "mode": "user", "result": result}
+
+
+@router.get("/push-status")
+async def push_status(_auth: InternalAuth) -> dict[str, Any]:
+    """Whether the API can mint FCM credentials (no secrets returned)."""
+    from bevel_api.lib import fcm as fcm_lib
+
+    return {
+        "fcmConfigured": fcm_lib.fcm_configured(),
+        "hint": "FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH",
+    }

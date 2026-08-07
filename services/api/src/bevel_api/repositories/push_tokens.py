@@ -82,6 +82,7 @@ async def list_tokens(
     *,
     tenant_slug: str | None = None,
     platform: str | None = None,
+    user_id: str | None = None,
     limit: int = 100,
 ) -> list[PushToken]:
     lim = max(1, min(limit, 500))
@@ -90,8 +91,22 @@ async def list_tokens(
         stmt = stmt.where(PushToken.tenant_slug == tenant_slug)
     if platform:
         stmt = stmt.where(PushToken.platform == platform.lower())
+    if user_id:
+        stmt = stmt.where(PushToken.user_id == user_id)
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def list_for_user(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    limit: int = 20,
+) -> list[PushToken]:
+    uid = (user_id or "").strip()
+    if not uid:
+        return []
+    return await list_tokens(session, user_id=uid, limit=limit)
 
 
 async def unregister(session: AsyncSession, token: str) -> bool:

@@ -75,7 +75,16 @@ jar (Safari cookies are never shared with WKWebView).
 
 ## Version
 
-`pubspec.yaml` → `0.4.0+5` (name + build). Bump for each store submission.
+`pubspec.yaml` → `0.4.1+6` (name + build). Bump for each store submission.
+
+Store / push / device QA:
+
+```bash
+./scripts/mobile/pull-firebase-config.sh   # 1Password BEVEL Firebase
+./scripts/mobile/store-checklist.sh
+./scripts/mobile/device-qa.sh
+./scripts/mobile/device-qa.sh run macos    # or ios / android
+```
 
 ## Consumer product surface
 
