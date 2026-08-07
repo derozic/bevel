@@ -11,12 +11,15 @@ import '../native/hermes_bridge.dart';
 import '../native/oauth_browser.dart';
 import '../native/session_bridge.dart';
 import '../native/sharing_service.dart';
+import 'channel_picker_sheet.dart';
 import 'layout/bevel_breakpoints.dart';
 import 'layout/workspace_rail.dart';
 
 /// In-app workspace browser (WKWebView on macOS / iOS, WebView on Android).
 ///
-/// Expanded layouts (iPad Pro, Fold inner, tablets) show a native rail + WebView.
+/// Consumer chat shell: WebView hosts FleetChat for parity with web. Flutter
+/// adds auth handoff, channel switcher (phone sheet / tablet rail), and keeps
+/// operator console destinations in the system browser.
 ///
 /// Auth: when [handoffCode] is set, loads workspace `/api/auth/handoff` first so
 /// Auth.js cookies land in the WebView jar (Safari cookies are never shared).
@@ -28,8 +31,10 @@ class WorkspaceShellPage extends StatefulWidget {
     this.workspaceHost,
     this.hermes,
     this.onOpenNativeHub,
+    this.onOpenNotifications,
     this.onSessionState,
     this.onPathChanged,
+    this.consumerMode = true,
   });
 
   final String initialPath;
@@ -39,10 +44,13 @@ class WorkspaceShellPage extends StatefulWidget {
   final String? workspaceHost;
   final HermesBridge? hermes;
   final VoidCallback? onOpenNativeHub;
+  final VoidCallback? onOpenNotifications;
   /// Called after session probe (authenticated or not).
   final void Function(bool healthy, String? email)? onSessionState;
   /// Persist last workspace path for relaunch restore.
   final void Function(String path)? onPathChanged;
+  /// Hide power-user chrome (Hermes desktop, native hub) from the main bar.
+  final bool consumerMode;
 
   @override
   State<WorkspaceShellPage> createState() => _WorkspaceShellPageState();
@@ -105,6 +113,11 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF0A0E12))
+      ..setUserAgent(
+        'Mozilla/5.0 (Mobile; BevelNative/${BevelConfig.versionLabel}) '
+        'AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 '
+        'BevelNative/${BevelConfig.versionLabel}',
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (p) {
@@ -134,11 +147,17 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                 widget.onPathChanged?.call(path);
               }
             }
+            // Mark page as native shell + tighten layout for chat.
+            unawaited(
+              _controller.runJavaScript(SessionBridge.injectNativeChromeJs),
+            );
             // After leaving handoff (or direct load), probe session once.
             if (!_sessionChecked &&
                 uri != null &&
                 !uri.path.contains('/api/auth/handoff')) {
               unawaited(_probeSessionAndChannels());
+            } else if (_sessionHealthy) {
+              unawaited(_refreshChannelsFromWebView());
             }
           },
           onWebResourceError: (err) {
@@ -151,10 +170,27 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           onNavigationRequest: (request) {
             final uri = Uri.tryParse(request.url);
             if (uri == null) return NavigationDecision.prevent;
-            // Handoff redeem must stay in WebView (plants cookies).
             final path = uri.path.toLowerCase();
+            // Handoff redeem must stay in WebView (plants cookies).
             if (path.contains('/api/auth/handoff')) {
               return NavigationDecision.navigate;
+            }
+            // Operator console / integrations stay in system browser.
+            if (SessionBridge.isOperatorPath(path) ||
+                path.contains('/console')) {
+              launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Console and integrations open in the browser — '
+                      'this app is for chat.',
+                    ),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+              return NavigationDecision.prevent;
             }
             // Google/GitHub/Auth.js IdP hops leave the WebView.
             if (BevelConfig.isOAuthNavigation(uri)) {
@@ -253,9 +289,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     final origin = _workspaceOrigin;
     if (origin != null) {
       return _controller
-          .loadRequest(Uri.parse(origin).replace(path: _callbackPath));
+          .loadRequest(Uri.parse(origin).replace(path: '/~general'));
     }
-    return _controller.loadRequest(BevelConfig.workspaceUri(_callbackPath));
+    return _controller.loadRequest(BevelConfig.workspaceUri('/~general'));
   }
 
   Future<void> _navigatePath(String path) {
@@ -265,6 +301,17 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       return _controller.loadRequest(base.replace(path: path));
     }
     return _controller.loadRequest(BevelConfig.workspaceUri(path));
+  }
+
+  Future<void> _openChannelPicker() {
+    return ChannelPickerSheet.show(
+      context,
+      channels: _channels,
+      activePath: _currentUri?.path ?? widget.initialPath,
+      onSelectPath: _navigatePath,
+      onOpenTimeline: () => _navigatePath('/timeline'),
+      onOpenNotifications: widget.onOpenNotifications,
+    );
   }
 
   Future<void> _share() async {
@@ -287,23 +334,25 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     final uri = _currentUri ?? BevelConfig.workspaceUri();
     final channel = _channelFromUri(uri);
     final tenant = _tenantFromHost(uri.host);
-    final handoff = bridge.handoffForWorkspace(
-      workspaceUrl: uri.toString(),
-      channel: channel,
-      tenant: tenant,
-      mode: 'build',
-      surface: 'desktop',
-      projectPath: null,
-      prompt:
-          'Continue work from BEVEL workspace: ${uri.toString()}'
-          '${channel != null ? ' (channel ~$channel)' : ''}'
-          '${tenant != null ? ' tenant=$tenant' : ''}. '
-          'Use skill bevel-workspace. When done: open returnUrl '
-          '(bevel://hermes/return) with a short status summary.',
-    ).copyWith(
-      successCriteria:
-          'Return to BEVEL channel with status + evidence; no secrets in chat',
-    );
+    final handoff = bridge
+        .handoffForWorkspace(
+          workspaceUrl: uri.toString(),
+          channel: channel,
+          tenant: tenant,
+          mode: 'build',
+          surface: 'desktop',
+          projectPath: null,
+          prompt:
+              'Continue work from BEVEL workspace: ${uri.toString()}'
+              '${channel != null ? ' (channel ~$channel)' : ''}'
+              '${tenant != null ? ' tenant=$tenant' : ''}. '
+              'Use skill bevel-workspace. When done: open returnUrl '
+              '(bevel://hermes/return) with a short status summary.',
+        )
+        .copyWith(
+          successCriteria:
+              'Return to BEVEL channel with status + evidence; no secrets in chat',
+        );
     final result = await bridge.openWithHandoff(handoff);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -311,7 +360,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     );
   }
 
-  /// Support /bevel/{slug}, /^{slug}, and /bevel/c/{slug}.
+  /// Support /~{slug}, /^{slug}, and /bevel/c/{slug}.
   static String? _channelFromUri(Uri uri) {
     final path = uri.path;
     if (path.startsWith('/bevel/c/')) {
@@ -355,6 +404,22 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     return null;
   }
 
+  String get _channelLabel {
+    final uri = _currentUri;
+    if (uri == null) return 'Chat';
+    final ch = _channelFromUri(uri);
+    if (ch != null) return '~$ch';
+    final path = uri.path;
+    if (path.startsWith('/talk/')) {
+      final parts = path.split('/').where((s) => s.isNotEmpty).toList();
+      final id = parts.length > 1 ? parts[1] : null;
+      return id != null ? 'talk/$id' : 'Talk';
+    }
+    if (path.startsWith('/timeline')) return 'Timeline';
+    if (path == '/me' || path.startsWith('/me/')) return 'Private';
+    return _title?.isNotEmpty == true ? _title! : 'Workspace';
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -365,6 +430,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
         (layout.isFoldInner &&
             layout.isLandscape &&
             layout.size.width >= 700);
+    final showPhonePicker = !showRail;
 
     final webBody = Stack(
       children: [
@@ -396,6 +462,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                     layout.layoutClass.name,
                     if (_sessionHealthy) 'session-ok' else 'session-?',
                     if (widget.handoffCode != null) 'handoff',
+                    if (widget.consumerMode) 'consumer',
                   ].join(' · '),
                   style: const TextStyle(
                     fontSize: 11,
@@ -414,14 +481,16 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _title?.isNotEmpty == true ? _title! : 'Workspace',
+              _channelLabel,
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
             Text(
               showRail
                   ? '${_currentUri?.host ?? Uri.parse(BevelConfig.workspaceUrl).host} · dual-pane'
-                  : (_currentUri?.host ??
-                      Uri.parse(BevelConfig.workspaceUrl).host),
+                  : (_sessionHealthy
+                      ? 'Signed in · chat'
+                      : (_currentUri?.host ??
+                          Uri.parse(BevelConfig.workspaceUrl).host)),
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(0xFF9AA8B5),
@@ -431,19 +500,26 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           ],
         ),
         actions: [
+          if (showPhonePicker)
+            IconButton(
+              tooltip: 'Channels',
+              onPressed: _openChannelPicker,
+              icon: const Icon(Icons.tag_rounded),
+            ),
           if (!showRail)
             IconButton(
               tooltip: 'Timeline',
               onPressed: () => _navigatePath('/timeline'),
               icon: const Icon(Icons.schedule_outlined),
             ),
+          if (!_sessionHealthy)
+            IconButton(
+              tooltip: 'Sign in (system browser)',
+              onPressed: () => _oauth.openSystemLogin(),
+              icon: const Icon(Icons.login_rounded),
+            ),
           IconButton(
-            tooltip: 'Sign in (system browser)',
-            onPressed: () => _oauth.openSystemLogin(),
-            icon: const Icon(Icons.login_rounded),
-          ),
-          IconButton(
-            tooltip: 'Home',
+            tooltip: '~general',
             onPressed: _goHome,
             icon: const Icon(Icons.home_outlined),
           ),
@@ -452,31 +528,87 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             onPressed: _reload,
             icon: const Icon(Icons.refresh_rounded),
           ),
-          Semantics(
-            identifier: 'bevel.shell.share',
-            button: true,
-            label: 'Share workspace',
-            child: IconButton(
-              tooltip: 'Share',
-              onPressed: _share,
-              icon: const Icon(Icons.ios_share_rounded),
-            ),
-          ),
-          if (hermes != null && HermesBridge.isSupportedPlatform)
-            Semantics(
-              identifier: 'bevel.shell.open_hermes',
-              button: true,
-              label: 'Open current page in Hermes Desktop',
-              child: IconButton(
-                tooltip: 'Open in Hermes Desktop',
-                onPressed: _openHermes,
-                icon: const Icon(Icons.auto_awesome_outlined),
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (value) {
+              switch (value) {
+                case 'share':
+                  unawaited(_share());
+                case 'browser':
+                  unawaited(_openExternal());
+                case 'notifications':
+                  widget.onOpenNotifications?.call();
+                case 'hermes':
+                  unawaited(_openHermes());
+                case 'hub':
+                  widget.onOpenNativeHub?.call();
+                case 'signin':
+                  unawaited(_oauth.openSystemLogin());
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'share',
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(Icons.ios_share_rounded),
+                  title: Text('Share channel'),
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
-            ),
-          IconButton(
-            tooltip: 'Open in browser',
-            onPressed: _openExternal,
-            icon: const Icon(Icons.open_in_browser_rounded),
+              const PopupMenuItem(
+                value: 'browser',
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(Icons.open_in_browser_rounded),
+                  title: Text('Open in browser'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              if (widget.onOpenNotifications != null)
+                const PopupMenuItem(
+                  value: 'notifications',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.notifications_outlined),
+                    title: Text('Notifications'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              if (!widget.consumerMode || kDebugMode) ...[
+                if (hermes != null && HermesBridge.isSupportedPlatform)
+                  const PopupMenuItem(
+                    value: 'hermes',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.auto_awesome_outlined),
+                      title: Text('Hermes Desktop'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                if (widget.onOpenNativeHub != null)
+                  const PopupMenuItem(
+                    value: 'hub',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.hub_outlined),
+                      title: Text('Native integrations'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+              ],
+              if (_sessionHealthy)
+                const PopupMenuItem(
+                  value: 'signin',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.login_rounded),
+                    title: Text('Re-authenticate'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+            ],
           ),
         ],
         bottom: PreferredSize(
@@ -505,7 +637,10 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                       channels: _channels,
                       onNavigate: _navigatePath,
                       onOpenTimeline: () => _navigatePath('/timeline'),
-                      onOpenNativeHub: widget.onOpenNativeHub,
+                      // Consumer: no native hub on rail; power users use More menu
+                      onOpenNativeHub:
+                          widget.consumerMode ? null : widget.onOpenNativeHub,
+                      onOpenNotifications: widget.onOpenNotifications,
                     ),
                   ),
                 ),
@@ -518,6 +653,16 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               ],
             )
           : webBody,
+      floatingActionButton: showPhonePicker
+          ? FloatingActionButton.small(
+              heroTag: 'bevel.channels.fab',
+              tooltip: 'Channels',
+              backgroundColor: scheme.primary.withValues(alpha: 0.92),
+              foregroundColor: Colors.white,
+              onPressed: _openChannelPicker,
+              child: const Icon(Icons.tag_rounded),
+            )
+          : null,
     );
   }
 }
@@ -543,7 +688,8 @@ class _ErrorPane extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.wifi_off_rounded, size: 40, color: Color(0xFF94A3B8)),
+            const Icon(Icons.wifi_off_rounded,
+                size: 40, color: Color(0xFF94A3B8)),
             const SizedBox(height: 12),
             Text(
               message,

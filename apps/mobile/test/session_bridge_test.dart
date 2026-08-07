@@ -32,6 +32,14 @@ void main() {
         contains('a@b.com'),
       );
     });
+
+    test('operator vs chat paths', () {
+      expect(SessionBridge.isOperatorPath('/console/settings'), isTrue);
+      expect(SessionBridge.isOperatorPath('/~general'), isFalse);
+      expect(SessionBridge.isChatPath('/~general'), isTrue);
+      expect(SessionBridge.isChatPath('/talk/hermes'), isTrue);
+      expect(SessionBridge.isChatPath('/console'), isFalse);
+    });
   });
 
   group('DeepLink auth_complete', () {

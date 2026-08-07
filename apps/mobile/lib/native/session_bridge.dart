@@ -71,6 +71,65 @@ class SessionBridge {
 })()
 ''';
 
+  /// Mark the document as running inside the native shell so web CSS can
+  /// de-emphasize console / marketing chrome that belongs in the browser.
+  static const String injectNativeChromeJs = r'''
+(function() {
+  try {
+    document.documentElement.setAttribute('data-bevel-native', '1');
+    document.documentElement.classList.add('bevel-native-shell');
+    if (!document.getElementById('bevel-native-style')) {
+      var s = document.createElement('style');
+      s.id = 'bevel-native-style';
+      s.textContent = [
+        'html[data-bevel-native="1"] .platform-footer,',
+        'html[data-bevel-native="1"] footer.platform-footer,',
+        'html[data-bevel-native="1"] a[href*="/console"],',
+        'html[data-bevel-native="1"] a[href*="/download"],',
+        'html[data-bevel-native="1"] a[href*="/claim"] {',
+        '  /* Keep layout; de-emphasize operator destinations */',
+        '}',
+        'html[data-bevel-native="1"] .landing-shell > .page-shell-container { display: none !important; }',
+        'html[data-bevel-native="1"] body { overscroll-behavior: none; }',
+        'html[data-bevel-native="1"] .bevel-workspace-root {',
+        '  height: 100% !important; max-height: 100% !important;',
+        '}',
+      ].join('\\n');
+      (document.head || document.documentElement).appendChild(s);
+    }
+    return 'ok';
+  } catch (e) {
+    return String(e);
+  }
+})()
+''';
+
+  /// Operator / admin surfaces — open in system browser, not the chat shell.
+  static bool isOperatorPath(String path) {
+    final p = path.toLowerCase();
+    return p.startsWith('/console') ||
+        p.startsWith('/api-keys') ||
+        p.contains('/console/') ||
+        p == '/settings' ||
+        p.startsWith('/docs/cli') ||
+        p.startsWith('/workflows');
+  }
+
+  /// Chat-relevant destinations the native shell should keep in-app.
+  static bool isChatPath(String path) {
+    final p = path.toLowerCase();
+    if (isOperatorPath(p)) return false;
+    if (p.startsWith('/~') || p.startsWith('/%7e')) return true;
+    if (p.startsWith('/bevel')) return true;
+    if (p.startsWith('/talk') || p.startsWith('/session')) return true;
+    if (p.startsWith('/timeline') || p == '/me' || p.startsWith('/u/')) {
+      return true;
+    }
+    if (p == '/' || p.isEmpty) return true;
+    if (p.startsWith('/login') || p.startsWith('/api/auth')) return true;
+    return false;
+  }
+
   static String _safeCallback(String? path) {
     final p = (path == null || path.isEmpty) ? '/~general' : path.trim();
     if (p.startsWith('/') && !p.startsWith('//')) return p;

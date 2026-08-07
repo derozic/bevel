@@ -75,7 +75,20 @@ jar (Safari cookies are never shared with WKWebView).
 
 ## Version
 
-`pubspec.yaml` → `0.2.0+2` (name + build). Bump for each store submission.
+`pubspec.yaml` → `0.4.0+5` (name + build). Bump for each store submission.
+
+## Consumer product surface
+
+The app is a **chat client**, not a full console:
+
+| In app | Web only |
+|--------|----------|
+| Google sign-in + session handoff | `/console/*` settings, API keys |
+| Channels, timeline, agents (FleetChat in WebView) | Slack / integrations admin |
+| Notification prefs, escalations | Workflows, docs, status board |
+| Share, deep links, push hooks | Operator tooling |
+
+Signed-in users auto-resume the last channel. Phone uses a channel sheet; tablets use a dual-pane rail.
 
 ## Developer portal checklist
 

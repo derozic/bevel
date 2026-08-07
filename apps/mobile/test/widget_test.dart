@@ -20,16 +20,25 @@ void main() {
     expect(find.text('BEVEL'), findsWidgets);
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(
-      find.textContaining('Open workspace'),
+      find.textContaining('Open chat'),
       findsWidgets,
     );
-    expect(find.text('Native integrations'), findsOneWidget);
+    // Power-user hub is under the More menu — not a primary home CTA.
+    expect(find.text('Native integrations'), findsNothing);
   });
 
   test('deep link routes map bevel scheme', () {
     expect(
       DeepLinkService.routeFor(Uri.parse('bevel://channel/product')),
-      '/bevel/product',
+      '/~product',
+    );
+    expect(
+      DeepLinkService.routeFor(Uri.parse('bevel://timeline')),
+      '/timeline',
+    );
+    expect(
+      DeepLinkService.routeFor(Uri.parse('bevel://talk/hermes')),
+      '/talk/hermes',
     );
     expect(
       DeepLinkService.routeFor(Uri.parse('bevel://login')),

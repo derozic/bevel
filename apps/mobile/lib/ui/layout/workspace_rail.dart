@@ -10,6 +10,7 @@ class WorkspaceRail extends StatelessWidget {
     required this.onNavigate,
     this.onOpenTimeline,
     this.onOpenNativeHub,
+    this.onOpenNotifications,
     this.escalatedSlugs = const {},
     this.channels,
   });
@@ -18,6 +19,7 @@ class WorkspaceRail extends StatelessWidget {
   final void Function(String path) onNavigate;
   final VoidCallback? onOpenTimeline;
   final VoidCallback? onOpenNativeHub;
+  final VoidCallback? onOpenNotifications;
   final Set<String> escalatedSlugs;
   /// Live channel list `(slug, displayName)` from the workspace BFF when available.
   final List<(String, String)>? channels;
@@ -126,14 +128,48 @@ class WorkspaceRail extends StatelessWidget {
                     escalated: escalatedSlugs.contains(slug),
                     onTap: () => onNavigate('/~$slug'),
                   ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(8, 14, 8, 6),
+                  child: Text(
+                    'AGENTS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+                _NavTile(
+                  icon: Icons.auto_awesome_outlined,
+                  label: 'Hermes',
+                  subtitle: 'personal agent',
+                  selected: _isActive('/talk/hermes'),
+                  onTap: () => onNavigate('/talk/hermes'),
+                ),
+                _NavTile(
+                  icon: Icons.chat_bubble_outline,
+                  label: 'Private',
+                  subtitle: 'your space',
+                  selected: _isActive('/me'),
+                  onTap: () => onNavigate('/me'),
+                ),
               ],
             ),
           ),
+          if (onOpenNotifications != null)
+            _NavTile(
+              icon: Icons.notifications_outlined,
+              label: 'Notifications',
+              subtitle: 'push prefs',
+              selected: false,
+              onTap: onOpenNotifications!,
+            ),
           if (onOpenNativeHub != null)
             _NavTile(
               icon: Icons.hub_outlined,
               label: 'Native hub',
-              subtitle: 'integrations',
+              subtitle: 'advanced',
               selected: false,
               onTap: onOpenNativeHub!,
             ),

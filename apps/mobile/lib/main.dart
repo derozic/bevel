@@ -92,6 +92,8 @@ class _BevelHomePageState extends State<BevelHomePage> {
   final _escalations = EscalationRepository();
   String? _status;
   String? _lastDeepLink;
+  var _didAutoOpenWorkspace = false;
+  var _workspaceOpen = false;
 
   @override
   void initState() {
@@ -105,8 +107,15 @@ class _BevelHomePageState extends State<BevelHomePage> {
       final caps = await NativeCapabilities.probe();
       if (caps.supportsNotifications) {
         await _notifications.initialize();
+        _notifications.onNotificationTap = _onNotificationPayload;
         // Best-effort Firebase/FCM when platform config is present
         unawaited(PushBootstrap.ensureInitialized());
+        final launchPayload = await _notifications.consumeLaunchPayload();
+        if (launchPayload != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _onNotificationPayload(launchPayload);
+          });
+        }
       }
       if (caps.supportsHealth) {
         await _health.configure();
@@ -124,9 +133,36 @@ class _BevelHomePageState extends State<BevelHomePage> {
         _caps = caps;
         _hermesStatus = hermesStatus;
       });
+
+      // Consumer default: signed-in users land in chat, not a developer hub.
+      if (!_didAutoOpenWorkspace &&
+          (onboarding.completedGoogleSignIn || onboarding.sessionHealthy) &&
+          !onboarding.needsOnboarding) {
+        _didAutoOpenWorkspace = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _workspaceOpen) return;
+          _openWorkspace(path: onboarding.lastWorkspacePath);
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _status = 'Native probe limited: $e');
+    }
+  }
+
+  void _onNotificationPayload(String payload) {
+    if (!mounted) return;
+    final uri = Uri.tryParse(payload);
+    if (uri != null && (uri.scheme == 'bevel' || uri.hasScheme)) {
+      _onDeepLink(uri);
+      return;
+    }
+    // Bare channel slug or path
+    final p = payload.trim();
+    if (p.startsWith('/')) {
+      _openWorkspace(path: p);
+    } else if (p.isNotEmpty) {
+      _openWorkspace(path: '/~${p.replaceFirst(RegExp(r'^[#~^]+'), '')}');
     }
   }
 
@@ -172,7 +208,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
             ? '/~${channel.toLowerCase()}'
             : (action.route != null && action.route != '/native-hub'
                 ? action.route!
-                : '/');
+                : '/~general');
         _openWorkspace(path: path);
         // Best-effort: post return note to FastAPI when fleet key is configured.
         if (channel != null && channel.isNotEmpty) {
@@ -196,6 +232,8 @@ class _BevelHomePageState extends State<BevelHomePage> {
       default:
         if (action.route != null) {
           _openWorkspace(path: action.route!);
+        } else if (action.channel != null && action.channel!.isNotEmpty) {
+          _openWorkspace(path: '/~${action.channel!.toLowerCase()}');
         }
     }
   }
@@ -335,6 +373,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
             ? _onboarding.lastWorkspacePath
             : '/~general')
         : path;
+    _workspaceOpen = true;
     Navigator.of(context)
         .push(
       MaterialPageRoute<void>(
@@ -343,7 +382,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
           handoffCode: handoffCode,
           workspaceHost: workspaceHost,
           hermes: _hermes,
+          consumerMode: true,
           onOpenNativeHub: () => _openNativeHub(),
+          onOpenNotifications: _openNotificationSettings,
           onPathChanged: (p) async {
             final next = _onboarding.copyWith(lastWorkspacePath: p);
             await next.save();
@@ -371,6 +412,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
       ),
     )
         .then((_) async {
+      _workspaceOpen = false;
       final next = _onboarding.copyWith(completedWorkspaceOpen: true);
       await next.save();
       if (!mounted) return;
@@ -489,6 +531,13 @@ class _BevelHomePageState extends State<BevelHomePage> {
       );
     }
 
+    final signedIn = _onboarding.completedGoogleSignIn ||
+        _onboarding.sessionHealthy ||
+        _onboarding.userEmail.isNotEmpty;
+    final lastPath = _onboarding.lastWorkspacePath.isNotEmpty
+        ? _onboarding.lastWorkspacePath
+        : '/~general';
+
     return AdaptiveScaffold(
       appBar: AppBar(
         title: Row(
@@ -512,32 +561,6 @@ class _BevelHomePageState extends State<BevelHomePage> {
             ),
             const SizedBox(width: 10),
             const Text(BevelConfig.appName),
-            if (caps?.isAppleSiliconMac == true) ...[
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  border: Border.all(color: scheme.primary.withValues(alpha: 0.4)),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  'Apple Silicon',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.4,
-                    color: scheme.primary,
-                  ),
-                ),
-              ),
-            ],
-            if (layout.isFoldCover) ...[
-              const SizedBox(width: 8),
-              const Text(
-                'Cover',
-                style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-              ),
-            ],
           ],
         ),
         actions: [
@@ -546,62 +569,98 @@ class _BevelHomePageState extends State<BevelHomePage> {
             onPressed: _openNotificationSettings,
             icon: const Icon(Icons.notifications_outlined),
           ),
-          if (caps?.supportsHermesBridge == true)
-            IconButton(
-              tooltip: 'Open Hermes Desktop',
-              onPressed: _openHermes,
-              icon: const Icon(Icons.auto_awesome_outlined),
-            ),
-          IconButton(
-            tooltip: 'Native integrations',
-            onPressed: caps == null ? null : () => _openNativeHub(),
-            icon: const Icon(Icons.hub_outlined),
-          ),
-          IconButton(
-            tooltip: 'Copy workspace URL',
-            onPressed: () async {
-              await Clipboard.setData(
-                ClipboardData(text: BevelConfig.workspaceUrl),
-              );
-              if (mounted) {
-                setState(() => _status = 'Copied ${BevelConfig.workspaceUrl}');
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (value) async {
+              switch (value) {
+                case 'hub':
+                  _openNativeHub();
+                case 'hermes':
+                  await _openHermes();
+                case 'copy':
+                  await Clipboard.setData(
+                    ClipboardData(text: BevelConfig.workspaceUrl),
+                  );
+                  if (mounted) {
+                    setState(
+                      () => _status = 'Copied ${BevelConfig.workspaceUrl}',
+                    );
+                  }
+                case 'browser':
+                  await _openExternal(BevelConfig.entryUri());
               }
             },
-            icon: const Icon(Icons.link_rounded),
+            itemBuilder: (ctx) => [
+              if (caps?.supportsHermesBridge == true)
+                const PopupMenuItem(
+                  value: 'hermes',
+                  child: Text('Hermes Desktop'),
+                ),
+              const PopupMenuItem(
+                value: 'hub',
+                child: Text('Advanced · native tools'),
+              ),
+              const PopupMenuItem(
+                value: 'copy',
+                child: Text('Copy workspace URL'),
+              ),
+              const PopupMenuItem(
+                value: 'browser',
+                child: Text('Open bevel.is in browser'),
+              ),
+            ],
           ),
         ],
       ),
       body: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: layout.contentMaxWidth.clamp(280, 720)),
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                layout.isFoldCover ? 16 : 24,
-                layout.isFoldCover ? 20 : 32,
-                layout.isFoldCover ? 16 : 24,
-                40,
+        child: ConstrainedBox(
+          constraints:
+              BoxConstraints(maxWidth: layout.contentMaxWidth.clamp(280, 720)),
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              layout.isFoldCover ? 16 : 24,
+              layout.isFoldCover ? 20 : 32,
+              layout.isFoldCover ? 16 : 24,
+              40,
+            ),
+            children: [
+              Text(
+                signedIn ? 'Your workspace' : BevelConfig.appTagline,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFFF4F7F5),
+                    ),
               ),
-              children: [
+              const SizedBox(height: 8),
+              Text(
+                signedIn
+                    ? 'Continue where you left off in chat. Channels, agents, and '
+                        'live conversation match the web app.'
+                    : isMac
+                        ? 'Sign in with Google, then chat opens in this window — '
+                            'no browser tabs, no cookie confusion.'
+                        : 'Sign in with Google Workspace. Chat, channels, and '
+                            'your agents — same experience as the web.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF9AA8B5),
+                      height: 1.45,
+                    ),
+              ),
+              if (_onboarding.userEmail.isNotEmpty) ...[
+                const SizedBox(height: 12),
                 Text(
-                  BevelConfig.appTagline,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFFF4F7F5),
-                      ),
+                  _onboarding.userName.isNotEmpty
+                      ? '${_onboarding.userName} · ${_onboarding.userEmail}'
+                      : _onboarding.userEmail,
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 13,
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  isMac
-                      ? 'One click to sign in. Workspace opens in this window — '
-                          'no browser tabs, no cookie confusion.'
-                      : 'Native workspace shell with Health, share, notifications, '
-                          'and deep links — one Flutter codebase including Mac.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF9AA8B5),
-                        height: 1.45,
-                      ),
-                ),
-                const SizedBox(height: 28),
+              ],
+              const SizedBox(height: 28),
+              if (!signedIn)
                 Semantics(
                   identifier: 'bevel.home.continue_google',
                   button: true,
@@ -618,120 +677,92 @@ class _BevelHomePageState extends State<BevelHomePage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Semantics(
-                  identifier: 'bevel.home.open_workspace',
-                  button: true,
-                  label: 'Open workspace',
-                  child: FilledButton.tonalIcon(
-                    onPressed: () => _openWorkspace(),
-                    icon: const Icon(Icons.forum_outlined),
-                    label: Text(
-                      isMac ? 'Open workspace window' : 'Open workspace',
-                    ),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
-                      ),
+              if (!signedIn) const SizedBox(height: 12),
+              Semantics(
+                identifier: 'bevel.home.open_workspace',
+                button: true,
+                label: signedIn ? 'Continue to chat' : 'Open chat',
+                child: FilledButton.icon(
+                  onPressed: () => _openWorkspace(path: lastPath),
+                  icon: const Icon(Icons.forum_outlined),
+                  label: Text(
+                    signedIn
+                        ? 'Continue to chat'
+                        : (isMac ? 'Open chat window' : 'Open chat'),
+                  ),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
                     ),
                   ),
                 ),
-                if (caps?.supportsHermesBridge == true) ...[
-                  const SizedBox(height: 10),
-                  Semantics(
-                    identifier: 'bevel.home.open_hermes',
-                    button: true,
-                    label: 'Open Hermes Desktop with handoff',
-                    child: OutlinedButton.icon(
-                      onPressed: _openHermes,
-                      icon: const Icon(Icons.auto_awesome_outlined),
-                      label: const Text('Open in Hermes Desktop'),
-                    ),
-                  ),
-                ],
+              ),
+              if (signedIn) ...[
                 const SizedBox(height: 10),
-                Semantics(
-                  identifier: 'bevel.home.native_hub',
-                  button: true,
-                  label: 'Native integrations',
-                  child: TextButton.icon(
-                    onPressed: caps == null ? null : () => _openNativeHub(),
-                    icon: const Icon(Icons.hub_outlined, size: 18),
-                    label: const Text('Native integrations'),
-                  ),
+                OutlinedButton.icon(
+                  onPressed: () => _openWorkspace(path: '/~general'),
+                  icon: const Icon(Icons.tag_rounded, size: 18),
+                  label: const Text('Open ~general'),
                 ),
+                const SizedBox(height: 8),
                 TextButton.icon(
-                  onPressed: () => _openExternal(BevelConfig.entryUri()),
-                  icon: const Icon(Icons.open_in_browser_rounded, size: 18),
-                  label: const Text('Open in browser (recovery)'),
-                ),
-                if (hermesLabel != null) ...[
-                  const SizedBox(height: 20),
-                  Card(
-                    child: ListTile(
-                      leading: Icon(
-                        _hermesStatus?.serveOnline == true
-                            ? Icons.check_circle_outline
-                            : Icons.auto_awesome_outlined,
-                        color: scheme.primary,
-                      ),
-                      title: const Text('Hermes Desktop'),
-                      subtitle: Text(hermesLabel),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => _openNativeHub(focusHermes: true),
-                    ),
-                  ),
-                ],
-                if (isMac) ...[
-                  const SizedBox(height: 24),
-                  Card(
-                    child: ListTile(
-                      leading: Icon(Icons.desktop_mac_rounded,
-                          color: scheme.primary),
-                      title: const Text('Apple Silicon'),
-                      subtitle: Text(
-                        caps?.isAppleSiliconMac == true
-                            ? 'arm64 · ${caps?.deviceModel ?? "Mac"}'
-                            : 'macOS desktop build',
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                Text(
-                  'Entry: ${BevelConfig.baseUrl}\n'
-                  'Workspace: ${BevelConfig.workspaceUrl}\n'
-                  'API: ${BevelConfig.apiBaseUrl}\n'
-                  'Client v${BevelConfig.versionLabel}'
-                  '${caps != null ? ' · ${caps.platformLabel}' : ''}'
-                  '${caps?.isAppleSiliconMac == true ? ' · arm64' : ''}'
-                  '${_lastDeepLink != null ? '\nLast link: $_lastDeepLink' : ''}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF6B7A88),
-                        height: 1.5,
-                      ),
-                ),
-                if (_status != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _status!,
-                    style: TextStyle(color: scheme.primary, fontSize: 13),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Text(
-                  'Layout: ${layout.layoutClass.name}'
-                  '${layout.isFoldCover ? ' · fold cover' : ''}'
-                  '${layout.isFoldInner ? ' · fold inner' : ''}'
-                  '${layout.prefersSplit ? ' · split' : ''}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF6B7A88),
-                      ),
+                  onPressed: _continueWithGoogle,
+                  icon: const Icon(Icons.login_rounded, size: 18),
+                  label: const Text('Re-authenticate'),
                 ),
               ],
-            ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => _openExternal(BevelConfig.entryUri()),
+                icon: const Icon(Icons.open_in_browser_rounded, size: 18),
+                label: const Text('Open in browser (recovery)'),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Chat lives here. Console, integrations, and API keys stay on the web.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF64748B),
+                      height: 1.4,
+                    ),
+              ),
+              if (hermesLabel != null && isMac) ...[
+                const SizedBox(height: 20),
+                Card(
+                  child: ListTile(
+                    leading: Icon(
+                      _hermesStatus?.serveOnline == true
+                          ? Icons.check_circle_outline
+                          : Icons.auto_awesome_outlined,
+                      color: scheme.primary,
+                    ),
+                    title: const Text('Hermes Desktop'),
+                    subtitle: Text(hermesLabel),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => _openNativeHub(focusHermes: true),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              Text(
+                'v${BevelConfig.versionLabel}'
+                '${caps != null ? ' · ${caps.platformLabel}' : ''}'
+                '${_lastDeepLink != null ? '\nLast link: $_lastDeepLink' : ''}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF6B7A88),
+                      height: 1.5,
+                    ),
+              ),
+              if (_status != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _status!,
+                  style: TextStyle(color: scheme.primary, fontSize: 13),
+                ),
+              ],
+            ],
           ),
+        ),
       ),
     );
   }

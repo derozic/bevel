@@ -84,8 +84,11 @@ class DeepLinkService {
       final segs = uri.pathSegments;
 
       // bevel://hermes/... or bevel:///hermes/...
+      // Do not treat bevel://talk/hermes as Hermes Desktop (host is "talk").
       final hermesPath = host == 'hermes' ||
-          (segs.isNotEmpty && segs.first.toLowerCase() == 'hermes');
+          ((host.isEmpty || host == 'localhost') &&
+              segs.isNotEmpty &&
+              segs.first.toLowerCase() == 'hermes');
       if (hermesPath) {
         final action = host == 'hermes'
             ? (segs.isNotEmpty ? segs.first.toLowerCase() : 'status')
@@ -97,7 +100,9 @@ class DeepLinkService {
           final channel = handoff.channel;
           return BevelDeepLinkAction(
             kind: 'hermes_open',
-            route: channel == null ? '/bevel' : '/bevel/$channel',
+            route: channel == null || channel.isEmpty
+                ? '/~general'
+                : '/~${channel.toLowerCase()}',
             channel: channel,
             handoff: handoff,
             raw: uri,
@@ -107,7 +112,9 @@ class DeepLinkService {
           final channel = q['channel'];
           return BevelDeepLinkAction(
             kind: 'hermes_return',
-            route: channel == null ? '/' : '/bevel/$channel',
+            route: channel == null || channel.isEmpty
+                ? '/~general'
+                : '/~${channel.toLowerCase()}',
             channel: channel,
             returnStatus: q['status'] ?? 'done',
             returnSummary: q['summary'],
@@ -144,12 +151,35 @@ class DeepLinkService {
 
       if (host == 'channel' || uri.path.startsWith('/channel')) {
         final id = host == 'channel'
-            ? uri.pathSegments.firstOrNull
-            : uri.pathSegments.skip(1).firstOrNull;
+            ? (uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null)
+            : (uri.pathSegments.length > 1 ? uri.pathSegments[1] : null);
+        final slug = id?.toLowerCase();
         return BevelDeepLinkAction(
           kind: 'navigate',
-          route: id == null ? '/bevel' : '/bevel/$id',
-          channel: id,
+          route: slug == null || slug.isEmpty ? '/~general' : '/~$slug',
+          channel: slug,
+          raw: uri,
+        );
+      }
+      // bevel://timeline
+      if (host == 'timeline' || uri.path.startsWith('/timeline')) {
+        return BevelDeepLinkAction(
+          kind: 'navigate',
+          route: '/timeline',
+          raw: uri,
+        );
+      }
+      // bevel://talk/hermes
+      if (host == 'talk' ||
+          (uri.pathSegments.isNotEmpty && uri.pathSegments.first == 'talk')) {
+        final agent = host == 'talk'
+            ? (uri.pathSegments.isNotEmpty ? uri.pathSegments.first : 'hermes')
+            : (uri.pathSegments.length > 1
+                ? uri.pathSegments[1]
+                : 'hermes');
+        return BevelDeepLinkAction(
+          kind: 'navigate',
+          route: '/talk/${agent.toLowerCase()}',
           raw: uri,
         );
       }

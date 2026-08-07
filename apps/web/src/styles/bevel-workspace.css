@@ -9,6 +9,28 @@
   --bevel-rail-width: clamp(13rem, 18vw, 20rem);
 }
 
+/* Flutter / native WebView shell (data-bevel-native set by SessionBridge inject) */
+html[data-bevel-native='1'] body:has(.bevel-workspace-root),
+html.bevel-native-shell body:has(.bevel-workspace-root) {
+  /* Nested inside native AppBar — use 100% of WebView, not browser chrome dvh */
+  height: 100%;
+  max-height: 100%;
+}
+
+html[data-bevel-native='1'] .bevel-workspace-root,
+html.bevel-native-shell .bevel-workspace-root {
+  height: 100%;
+  max-height: 100%;
+  /* WebView already has native chrome; avoid double vertical overscroll bounce */
+  overscroll-behavior: none;
+}
+
+/* Operator destinations stay on the web browser — de-emphasize in-app */
+html[data-bevel-native='1'] a[href^='/console'],
+html[data-bevel-native='1'] a[href*='//bevel.is/console'] {
+  opacity: 0.55;
+}
+
 /* Lock document scroll while the workspace is mounted */
 html:has(.bevel-workspace-root),
 body:has(.bevel-workspace-root) {

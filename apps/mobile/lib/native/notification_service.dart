@@ -24,6 +24,9 @@ class NotificationService {
   final PushRegistrationService _push;
   bool _ready = false;
 
+  /// Called when the user taps a notification (payload is usually a bevel:// URL).
+  void Function(String payload)? onNotificationTap;
+
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
     'bevel_workspace',
     'Workspace activity',
@@ -78,10 +81,19 @@ class NotificationService {
 
   void _onResponse(NotificationResponse response) {
     // Deep-link payload: channel id / session id for the Flutter router.
-    // Example: bevel://channel/product
+    // Example: bevel://channel/product or bevel://timeline
     final payload = response.payload;
     if (payload == null || payload.isEmpty) return;
-    // Consumers listen via a stream in a later PR when app routing lands.
+    onNotificationTap?.call(payload);
+  }
+
+  /// Cold-start: app opened from a notification while terminated.
+  Future<String?> consumeLaunchPayload() async {
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp != true) return null;
+    final payload = details?.notificationResponse?.payload;
+    if (payload == null || payload.isEmpty) return null;
+    return payload;
   }
 
   /// Request OS notification permission (iOS provisional optional later).
