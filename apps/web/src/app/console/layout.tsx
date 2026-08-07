@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -14,6 +14,8 @@ import {
   Search,
   GitBranch,
   BookOpen,
+  MessageSquare,
+  ArrowLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
@@ -21,6 +23,7 @@ import { useSession } from "next-auth/react";
 import { UserAvatar } from "@/components/console/user-avatar";
 import { useCommandPalette } from "@/components/console/command-palette";
 import { DayNightBadge } from "@/components/console/day-night-badge";
+import { bevelUrls } from "@/components/console/bevel-urls";
 
 interface NavigationItem {
   name: string;
@@ -50,6 +53,7 @@ export default function DashboardLayout({
   const { data: session } = useSession();
   const { setOpen: setPaletteOpen } = useCommandPalette();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const chatHref = useMemo(() => bevelUrls.workspaceChat(), []);
 
   const user = session?.user?.email
     ? {
@@ -66,6 +70,11 @@ export default function DashboardLayout({
     [router],
   );
 
+  const goToChat = useCallback(() => {
+    // Full navigation so cross-host (bevel.is → bevel.2x4m.cc) always works.
+    window.location.assign(chatHref);
+  }, [chatHref]);
+
   // Dashboard-only shortcuts (⌘B sidebar, nav keys). ⌘K is owned by CommandPaletteProvider.
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -77,6 +86,13 @@ export default function DashboardLayout({
       if (e.key === "b" || e.key === "B") {
         e.preventDefault();
         setSidebarOpen((v) => !v);
+        return;
+      }
+
+      // ⌘H / Ctrl+H → leave console for workspace chat
+      if (e.key === "h" || e.key === "H") {
+        e.preventDefault();
+        goToChat();
         return;
       }
 
@@ -112,14 +128,14 @@ export default function DashboardLayout({
 
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [softGo]);
+  }, [softGo, goToChat]);
 
   return (
     <div className="min-h-screen bg-background text-text">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 glass border-b border-border">
         <div className="flex items-center justify-between h-14 px-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <button
               type="button"
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -133,6 +149,22 @@ export default function DashboardLayout({
               <Terminal className="w-6 h-6 text-accent" />
               <span className="font-bold text-lg text-accent">BEVEL</span>
             </Link>
+
+            <a
+              href={chatHref}
+              onClick={(e) => {
+                e.preventDefault();
+                goToChat();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-accent/90 sm:gap-2 sm:px-3 sm:text-sm"
+              data-testid="console-back-to-chat"
+              title="Leave console and open workspace chat (~general)"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
+              <MessageSquare className="hidden h-4 w-4 sm:inline" aria-hidden />
+              <span className="hidden sm:inline">Back to chat</span>
+              <span className="sm:hidden">Chat</span>
+            </a>
           </div>
 
           <div className="flex items-center gap-3">
@@ -167,7 +199,30 @@ export default function DashboardLayout({
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="fixed left-0 top-14 bottom-0 w-64 glass border-r border-border z-30 overflow-y-auto"
             >
-              <nav className="p-4 space-y-1">
+              <div className="p-4 pb-2">
+                <a
+                  href={chatHref}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    goToChat();
+                  }}
+                  className="flex items-center justify-between rounded-lg border border-accent/40 bg-accent/15 px-3 py-2.5 text-accent transition hover:bg-accent/25"
+                  data-testid="console-sidebar-back-to-chat"
+                >
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className="h-5 w-5" />
+                    <span className="font-semibold">Back to chat</span>
+                  </div>
+                  <kbd className="px-1.5 py-0.5 text-xs rounded bg-surface text-text-muted">
+                    ⌘H
+                  </kbd>
+                </a>
+                <p className="mt-2 px-1 text-[11px] leading-snug text-text-muted">
+                  Open ~general in your workspace. Console is settings only.
+                </p>
+              </div>
+
+              <nav className="p-4 pt-2 space-y-1">
                 {navigation.map((item) => {
                   const isActive = pathname === item.href;
                   return (
@@ -220,6 +275,10 @@ export default function DashboardLayout({
                   Shortcuts
                 </h3>
                 <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Back to chat</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-surface">⌘H</kbd>
+                  </div>
                   <div className="flex justify-between">
                     <span className="text-text-muted">Toggle Sidebar</span>
                     <kbd className="px-1.5 py-0.5 rounded bg-surface">⌘B</kbd>

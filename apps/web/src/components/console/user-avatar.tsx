@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import {
@@ -10,9 +10,11 @@ import {
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
   BuildingOffice2Icon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline'
 import { platformLoginUrl, platformPublicUrl } from '@/lib/platform'
 import { BEVEL_PRIVATE_PATH } from '@/lib/bevel'
+import { bevelUrls } from '@/components/console/bevel-urls'
 import { cn } from '@/lib/utils'
 
 /**
@@ -28,6 +30,7 @@ export function UserAvatar({
   const label = user?.name || user?.email || 'Account'
   const initial = (label[0] || 'B').toUpperCase()
   const picture = user?.picture?.trim() || ''
+  const chatHref = useMemo(() => bevelUrls.workspaceChat(), [])
 
   return (
     <div className="relative">
@@ -95,6 +98,19 @@ export function UserAvatar({
                 <p className="truncate text-xs text-muted">{user.email}</p>
               ) : null}
             </div>
+            <a
+              href={chatHref}
+              role="menuitem"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-accent hover:bg-accent/10"
+              onClick={(e) => {
+                e.preventDefault()
+                setOpen(false)
+                window.location.assign(chatHref)
+              }}
+            >
+              <ChatBubbleLeftRightIcon className="h-4 w-4" />
+              Back to chat
+            </a>
             <MenuLink
               href={BEVEL_PRIVATE_PATH}
               icon={HomeIcon}

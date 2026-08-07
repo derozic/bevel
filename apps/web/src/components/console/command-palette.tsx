@@ -27,6 +27,7 @@ import {
   LayoutDashboard,
   LogIn,
   LogOut,
+  MessageSquare,
   Moon,
   Package,
   Play,
@@ -43,6 +44,7 @@ import {
 import { useDaypart } from "@/components/console/daypart-provider";
 import { daypartOrder, type Daypart } from "@/components/console/daypart";
 import { trackWebEvent } from "@/components/console/track";
+import { bevelUrls } from "@/components/console/bevel-urls";
 
 type PaletteItem = {
   id: string;
@@ -275,6 +277,18 @@ function CommandPalette() {
         icon: Zap,
         keywords: "onboarding setup",
         run: () => go("/start"),
+      },
+      {
+        id: "workspace-chat",
+        label: "Back to chat",
+        group: "Workspace",
+        icon: MessageSquare,
+        keywords: "channel general fleet conversation leave console",
+        hint: "⌘H",
+        run: () => {
+          setOpen(false);
+          window.location.assign(bevelUrls.workspaceChat());
+        },
       },
       {
         id: "dashboard",
