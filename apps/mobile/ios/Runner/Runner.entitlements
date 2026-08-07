@@ -1,21 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Device install baseline.
+
+  Full capabilities (Push, HealthKit, Associated Domains) require the App ID
+  com.derozic.bevel.bevelApp to enable those services in Apple Developer Portal
+  and a regenerated provisioning profile. Re-enable via:
+
+    apps/mobile/ios/Runner/Runner.entitlements.full.example
+
+  Chat + workspace shell work without them; push needs APNs capability.
+-->
 <plist version="1.0">
 <dict>
-	<key>com.apple.developer.healthkit</key>
-	<true/>
-	<key>com.apple.developer.healthkit.access</key>
-	<array/>
-	<key>com.apple.developer.healthkit.background-delivery</key>
-	<true/>
-	<key>aps-environment</key>
-	<string>development</string>
-	<key>com.apple.developer.associated-domains</key>
-	<array>
-		<string>applinks:bevel.2x4m.lvh.me</string>
-		<string>applinks:bevel.lvh.me</string>
-		<string>applinks:bevel.is</string>
-		<string>applinks:bevel.2x4m.cc</string>
-	</array>
 </dict>
 </plist>
