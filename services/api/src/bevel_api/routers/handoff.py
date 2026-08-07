@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -14,6 +16,7 @@ from bevel_api.repositories import handoff as handoff_repo
 from bevel_api.repositories import users as users_repo
 
 router = APIRouter(prefix="/v1/auth", tags=["Auth"])
+log = logging.getLogger("bevel.auth")
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -30,6 +33,76 @@ class IssueHandoffBody(BaseModel):
 
 class RedeemHandoffBody(BaseModel):
     code: str = Field(..., min_length=8, max_length=256)
+
+
+class GoogleNativeBody(BaseModel):
+    """Native Google Sign-In (Flutter) → handoff code for WebView session."""
+
+    idToken: str = Field(..., min_length=20, max_length=8192)
+    tenantSlug: str = Field(default="2x4m", min_length=1, max_length=64)
+    callbackPath: str = "/~general"
+    accessToken: str | None = None
+
+
+def _google_audiences() -> list[str]:
+    """OAuth client IDs allowed as id_token audience (web + iOS + Android)."""
+    raw = (
+        os.getenv("GOOGLE_NATIVE_CLIENT_IDS")
+        or os.getenv("AUTH_GOOGLE_ID")
+        or os.getenv("GOOGLE_CLIENT_ID")
+        or ""
+    )
+    parts: list[str] = []
+    for chunk in raw.replace(";", ",").split(","):
+        c = chunk.strip().strip('"').strip("'")
+        if c:
+            parts.append(c)
+    # Common secondary clients from env
+    for key in (
+        "GOOGLE_IOS_CLIENT_ID",
+        "GOOGLE_ANDROID_CLIENT_ID",
+        "AUTH_GOOGLE_IOS_ID",
+        "AUTH_GOOGLE_ANDROID_ID",
+    ):
+        v = (os.getenv(key) or "").strip().strip('"')
+        if v and v not in parts:
+            parts.append(v)
+    return parts
+
+
+def _verify_google_id_token(token: str) -> dict[str, Any]:
+    """Verify Google ID token; returns claims or raises HTTPException."""
+    audiences = _google_audiences()
+    if not audiences:
+        raise HTTPException(
+            503,
+            "Google native login not configured — set AUTH_GOOGLE_ID / GOOGLE_NATIVE_CLIENT_IDS",
+        )
+    try:
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token as google_id_token
+    except ImportError as exc:
+        raise HTTPException(503, "google-auth not installed") from exc
+
+    last_err: Exception | None = None
+    request = google_requests.Request()
+    for aud in audiences:
+        try:
+            claims = google_id_token.verify_oauth2_token(token, request, audience=aud)
+            # Basic integrity
+            iss = str(claims.get("iss") or "")
+            if iss not in {"accounts.google.com", "https://accounts.google.com"}:
+                raise ValueError(f"bad iss {iss}")
+            if not claims.get("email"):
+                raise ValueError("email missing")
+            if claims.get("email_verified") is False:
+                raise ValueError("email not verified")
+            return claims
+        except Exception as exc:  # noqa: BLE001 — try next audience
+            last_err = exc
+            continue
+    log.warning("google id_token verify failed: %s", last_err)
+    raise HTTPException(401, "Invalid Google ID token")
 
 
 @router.post("/handoff")
@@ -86,3 +159,53 @@ async def redeem_handoff(
         image_url=payload.get("imageUrl"),
     )
     return {"ok": True, **payload}
+
+
+@router.post("/google-native")
+async def google_native_login(
+    body: GoogleNativeBody,
+    session: SessionDep,
+) -> dict[str, Any]:
+    """Exchange a native Google Sign-In ID token for a handoff code.
+
+    Flutter uses the Google Sign-In SDK (in-app account picker — not Safari),
+    then redeems the returned code in the WebView via /api/auth/handoff so
+    Auth.js cookies land in the WebView jar.
+    """
+    claims = _verify_google_id_token(body.idToken.strip())
+    email = str(claims["email"]).strip().lower()
+    name = str(claims.get("name") or claims.get("given_name") or email.split("@")[0])
+    image = claims.get("picture")
+    image_url = str(image) if image else None
+
+    path = body.callbackPath.strip() or "/~general"
+    if not path.startswith("/") or path.startswith("//"):
+        path = "/~general"
+    tenant = (body.tenantSlug or "2x4m").strip().lower() or "2x4m"
+
+    plain, row = await handoff_repo.issue(
+        session,
+        email=email,
+        name=name,
+        image_url=image_url,
+        tenant_slug=tenant,
+        callback_path=path,
+        ttl_seconds=180,
+    )
+    user = await users_repo.upsert_identity(
+        session,
+        email=email,
+        name=name,
+        image_url=image_url,
+    )
+    return {
+        "ok": True,
+        "code": plain,
+        "expiresAt": row.expires_at.isoformat(),
+        "email": email,
+        "name": name,
+        "imageUrl": image_url,
+        "userId": getattr(user, "id", None) or email,
+        "tenantSlug": tenant,
+        "callbackPath": path,
+    }

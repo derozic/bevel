@@ -40,9 +40,9 @@ class _GoogleWorkspaceOnboardingState extends State<GoogleWorkspaceOnboarding> {
     _StepCopy(
       title: 'Google Workspace',
       body:
-          'Sign in with your work Google account. We open the system browser '
-          '(Safari / Chrome) so Google Workspace SSO and cookies work correctly — '
-          'not an embedded WebView.',
+          'Sign in with your work Google account using the native Google '
+          'account picker in the app — no Safari handoff. We then plant a '
+          'secure workspace session for chat.',
       icon: Icons.apartment_outlined,
     ),
     _StepCopy(

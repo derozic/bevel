@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,6 +14,7 @@ import 'native/hermes_handoff.dart';
 import 'native/hermes_return_reporter.dart';
 import 'native/native_capabilities.dart';
 import 'native/notification_service.dart';
+import 'native/google_native_auth.dart';
 import 'native/oauth_browser.dart';
 import 'native/sharing_service.dart';
 import 'native/push_handlers.dart';
@@ -85,6 +87,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
   final _notifications = NotificationService();
   final _deepLinks = DeepLinkService();
   final _oauth = const OAuthBrowser();
+  final _googleNative = GoogleNativeAuth();
   final _hermes = HermesBridge();
 
   NativeCapabilities? _caps;
@@ -663,18 +666,58 @@ class _BevelHomePageState extends State<BevelHomePage> {
   }
 
   Future<void> _continueWithGoogle() async {
-    setState(() => _status = 'Opening secure sign-in…');
+    setState(() => _status = 'Continue with Google…');
+    try {
+      // Prefer native Google Sign-In SDK (in-app account sheet).
+      final selected = _onboarding.selectedWorkspace;
+      final tenant = selected?.slug ??
+          (selected?.isPrivate == true ? '2x4m' : '2x4m');
+      final path = selected?.homePath ??
+          (_onboarding.lastWorkspacePath.isNotEmpty
+              ? _onboarding.lastWorkspacePath
+              : '/~general');
+      final host = selected?.host ??
+          Uri.parse(BevelConfig.workspaceUrl).host;
+
+      final result = await _googleNative.signIn(
+        tenantSlug: tenant,
+        callbackPath: path,
+        workspaceHost: host,
+      );
+      if (!mounted) return;
+      if (result == null) {
+        setState(() => _status = 'Sign-in cancelled');
+        return;
+      }
+      setState(() => _status = 'Signed in as ${result.email}');
+      await _onAuthComplete(
+        result.callbackPath ?? path,
+        email: result.email,
+        userId: result.userId,
+        userName: result.name,
+        handoffCode: result.handoffCode,
+        workspaceHost: result.workspaceHost ?? host,
+      );
+      return;
+    } catch (e) {
+      debugPrint('Native Google sign-in failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _status =
+            'Native Google sign-in failed — falling back to system browser…';
+      });
+    }
+
+    // Fallback: system browser OAuth (legacy)
     final ok = await _oauth.openSystemLogin();
     if (!mounted) return;
     if (!ok) {
-      // Fallback: open login inside shell (still may bounce IdP out).
-      setState(() => _status = 'Opening login in workspace window…');
-      _openWorkspace(path: BevelConfig.loginPath);
+      setState(() => _status = 'Could not open sign-in');
       return;
     }
     setState(() {
       _status =
-          'Finish Google in the browser window. We will open your workspace when you return.';
+          'Finish Google in the browser, then we will return you to the app.';
     });
   }
 

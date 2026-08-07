@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../config.dart';
 import '../native/hermes_bridge.dart';
+import '../native/google_native_auth.dart';
 import '../native/oauth_browser.dart';
 import '../native/session_bridge.dart';
 import '../native/sharing_service.dart';
@@ -66,6 +67,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   late final WebViewController _controller;
   final _sharing = const SharingService();
   final _oauth = const OAuthBrowser();
+  final _googleNative = GoogleNativeAuth();
   var _loading = true;
   var _progress = 0;
   String? _title;
@@ -240,19 +242,17 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
 
       if (!healthy && !_authRetryUsed) {
         _authRetryUsed = true;
-        // One guided recovery: open system login (user may still be signed in there).
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Workspace session missing — opening Google sign-in. '
-                'We will return you here with a handoff code.',
+                'Workspace session missing — signing in with Google…',
               ),
-              duration: Duration(seconds: 4),
+              duration: Duration(seconds: 3),
             ),
           );
         }
-        await _oauth.openSystemLogin();
+        await _nativeGoogleThenReload();
         return;
       }
 
@@ -290,6 +290,43 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   }
 
   Future<void> _reload() => _controller.reload();
+
+  /// In-app Google Sign-In → handoff redeem on this host (no Safari).
+  Future<void> _nativeGoogleThenReload() async {
+    try {
+      final host = widget.workspaceHost?.trim().isNotEmpty == true
+          ? widget.workspaceHost!.trim()
+          : Uri.parse(BevelConfig.workspaceUrl).host;
+      final path = _callbackPath;
+      final tenant = host.contains('2x4m')
+          ? '2x4m'
+          : host.split('.').firstWhere(
+                (s) => s != 'bevel' && s.isNotEmpty,
+                orElse: () => '2x4m',
+              );
+      final result = await _googleNative.signIn(
+        tenantSlug: tenant,
+        callbackPath: path,
+        workspaceHost: host,
+      );
+      if (result == null) return;
+      final redeem = SessionBridge.handoffRedeemUri(
+        code: result.handoffCode,
+        callbackPath: result.callbackPath ?? path,
+        workspaceOrigin: 'https://$host',
+      );
+      await _controller.loadRequest(redeem);
+      _sessionChecked = false;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google sign-in failed: $e')),
+        );
+      }
+      // Last resort: system browser
+      await _oauth.openSystemLogin();
+    }
+  }
 
   Future<void> _goHome() {
     final origin = _workspaceOrigin;
@@ -445,7 +482,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             message: _error!,
             onRetry: _reload,
             onExternal: _openExternal,
-            onSignIn: () => _oauth.openSystemLogin(),
+            onSignIn: _nativeGoogleThenReload,
           )
         else
           WebViewWidget(controller: _controller),
@@ -530,8 +567,8 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             ),
           if (!_sessionHealthy)
             IconButton(
-              tooltip: 'Sign in (system browser)',
-              onPressed: () => _oauth.openSystemLogin(),
+              tooltip: 'Sign in with Google',
+              onPressed: _nativeGoogleThenReload,
               icon: const Icon(Icons.login_rounded),
             ),
           IconButton(
@@ -562,7 +599,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                 case 'hub':
                   widget.onOpenNativeHub?.call();
                 case 'signin':
-                  unawaited(_oauth.openSystemLogin());
+                  unawaited(_nativeGoogleThenReload());
               }
             },
             itemBuilder: (ctx) => [
