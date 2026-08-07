@@ -68,9 +68,13 @@ pull_field() {
     echo "    OK $field → $dest ($(wc -c <"$dest" | tr -d ' ') bytes)"
     return 0
   fi
-  # Alternate path: document title
+  # Document titles used by bootstrap: "BEVEL Firebase <name>"
   if op document get "$field" --vault "$VAULT" >"$dest" 2>/dev/null; then
     echo "    OK document $field → $dest"
+    return 0
+  fi
+  if op document get "BEVEL Firebase $field" --vault "$VAULT" >"$dest" 2>/dev/null; then
+    echo "    OK document BEVEL Firebase $field → $dest"
     return 0
   fi
   echo "    MISS $field (add to 1Password item)"
