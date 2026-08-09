@@ -32,7 +32,8 @@
 				<string>bevel</string>
 			</array>
 		</dict>
-		<!-- Google Sign-In (reversed web OAuth client from AUTH_GOOGLE_ID) -->
+		<!-- Google Sign-In reversed client ID (type iOS OAuth client — set after Console create).
+		     Placeholder scheme is replaced by scripts/mobile/apply-google-ios-client.sh -->
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
@@ -40,12 +41,11 @@
 			<string>google-sign-in</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.336973686985-0ggvfg30mh3junprhcfmdgdtepbnqfb0</string>
+				<string>com.googleusercontent.apps.REPLACE_IOS_CLIENT</string>
 			</array>
 		</dict>
 	</array>
-	<key>GIDClientID</key>
-	<string>336973686985-0ggvfg30mh3junprhcfmdgdtepbnqfb0.apps.googleusercontent.com</string>
+	<!-- Server (WEB) client — ID token audience only; not used for custom schemes -->
 	<key>GIDServerClientID</key>
 	<string>336973686985-0ggvfg30mh3junprhcfmdgdtepbnqfb0.apps.googleusercontent.com</string>
 	<key>CFBundleVersion</key>

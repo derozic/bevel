@@ -702,10 +702,52 @@ class _BevelHomePageState extends State<BevelHomePage> {
     } catch (e) {
       debugPrint('Native Google sign-in failed: $e');
       if (!mounted) return;
-      setState(() {
-        _status =
-            'Native Google sign-in failed — falling back to system browser…';
-      });
+      final msg = e.toString();
+      // WEB client misconfigured as iOS → Google Error 400 custom scheme
+      final needsIosClient = msg.contains('GOOGLE_IOS_CLIENT_ID') ||
+          msg.contains('WEB') ||
+          msg.contains('custom scheme') ||
+          msg.contains('invalid_request');
+      if (needsIosClient &&
+          defaultTargetPlatform == TargetPlatform.iOS) {
+        setState(() {
+          _status =
+              'Need an iOS OAuth client (not WEB). See scripts/mobile/apply-google-ios-client.sh';
+        });
+        if (mounted) {
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF141A21),
+              title: const Text('Google iOS client required'),
+              content: const Text(
+                'Google blocked sign-in because a WEB OAuth client was used '
+                'for native iOS (custom schemes are not allowed).\n\n'
+                'Create OAuth client type iOS in Cloud Console (2x4m project) '
+                'with bundle id com.derozic.bevel.bevelApp, then run:\n\n'
+                './scripts/mobile/apply-google-ios-client.sh <client-id>\n\n'
+                'You can continue with browser sign-in for now.',
+                style: TextStyle(color: Color(0xFFCBD5E1), height: 1.35),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Use browser'),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _status =
+              'Native Google sign-in failed — falling back to system browser…';
+        });
+      }
     }
 
     // Fallback: system browser OAuth (legacy)

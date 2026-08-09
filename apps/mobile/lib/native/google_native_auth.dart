@@ -29,7 +29,10 @@ class GoogleNativeAuthResult {
   final String? workspaceHost;
 }
 
-/// In-app Google account picker (Google Sign-In SDK) — not Safari / Chrome.
+/// In-app Google account picker (Google Sign-In SDK) — not Safari.
+///
+/// Requires an **iOS** / **Android** OAuth client (not WEB). Using a WEB client
+/// causes: "Custom scheme URIs are not allowed for 'WEB' client type".
 ///
 /// Flow:
 ///   1. Native Google UI → ID token
@@ -41,34 +44,61 @@ class GoogleNativeAuth {
   final http.Client _client;
   GoogleSignIn? _signIn;
 
-  /// Web OAuth client ID (AUTH_GOOGLE_ID) — used as serverClientId so Google
-  /// issues an ID token the API can verify.
+  /// Web OAuth client — used as [serverClientId] so Google issues an ID token
+  /// the API can verify (audience = this client).
   static const String serverClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
     defaultValue:
         '336973686985-0ggvfg30mh3junprhcfmdgdtepbnqfb0.apps.googleusercontent.com',
   );
 
-  /// Optional iOS client ID (dart-define or same as server when only web client exists).
+  /// iOS OAuth client ID (type **iOS**, bundle com.derozic.bevel.bevelApp).
+  /// Empty until created in Google Cloud Console — do NOT put a WEB client here.
   static const String iosClientId = String.fromEnvironment(
     'GOOGLE_IOS_CLIENT_ID',
-    defaultValue:
-        '336973686985-0ggvfg30mh3junprhcfmdgdtepbnqfb0.apps.googleusercontent.com',
+    defaultValue: '',
   );
 
-  GoogleSignIn get _google {
-    return _signIn ??= GoogleSignIn(
+  /// Android OAuth client ID (type **Android**, package + SHA-1). Optional when
+  /// google-services.json already wires the client.
+  static const String androidClientId = String.fromEnvironment(
+    'GOOGLE_ANDROID_CLIENT_ID',
+    defaultValue: '',
+  );
+
+  bool get hasIosClientConfigured => iosClientId.trim().isNotEmpty;
+
+  GoogleSignIn _buildGoogle() {
+    final isApple = defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+
+    // iOS: require a real iOS client — WEB client causes Error 400 custom scheme.
+    String? clientId;
+    if (isApple) {
+      final ios = iosClientId.trim();
+      if (ios.isEmpty) {
+        throw StateError(
+          'Missing GOOGLE_IOS_CLIENT_ID. Create an OAuth client of type iOS '
+          '(bundle id com.derozic.bevel.bevelApp) in Google Cloud project '
+          'x4m-493516 / 2x4m, then rebuild with '
+          '--dart-define=GOOGLE_IOS_CLIENT_ID=….apps.googleusercontent.com '
+          'and set the matching REVERSED_CLIENT_ID URL scheme in Info.plist.',
+        );
+      }
+      clientId = ios;
+    } else if (androidClientId.trim().isNotEmpty) {
+      clientId = androidClientId.trim();
+    }
+
+    return GoogleSignIn(
       scopes: const <String>['email', 'profile', 'openid'],
       serverClientId: serverClientId,
-      // iOS: explicit client id (GoogleService-Info may lack CLIENT_ID until
-      // an iOS OAuth client is created in Cloud Console).
-      clientId: defaultTargetPlatform == TargetPlatform.iOS ||
-              defaultTargetPlatform == TargetPlatform.macOS
-          ? iosClientId
-          : null,
-      hostedDomain: null, // any Workspace domain at platform entry
+      clientId: clientId,
+      hostedDomain: null,
     );
   }
+
+  GoogleSignIn get _google => _signIn ??= _buildGoogle();
 
   Future<GoogleNativeAuthResult?> signIn({
     String tenantSlug = '2x4m',
@@ -76,8 +106,8 @@ class GoogleNativeAuth {
     String? workspaceHost,
   }) async {
     if (kIsWeb) return null;
+
     try {
-      // Prefer interactive account picker every time user taps Continue.
       await _google.signOut();
     } catch (_) {
       /* ignore */
@@ -85,17 +115,15 @@ class GoogleNativeAuth {
 
     final account = await _google.signIn();
     if (account == null) {
-      // User cancelled
-      return null;
+      return null; // cancelled
     }
 
     final auth = await account.authentication;
     final idToken = auth.idToken;
     if (idToken == null || idToken.isEmpty) {
       throw StateError(
-        'Google Sign-In did not return an ID token. '
-        'Ensure GOOGLE_SERVER_CLIENT_ID is the web OAuth client and '
-        'iOS URL scheme / CLIENT_ID are configured.',
+        'Google Sign-In returned no ID token. Check that serverClientId is the '
+        'WEB OAuth client and the platform client is type iOS/Android (not WEB).',
       );
     }
 
