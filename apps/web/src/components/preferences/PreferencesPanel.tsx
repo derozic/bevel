@@ -293,14 +293,14 @@ function PreferencesSaveFooter() {
             ) : null}
           </p>
           <p className="text-[11px] text-muted/90">
-            Auto-saves after you pause typing ·{' '}
+            Server save after you pause (~3s) or use Save /{' '}
             <kbd className="rounded border border-border bg-surface px-1 font-mono text-[10px]">
               ⌘
             </kbd>
             <kbd className="ml-0.5 rounded border border-border bg-surface px-1 font-mono text-[10px]">
               S
-            </kbd>{' '}
-            anytime · AI API keys stay local only
+            </kbd>
+            {' '}· AI API keys stay local only
           </p>
           <FeatureFlagsBarFromDom compact className="mt-1.5" />
         </div>

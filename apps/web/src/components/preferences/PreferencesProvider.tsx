@@ -50,8 +50,11 @@ export type PreferencesSaveStatus =
   | 'saved'
   | 'error'
 
-/** Debounced persistence — insurance if the user never hits Update. */
-const AUTOSAVE_MS = 900
+/**
+ * Server autosave only after the user pauses typing — not per keystroke.
+ * LocalStorage cache updates immediately (silent); network waits for idle.
+ */
+const AUTOSAVE_MS = 2800
 
 type PreferencesContextValue = {
   open: boolean
@@ -102,6 +105,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Skip dirty/autosave on the initial load from storage
   const hydrated = useRef(false)
+  /** Monotonic id so only the latest in-flight server save can commit UI state. */
+  const saveGen = useRef(0)
+  const inFlight = useRef(false)
+  const pendingAfterFlight = useRef(false)
 
   const clearTimers = useCallback(() => {
     if (savedFlashTimer.current) {
@@ -114,75 +121,105 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const persist = useCallback(
-    (value: BevelUserPreferences, source: 'auto' | 'manual') => {
-      // Local cache first (offline-friendly), then Postgres via API
+  const writeLocalCache = useCallback(
+    (value: BevelUserPreferences) => {
       try {
         savePreferences(tenantSlug, userId, value)
       } catch {
         /* quota / private mode */
       }
-
-      void (async () => {
-        try {
-          const res = await fetch('/api/me/settings', {
-            method: 'PUT',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              preferences: value,
-              merge: true,
-              tenantId: tenantSlug || undefined,
-            }),
-          })
-          if (!res.ok) {
-            // Fall back: still try profile endpoint so identity is not lost
-            const profile = value.profile
-            await fetch('/api/me/profile', {
-              method: 'PUT',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                handle: profile?.handle || undefined,
-                name: profile?.displayName || undefined,
-                imageUrl: profile?.photoUrl || undefined,
-                personalAgentId: profile?.personalAgentId || undefined,
-                profile: profile || undefined,
-                preferences: value,
-                tenantId: tenantSlug || undefined,
-              }),
-            }).catch(() => null)
-            if (!res.ok) {
-              setSaveStatus('error')
-              return
-            }
-          }
-          const at = Date.now()
-          setLastSavedAt(at)
-          setDirty(false)
-          setSaveStatus('saved')
-          if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current)
-          const flashMs = source === 'manual' ? 2200 : 1600
-          savedFlashTimer.current = setTimeout(() => {
-            setSaveStatus((s) => (s === 'saved' ? 'idle' : s))
-          }, flashMs)
-        } catch {
-          setSaveStatus('error')
-        }
-      })()
     },
     [tenantSlug, userId],
   )
 
+  const persist = useCallback(
+    async (value: BevelUserPreferences, source: 'auto' | 'manual') => {
+      writeLocalCache(value)
+
+      // Coalesce: one network write at a time; queue one more for the latest value
+      if (inFlight.current) {
+        pendingAfterFlight.current = true
+        return
+      }
+
+      const gen = ++saveGen.current
+      inFlight.current = true
+      // Only flash "Saving…" for explicit Save / ⌘S — not while typing
+      if (source === 'manual') {
+        setSaveStatus('saving')
+      }
+
+      try {
+        const res = await fetch('/api/me/settings', {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            preferences: value,
+            merge: true,
+            tenantId: tenantSlug || undefined,
+          }),
+        })
+        if (!res.ok) {
+          const profile = value.profile
+          const fallback = await fetch('/api/me/profile', {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              handle: profile?.handle || undefined,
+              name: profile?.displayName || undefined,
+              imageUrl: profile?.photoUrl || undefined,
+              personalAgentId: profile?.personalAgentId || undefined,
+              profile: profile || undefined,
+              preferences: value,
+              tenantId: tenantSlug || undefined,
+            }),
+          }).catch(() => null)
+          if (!fallback?.ok) {
+            if (gen === saveGen.current) setSaveStatus('error')
+            return
+          }
+        }
+        // Stale response (newer edit started) — ignore UI success
+        if (gen !== saveGen.current) return
+
+        const at = Date.now()
+        setLastSavedAt(at)
+        setDirty(false)
+        setSaveStatus('saved')
+        if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current)
+        const flashMs = source === 'manual' ? 2200 : 1400
+        savedFlashTimer.current = setTimeout(() => {
+          setSaveStatus((s) => (s === 'saved' ? 'idle' : s))
+        }, flashMs)
+      } catch {
+        if (gen === saveGen.current) setSaveStatus('error')
+      } finally {
+        inFlight.current = false
+        if (pendingAfterFlight.current && gen === saveGen.current) {
+          pendingAfterFlight.current = false
+          // One more write with whatever is current after the pause
+          void persist(prefsRef.current, source)
+        } else {
+          pendingAfterFlight.current = false
+        }
+      }
+    },
+    [tenantSlug, userId, writeLocalCache],
+  )
+
   const scheduleAutosave = useCallback(() => {
     if (!hydrated.current) return
+    // Immediate silent local cache; server only after idle
+    writeLocalCache(prefsRef.current)
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     autosaveTimer.current = setTimeout(() => {
       autosaveTimer.current = null
-      setSaveStatus('saving')
-      persist(prefsRef.current, 'auto')
+      // Stay on "dirty" until network finishes — never "saving" per keystroke
+      void persist(prefsRef.current, 'auto')
     }, AUTOSAVE_MS)
-  }, [persist])
+  }, [persist, writeLocalCache])
 
   const saveNow = useCallback(() => {
     if (!hydrated.current) return
@@ -190,8 +227,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       clearTimeout(autosaveTimer.current)
       autosaveTimer.current = null
     }
-    setSaveStatus('saving')
-    persist(prefsRef.current, 'manual')
+    void persist(prefsRef.current, 'manual')
   }, [persist])
 
   // Load when identity is known — server (Postgres) is source of truth when signed in
@@ -355,7 +391,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
           clearTimeout(autosaveTimer.current)
           autosaveTimer.current = null
         }
-        persist(prefsRef.current, 'auto')
+        void persist(prefsRef.current, 'auto')
       }
       setOpenState(next)
     },
