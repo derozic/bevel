@@ -207,7 +207,9 @@ export default function DashboardSettingsPage() {
         );
         setProfileBio((fromPrefs.bio || "").slice(0, BIO_MAX));
         setActiveProvider(
-          data.preferences?.ai?.activeProvider || data.active_provider || "claude",
+          (data.preferences?.ai?.activeProvider ||
+            data.active_provider ||
+            "claude") as ProviderId,
         );
         setProviderState(
           mapProviders(
