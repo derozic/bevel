@@ -60,3 +60,9 @@ services/api/.venv/
 dist/
 
 /build/
+
+# Native app binaries (published via rsync to prod /opt/bevel/static/downloads)
+apps/web/public/downloads/*.ipa
+apps/web/public/downloads/*.apk
+apps/web/public/downloads/*.zip
+apps/web/public/downloads/*.aab
