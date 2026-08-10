@@ -14,6 +14,7 @@ import {
 import { useSession } from 'next-auth/react'
 import {
   DEFAULT_PREFERENCES,
+  parsePreferences,
   type BevelUserPreferences,
 } from '@bevel/schema'
 import { loadPreferences, savePreferences } from '@/lib/preferences/storage'
@@ -22,6 +23,15 @@ import {
   queryMediaPermission,
 } from '@/lib/preferences/permissions'
 import { applyDaypartAtmosphere } from '@/lib/daypart'
+
+/** Never let partial/corrupt prefs crash the app tree. */
+function safePrefs(input: unknown): BevelUserPreferences {
+  try {
+    return parsePreferences(input)
+  } catch {
+    return structuredClone(DEFAULT_PREFERENCES)
+  }
+}
 
 export type PreferencesSectionId =
   | 'ai'
@@ -240,7 +250,12 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     setLastSavedAt(null)
 
     // Paint local cache immediately, then overlay server prefs
-    const local = loadPreferences(tenantSlug, userId)
+    let local: BevelUserPreferences
+    try {
+      local = safePrefs(loadPreferences(tenantSlug, userId))
+    } catch {
+      local = structuredClone(DEFAULT_PREFERENCES)
+    }
     setPrefsState(local)
     prefsRef.current = local
 
@@ -267,32 +282,34 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
           return
         }
         const data = (await res.json().catch(() => ({}))) as {
-          preferences?: BevelUserPreferences
+          preferences?: BevelUserPreferences | Record<string, unknown>
           updatedAt?: string | null
         }
         if (cancelled) return
         if (data.preferences && typeof data.preferences === 'object') {
-          // parsePreferences fills defaults for missing keys
-          const { parsePreferences } = await import('@bevel/schema')
-          const merged = parsePreferences({
+          const server = data.preferences as Record<string, unknown>
+          const serverProfile =
+            server.profile && typeof server.profile === 'object'
+              ? (server.profile as Record<string, unknown>)
+              : {}
+          const merged = safePrefs({
             ...local,
-            ...data.preferences,
+            ...server,
             profile: {
               ...local.profile,
-              ...(data.preferences.profile ?? {}),
+              ...serverProfile,
             },
           })
           setPrefsState(merged)
           prefsRef.current = merged
-          // Keep local cache in sync with server
-          savePreferences(tenantSlug, userId, merged)
+          writeLocalCache(merged)
           if (data.updatedAt) {
             const ts = Date.parse(data.updatedAt)
             if (!Number.isNaN(ts)) setLastSavedAt(ts)
           }
         }
       } catch {
-        /* offline — keep local */
+        /* offline / corrupt — keep local */
       } finally {
         if (!cancelled) hydrated.current = true
       }
@@ -302,7 +319,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       cancelled = true
       clearTimers()
     }
-  }, [tenantSlug, userId, clearTimers])
+  }, [tenantSlug, userId, clearTimers, writeLocalCache])
 
   const setPrefs = useCallback(
     (
@@ -311,7 +328,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         | ((prev: BevelUserPreferences) => BevelUserPreferences),
     ) => {
       setPrefsState((prev) => {
-        const value = typeof next === 'function' ? next(prev) : next
+        const raw = typeof next === 'function' ? next(prev) : next
+        const value = safePrefs(raw)
         prefsRef.current = value
         if (hydrated.current) {
           setDirty(true)
@@ -424,20 +442,23 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   // Density, zoom, simplified layout
   useEffect(() => {
     const root = document.documentElement
-    root.dataset.bevelDensity = prefs.appearance.density
+    const appearance = prefs?.appearance
+    const accessibility = prefs?.accessibility
+    if (!appearance || !accessibility) return
+    root.dataset.bevelDensity = appearance.density
     root.style.setProperty(
       '--bevel-ui-zoom',
-      `${prefs.accessibility.zoomPercent / 100}`,
+      `${accessibility.zoomPercent / 100}`,
     )
-    if (prefs.accessibility.simplifiedLayout) {
+    if (accessibility.simplifiedLayout) {
       root.dataset.bevelSimplified = 'true'
     } else {
       delete root.dataset.bevelSimplified
     }
   }, [
-    prefs.appearance.density,
-    prefs.accessibility.zoomPercent,
-    prefs.accessibility.simplifiedLayout,
+    prefs?.appearance?.density,
+    prefs?.accessibility?.zoomPercent,
+    prefs?.accessibility?.simplifiedLayout,
   ])
 
   /**
@@ -447,8 +468,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
    */
   useLayoutEffect(() => {
     const root = document.documentElement
-    const themeId = prefs.appearance.themeId ?? 'tenant'
-    let daypartPref = prefs.appearance.daypart ?? 'auto'
+    const themeId = prefs?.appearance?.themeId ?? 'tenant'
+    let daypartPref = prefs?.appearance?.daypart ?? 'auto'
 
     if (themeId === 'system') {
       const dark = window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -507,13 +528,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       window.cancelAnimationFrame(raf)
       mq.removeEventListener('change', onChange)
     }
-  }, [prefs.appearance.daypart, prefs.appearance.themeId])
+  }, [prefs?.appearance?.daypart, prefs?.appearance?.themeId])
 
   // Auto daypart clock tick (only when not locked by system theme)
   useEffect(() => {
-    if (prefs.appearance.themeId === 'system') return
-    if (prefs.appearance.themeId === 'high_contrast') {
-      const pref = prefs.appearance.daypart ?? 'auto'
+    const themeId = prefs?.appearance?.themeId
+    if (!themeId || themeId === 'system') return
+    if (themeId === 'high_contrast') {
+      const pref = prefs?.appearance?.daypart ?? 'auto'
       if (pref !== 'auto') return
       const timer = window.setInterval(() => {
         applyDaypartAtmosphere('auto')
@@ -521,13 +543,13 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       }, 60_000)
       return () => window.clearInterval(timer)
     }
-    const pref = prefs.appearance.daypart ?? 'auto'
+    const pref = prefs?.appearance?.daypart ?? 'auto'
     if (pref !== 'auto') return
     const timer = window.setInterval(() => {
       applyDaypartAtmosphere('auto')
     }, 60_000)
     return () => window.clearInterval(timer)
-  }, [prefs.appearance.daypart, prefs.appearance.themeId])
+  }, [prefs?.appearance?.daypart, prefs?.appearance?.themeId])
 
   const openSection = useCallback((s: PreferencesSectionId) => {
     setSection(s)
