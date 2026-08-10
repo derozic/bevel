@@ -79,7 +79,7 @@ function SaveStatusLabel({ compact = false }: { compact?: boolean }) {
           className="size-1.5 animate-pulse rounded-full bg-muted"
           aria-hidden
         />
-        Saving to this browser…
+        Saving to server…
       </span>
     )
   }
@@ -87,20 +87,20 @@ function SaveStatusLabel({ compact = false }: { compact?: boolean }) {
     return (
       <span className="inline-flex items-center gap-1 font-medium text-accent" role="status">
         <CheckCircleIcon className="size-3.5" aria-hidden />
-        {compact ? 'Saved' : 'Saved on this device'}
+        {compact ? 'Saved' : 'Saved to server'}
       </span>
     )
   }
   if (saveStatus === 'error') {
     return (
       <span className="font-medium text-danger" role="status">
-        Couldn’t save — browser storage may be full or blocked
+        Couldn’t save to server — check connection and try again
       </span>
     )
   }
   return (
     <span className="text-muted" role="status">
-      {compact ? 'Local save' : 'All set on this device'}
+      {compact ? 'Server save' : 'Synced to your account'}
     </span>
   )
 }
