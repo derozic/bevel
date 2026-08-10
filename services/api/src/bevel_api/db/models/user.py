@@ -33,6 +33,11 @@ class User(Base):
     personal_agent_config: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=dict
     )
+    # Full BevelUserPreferences blob (profile, appearance, notifications, …)
+    # Source of truth for settings UI; localStorage is cache only.
+    preferences: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )

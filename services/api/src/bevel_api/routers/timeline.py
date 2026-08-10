@@ -86,6 +86,10 @@ class ProfileUpdateBody(BaseModel):
     clearPersonalAgent: bool = False
     tenantId: Optional[str] = None
     personalAgentConfig: Optional[dict[str, Any]] = None
+    # Full h-card profile section (bio, socials, tags, …) → users.preferences.profile
+    profile: Optional[dict[str, Any]] = None
+    # Optional full preferences patch alongside profile
+    preferences: Optional[dict[str, Any]] = None
 
 
 class TimelineSourceBody(BaseModel):
@@ -304,6 +308,8 @@ async def put_me_profile(
             personal_agent_id=personal_agent,
             personal_agent_config=body.personalAgentConfig,
             tenant_id=body.tenantId,
+            profile=body.profile,
+            preferences=body.preferences,
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -312,8 +318,12 @@ async def put_me_profile(
     return {
         "ok": True,
         "user": users_repo.to_public_dict(
-            updated, include_email=True, include_agent_config=True
+            updated,
+            include_email=True,
+            include_agent_config=True,
+            include_preferences=True,
         ),
+        "preferences": dict(updated.preferences or {}),
     }
 
 

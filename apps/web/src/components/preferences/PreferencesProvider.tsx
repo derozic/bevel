@@ -116,39 +116,60 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback(
     (value: BevelUserPreferences, source: 'auto' | 'manual') => {
+      // Local cache first (offline-friendly), then Postgres via API
       try {
         savePreferences(tenantSlug, userId, value)
-        // Server SoT for handle + personal agent (timeline @/^ resolution)
-        const profile = value.profile
-        if (profile?.handle || profile?.personalAgentId || profile?.displayName) {
-          void fetch('/api/me/profile', {
+      } catch {
+        /* quota / private mode */
+      }
+
+      void (async () => {
+        try {
+          const res = await fetch('/api/me/settings', {
             method: 'PUT',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              handle: profile.handle || undefined,
-              name: profile.displayName || undefined,
-              imageUrl: profile.photoUrl || undefined,
-              personalAgentId: profile.personalAgentId || undefined,
+              preferences: value,
+              merge: true,
               tenantId: tenantSlug || undefined,
             }),
-          }).catch(() => {
-            /* local prefs still saved; API may be offline in dev */
           })
+          if (!res.ok) {
+            // Fall back: still try profile endpoint so identity is not lost
+            const profile = value.profile
+            await fetch('/api/me/profile', {
+              method: 'PUT',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                handle: profile?.handle || undefined,
+                name: profile?.displayName || undefined,
+                imageUrl: profile?.photoUrl || undefined,
+                personalAgentId: profile?.personalAgentId || undefined,
+                profile: profile || undefined,
+                preferences: value,
+                tenantId: tenantSlug || undefined,
+              }),
+            }).catch(() => null)
+            if (!res.ok) {
+              setSaveStatus('error')
+              return
+            }
+          }
+          const at = Date.now()
+          setLastSavedAt(at)
+          setDirty(false)
+          setSaveStatus('saved')
+          if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current)
+          const flashMs = source === 'manual' ? 2200 : 1600
+          savedFlashTimer.current = setTimeout(() => {
+            setSaveStatus((s) => (s === 'saved' ? 'idle' : s))
+          }, flashMs)
+        } catch {
+          setSaveStatus('error')
         }
-        const at = Date.now()
-        setLastSavedAt(at)
-        setDirty(false)
-        setSaveStatus('saved')
-        if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current)
-        // Manual Update keeps "Saved" a bit longer so the CTA feels conclusive
-        const flashMs = source === 'manual' ? 2200 : 1600
-        savedFlashTimer.current = setTimeout(() => {
-          setSaveStatus((s) => (s === 'saved' ? 'idle' : s))
-        }, flashMs)
-      } catch {
-        setSaveStatus('error')
-      }
+      })()
     },
     [tenantSlug, userId],
   )
@@ -173,21 +194,76 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     persist(prefsRef.current, 'manual')
   }, [persist])
 
-  // Load when identity is known
+  // Load when identity is known — server (Postgres) is source of truth when signed in
   useEffect(() => {
+    let cancelled = false
     hydrated.current = false
     clearTimers()
-    const loaded = loadPreferences(tenantSlug, userId)
-    setPrefsState(loaded)
-    prefsRef.current = loaded
     setSaveStatus('idle')
     setDirty(false)
     setLastSavedAt(null)
-    const t = window.setTimeout(() => {
-      hydrated.current = true
-    }, 0)
+
+    // Paint local cache immediately, then overlay server prefs
+    const local = loadPreferences(tenantSlug, userId)
+    setPrefsState(local)
+    prefsRef.current = local
+
+    const isAnon = !userId || userId === 'anon'
+    if (isAnon) {
+      const t = window.setTimeout(() => {
+        if (!cancelled) hydrated.current = true
+      }, 0)
+      return () => {
+        cancelled = true
+        window.clearTimeout(t)
+        clearTimers()
+      }
+    }
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/me/settings', {
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        })
+        if (!res.ok || cancelled) {
+          if (!cancelled) hydrated.current = true
+          return
+        }
+        const data = (await res.json().catch(() => ({}))) as {
+          preferences?: BevelUserPreferences
+          updatedAt?: string | null
+        }
+        if (cancelled) return
+        if (data.preferences && typeof data.preferences === 'object') {
+          // parsePreferences fills defaults for missing keys
+          const { parsePreferences } = await import('@bevel/schema')
+          const merged = parsePreferences({
+            ...local,
+            ...data.preferences,
+            profile: {
+              ...local.profile,
+              ...(data.preferences.profile ?? {}),
+            },
+          })
+          setPrefsState(merged)
+          prefsRef.current = merged
+          // Keep local cache in sync with server
+          savePreferences(tenantSlug, userId, merged)
+          if (data.updatedAt) {
+            const ts = Date.parse(data.updatedAt)
+            if (!Number.isNaN(ts)) setLastSavedAt(ts)
+          }
+        }
+      } catch {
+        /* offline — keep local */
+      } finally {
+        if (!cancelled) hydrated.current = true
+      }
+    })()
+
     return () => {
-      window.clearTimeout(t)
+      cancelled = true
       clearTimers()
     }
   }, [tenantSlug, userId, clearTimers])

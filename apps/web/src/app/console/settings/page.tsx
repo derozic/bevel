@@ -173,11 +173,24 @@ export default function DashboardSettingsPage() {
           const payload = (await response.json().catch(() => null)) as { detail?: string } | null;
           throw new Error(payload?.detail || "Could not load settings from your BEVEL account.");
         }
-        const data = (await response.json()) as ApiSettings;
+        const data = (await response.json()) as ApiSettings & {
+          preferences?: {
+            profile?: { displayName?: string; handle?: string; bio?: string }
+            ai?: {
+              activeProvider?: string
+              naturalLanguage?: boolean
+              providers?: Record<string, { configured?: boolean; keyPreview?: string }>
+            }
+          }
+        };
         if (cancelled) return;
 
         const local = loadPreferences(tenantSlug, userId);
-        const fromPrefs = local.profile;
+        const serverProfile = data.preferences?.profile
+        const fromPrefs = {
+          ...local.profile,
+          ...(serverProfile ?? {}),
+        };
 
         setProfileName(
           fromPrefs.displayName ||
@@ -193,10 +206,20 @@ export default function DashboardSettingsPage() {
           ),
         );
         setProfileBio((fromPrefs.bio || "").slice(0, BIO_MAX));
-        setActiveProvider(data.active_provider || "claude");
-        setProviderState(mapProviders(data.providers || {}));
+        setActiveProvider(
+          data.preferences?.ai?.activeProvider || data.active_provider || "claude",
+        );
+        setProviderState(
+          mapProviders(
+            (data.preferences?.ai?.providers as ApiSettings["providers"]) ||
+              data.providers ||
+              {},
+          ),
+        );
         setDebugLogs(data.debug_logs ?? true);
-        setNaturalLanguage(data.natural_language ?? true);
+        setNaturalLanguage(
+          data.preferences?.ai?.naturalLanguage ?? data.natural_language ?? true,
+        );
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error instanceof Error ? error.message : "Failed to load settings.");
@@ -242,8 +265,7 @@ export default function DashboardSettingsPage() {
       const bio = profileBio.trim().slice(0, BIO_MAX);
       const handle = profileHandle.trim().replace(/^@/, "");
 
-      // Persist h-card profile (bio = p-note) into the same prefs store the
-      // announcement banner and Preferences panel read.
+      // Persist full preferences document to Postgres (profile + AI settings)
       const current = loadPreferences(tenantSlug, userId);
       const nextPrefs = {
         ...current,
@@ -253,45 +275,42 @@ export default function DashboardSettingsPage() {
           handle,
           bio,
         },
+        ai: {
+          ...current.ai,
+          activeProvider: activeProvider as typeof current.ai.activeProvider,
+          naturalLanguage,
+          providers: current.ai.providers,
+        },
       };
       savePreferences(tenantSlug, userId, nextPrefs);
       if (prefs?.setPrefs) {
         prefs.setPrefs(nextPrefs);
       }
 
-      void fetch("/api/me/profile", {
+      const settingsResponse = await fetch("/api/me/settings", {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          handle: handle || undefined,
-          name: profileName.trim() || undefined,
+          preferences: nextPrefs,
+          merge: true,
           tenantId: tenantSlug || undefined,
-        }),
-      }).catch(() => {
-        /* local prefs still saved */
-      });
-
-      const settingsResponse = await fetch("/api/me/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile_name: profileName,
-          profile_handle: profileHandle,
-          profile_bio: bio,
-          active_provider: activeProvider,
-          debug_logs: debugLogs,
-          natural_language: naturalLanguage,
         }),
       });
 
       if (!settingsResponse.ok) {
         const payload = (await settingsResponse.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(payload?.detail || "Failed to save settings.");
+        throw new Error(payload?.detail || "Failed to save settings to the server.");
       }
 
-      const saved = (await settingsResponse.json()) as ApiSettings;
-      setProviderState(mapProviders(saved.providers || {}));
+      const saved = (await settingsResponse.json()) as ApiSettings & {
+        preferences?: { ai?: { providers?: ApiSettings["providers"] } }
+      };
+      setProviderState(
+        mapProviders(
+          saved.preferences?.ai?.providers || saved.providers || {},
+        ),
+      );
 
       if (apiKeyDraft.trim()) {
         setSavePhase("validating");

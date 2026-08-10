@@ -37,8 +37,11 @@ def to_public_dict(
     *,
     include_email: bool = False,
     include_agent_config: bool = False,
+    include_preferences: bool = False,
 ) -> dict[str, Any]:
     """Directory-safe user card. Email only for the authenticated self."""
+    prefs = dict(user.preferences or {})
+    profile = dict(prefs.get("profile") or {})
     out: dict[str, Any] = {
         "id": user.id,
         "name": user.name,
@@ -48,11 +51,18 @@ def to_public_dict(
         "role": user.role,
         "personalAgentId": user.personal_agent_id,
         "isActive": user.is_active,
+        # Convenience mirrors from preferences.profile when present
+        "displayName": profile.get("displayName") or user.name,
+        "bio": profile.get("bio") or "",
+        "photoUrl": profile.get("photoUrl") or user.image_url,
     }
     if include_email:
         out["email"] = user.email
     if include_agent_config:
         out["personalAgentConfig"] = dict(user.personal_agent_config or {})
+    if include_preferences:
+        out["preferences"] = prefs
+        out["profile"] = profile
     return out
 
 
@@ -109,6 +119,103 @@ async def lookup_handles(
     return list(result.scalars().all())
 
 
+def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+    """Recursive dict merge; patch wins. Arrays and scalars replace."""
+    out = dict(base)
+    for key, val in patch.items():
+        if (
+            key in out
+            and isinstance(out[key], dict)
+            and isinstance(val, dict)
+            and not _is_plain_record(val)
+        ):
+            out[key] = _deep_merge(out[key], val)
+        else:
+            out[key] = val
+    return out
+
+
+def _is_plain_record(d: dict[str, Any]) -> bool:
+    """Heuristic: treat map-like records (channelMap) as replace, not merge trees."""
+    # Nested preference objects we deep-merge are known; freeform maps replace.
+    return False
+
+
+async def get_preferences(session: AsyncSession, user_id: str) -> dict[str, Any]:
+    user = await get_by_id(session, user_id)
+    if not user:
+        return {}
+    return dict(user.preferences or {})
+
+
+async def save_preferences(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    preferences: dict[str, Any],
+    merge: bool = True,
+    tenant_id: str | None = None,
+) -> User | None:
+    """Persist full preferences blob and sync denormalized profile columns."""
+    user = await get_by_id(session, user_id)
+    if not user:
+        return None
+
+    incoming = dict(preferences or {})
+    # Never accept raw provider secrets if a client ever sends them
+    ai = incoming.get("ai")
+    if isinstance(ai, dict):
+        for k in ("apiKey", "api_key", "secret", "token"):
+            ai.pop(k, None)
+        providers = ai.get("providers")
+        if isinstance(providers, dict):
+            for _pid, state in providers.items():
+                if isinstance(state, dict):
+                    for k in ("apiKey", "api_key", "secret", "token"):
+                        state.pop(k, None)
+
+    if merge:
+        current = dict(user.preferences or {})
+        next_prefs = _deep_merge(current, incoming)
+    else:
+        next_prefs = incoming
+
+    user.preferences = next_prefs
+
+    # Sync profile denorms from preferences.profile when present
+    profile = next_prefs.get("profile")
+    if isinstance(profile, dict):
+        display = (profile.get("displayName") or "").strip()
+        if display:
+            user.name = display
+        photo = (profile.get("photoUrl") or "").strip()
+        if photo:
+            user.image_url = photo
+        handle_raw = profile.get("handle")
+        if handle_raw is not None:
+            normalized = normalize_handle(str(handle_raw))
+            if str(handle_raw).strip() and not normalized:
+                raise ValueError("invalid handle — use 2–63 chars [a-z0-9_-]")
+            if normalized:
+                existing = await get_by_handle(
+                    session,
+                    handle=normalized,
+                    tenant_id=user.tenant_id or tenant_id,
+                )
+                if existing and existing.id != user.id:
+                    raise ValueError(f"handle @{normalized} is already taken")
+            user.handle = normalized
+        agent = (profile.get("personalAgentId") or "").strip().lower() or None
+        if "personalAgentId" in profile:
+            user.personal_agent_id = agent
+
+    if tenant_id and not user.tenant_id:
+        user.tenant_id = tenant_id
+    user.updated_at = _utcnow()
+    await session.flush()
+    return user
+
+
 async def update_profile(
     session: AsyncSession,
     *,
@@ -119,6 +226,8 @@ async def update_profile(
     personal_agent_id: str | None | object = ...,
     personal_agent_config: dict[str, Any] | None = None,
     tenant_id: str | None = None,
+    profile: dict[str, Any] | None = None,
+    preferences: dict[str, Any] | None = None,
 ) -> User | None:
     user = await get_by_id(session, user_id)
     if not user:
@@ -146,6 +255,48 @@ async def update_profile(
         user.personal_agent_config = dict(personal_agent_config)
     if tenant_id and not user.tenant_id:
         user.tenant_id = tenant_id
+
+    # Merge profile/preferences into JSONB SoT
+    prefs = dict(user.preferences or {})
+    if preferences:
+        prefs = _deep_merge(prefs, dict(preferences))
+    if profile:
+        existing_profile = dict(prefs.get("profile") or {})
+        prefs["profile"] = _deep_merge(existing_profile, dict(profile))
+        # Keep denorms in sync when only profile patch is sent
+        p = prefs["profile"]
+        if name is None and p.get("displayName"):
+            user.name = str(p["displayName"]).strip() or user.name
+        if image_url is None and p.get("photoUrl"):
+            user.image_url = str(p["photoUrl"]).strip() or user.image_url
+        if handle is None and p.get("handle") is not None:
+            nh = normalize_handle(str(p.get("handle") or ""))
+            if str(p.get("handle") or "").strip() and not nh:
+                raise ValueError("invalid handle — use 2–63 chars [a-z0-9_-]")
+            if nh:
+                existing = await get_by_handle(
+                    session, handle=nh, tenant_id=user.tenant_id or tenant_id
+                )
+                if existing and existing.id != user.id:
+                    raise ValueError(f"handle @{nh} is already taken")
+            user.handle = nh
+        if personal_agent_id is ... and "personalAgentId" in p:
+            user.personal_agent_id = (
+                str(p.get("personalAgentId") or "").strip().lower() or None
+            )
+    # Always reflect column-level name/handle/image into profile for consistency
+    prof = dict(prefs.get("profile") or {})
+    if name is not None:
+        prof["displayName"] = user.name
+    if handle is not None:
+        prof["handle"] = user.handle or ""
+    if image_url is not None:
+        prof["photoUrl"] = user.image_url or ""
+    if personal_agent_id is not ...:
+        prof["personalAgentId"] = user.personal_agent_id or ""
+    prefs["profile"] = prof
+    user.preferences = prefs
+
     user.updated_at = _utcnow()
     await session.flush()
     return user

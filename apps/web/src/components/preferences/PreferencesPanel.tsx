@@ -286,9 +286,8 @@ function PreferencesSaveFooter() {
           </p>
           <p className="text-xs leading-relaxed text-muted">
             Saves <strong className="font-medium text-foreground/90">profile, appearance, and settings</strong>{' '}
-            in <strong className="font-medium text-foreground/90">this browser</strong> for{' '}
-            <strong className="font-medium text-foreground/90">this workspace only</strong>
-            {' '}— not to the server.
+            to the <strong className="font-medium text-foreground/90">server</strong> (PostgreSQL)
+            so they follow you across devices and browsers.
             {savedAgo ? (
               <span className="text-muted/90"> · Last saved {savedAgo}</span>
             ) : null}
@@ -301,7 +300,7 @@ function PreferencesSaveFooter() {
             <kbd className="ml-0.5 rounded border border-border bg-surface px-1 font-mono text-[10px]">
               S
             </kbd>{' '}
-            anytime
+            anytime · AI API keys stay local only
           </p>
           <FeatureFlagsBarFromDom compact className="mt-1.5" />
         </div>

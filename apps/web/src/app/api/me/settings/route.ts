@@ -1,32 +1,55 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { bevelApiFetch } from '@/lib/bevel-api.server'
 
 /**
- * Lightweight settings payload for the console.
- * Provider secrets stay client-local until a full vault lands in Postgres.
+ * Full BevelUserPreferences — source of truth is Postgres via FastAPI.
+ * GET  → load preferences for the signed-in user
+ * PUT  → deep-merge save profile, appearance, notifications, media, etc.
  */
+
 export async function GET() {
   const session = await auth()
   if (!session?.user?.email) {
     return NextResponse.json({ detail: 'Sign in required' }, { status: 401 })
   }
 
-  return NextResponse.json({
-    profile_name: session.user.name || session.user.email.split('@')[0] || '',
-    profile_handle: session.user.email.split('@')[0] || '',
-    active_provider: 'claude',
-    debug_logs: false,
-    natural_language: true,
-    email: session.user.email,
-    name: session.user.name,
-    providers: {
-      claude: { configured: false, key_preview: '' },
-      openai: { configured: false, key_preview: '' },
-      gemini: { configured: false, key_preview: '' },
-      grok: { configured: false, key_preview: '' },
-      kimi: { configured: false, key_preview: '' },
-    },
-  })
+  try {
+    const res = await bevelApiFetch('/api/v1/me/preferences')
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      return NextResponse.json(data, { status: res.status })
+    }
+    const prefs = (data.preferences ?? {}) as Record<string, unknown>
+    const profile = (prefs.profile ?? {}) as Record<string, unknown>
+    return NextResponse.json({
+      ok: true,
+      preferences: prefs,
+      profile,
+      user: data.user ?? null,
+      email: session.user.email,
+      name: session.user.name,
+      // Console-compat fields (legacy)
+      profile_name:
+        (profile.displayName as string) ||
+        session.user.name ||
+        session.user.email.split('@')[0] ||
+        '',
+      profile_handle:
+        (profile.handle as string) ||
+        session.user.email.split('@')[0] ||
+        '',
+      updatedAt: data.updatedAt ?? null,
+    })
+  } catch (err) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: err instanceof Error ? err.message : 'failed',
+      },
+      { status: 502 },
+    )
+  }
 }
 
 export async function PUT(request: Request) {
@@ -34,8 +57,49 @@ export async function PUT(request: Request) {
   if (!session?.user?.email) {
     return NextResponse.json({ detail: 'Sign in required' }, { status: 401 })
   }
+
   const body = await request.json().catch(() => ({}))
-  return NextResponse.json({ ok: true, saved: body })
+  // Accept either { preferences: {...} } or a bare preferences document
+  const preferences =
+    body && typeof body === 'object' && body.preferences
+      ? body.preferences
+      : body
+  const merge = body?.merge !== false
+  const tenantId =
+    body?.tenantId ||
+    (session as { tenantSlug?: string }).tenantSlug ||
+    undefined
+
+  try {
+    const res = await bevelApiFetch('/api/v1/me/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({
+        preferences,
+        merge,
+        tenantId,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    return NextResponse.json(
+      {
+        ok: res.ok,
+        saved: true,
+        preferences: data.preferences ?? preferences,
+        user: data.user ?? null,
+        updatedAt: data.updatedAt ?? null,
+        ...(res.ok ? {} : { detail: data.detail || data.error || 'save failed' }),
+      },
+      { status: res.status },
+    )
+  } catch (err) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: err instanceof Error ? err.message : 'failed',
+      },
+      { status: 502 },
+    )
+  }
 }
 
 export async function PATCH(request: Request) {
