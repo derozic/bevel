@@ -20,7 +20,7 @@ export async function registerBevelServiceWorker(): Promise<ServiceWorkerRegistr
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null
   try {
     // Bust old SWs that cached `/` (307→login) and caused ERR_TOO_MANY_REDIRECTS.
-    const reg = await navigator.serviceWorker.register('/sw.js?v=5', { scope: '/' })
+    const reg = await navigator.serviceWorker.register('/sw.js?v=6', { scope: '/' })
     return reg
   } catch {
     return null
