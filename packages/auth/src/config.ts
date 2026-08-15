@@ -638,6 +638,9 @@ export function createTenantAuthConfig(
           session.user.image = token.picture
             ? String(token.picture)
             : session.user.image
+          // Always stamp id. Talk/DMs used to require user.id while /login only
+          // checked email — missing id caused /talk ↔ /login flicker.
+          session.user.id = String(token.sub || token.email || session.user.email)
 
           const slug = String(token.tenantSlug ?? tenant.slug)
           const active = lookupTenantBySlug(slug) ?? tenant

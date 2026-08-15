@@ -101,6 +101,8 @@ export default async function LoginPage({
   // A partial session (user without email) used to bounce:
   // login → /welcome → login (ERR_TOO_MANY_REDIRECTS).
   if (session?.user?.email) {
+    // Already signed in. Never bounce through this page again for the same
+    // callback — a missing user.id on /talk used to send us back here forever.
     redirect(callbackUrl)
   }
 

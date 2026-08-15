@@ -8,6 +8,7 @@ import {
   bevelTalkPath,
 } from '@/lib/bevel'
 import { parseChatAgentsParam } from '@/lib/chat-agents'
+import { sessionActorId } from '@/lib/session-user'
 
 /**
  * Direct agent session body — rendered inside /bevel layout (BevelShell).
@@ -40,11 +41,14 @@ export async function AgentBevelSessionView({
   const agentNames = agentIds.map((id) => getAgentById(id)?.name ?? id)
   const sessionTitle = bevelConversationTitle(agentNames)
 
-  if (!session?.user?.id) {
+  const actorId = sessionActorId(session)
+  // Email-only sessions must not redirect to /login — login sees email and
+  // sends them right back here (full-page flicker).
+  if (!actorId) {
     redirect(`/login?callbackUrl=${encodeURIComponent(callbackPath)}`)
   }
 
-  const directSessionId = bevelDirectSessionId(session.user.id, agentIds)
+  const directSessionId = bevelDirectSessionId(actorId, agentIds)
 
   return (
     <BevelChatPane
