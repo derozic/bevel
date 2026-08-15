@@ -25,9 +25,9 @@ type Workflow = {
 const WORKFLOWS: Workflow[] = [
   {
     id: 'channel-mention',
-    name: 'Channel @mention routing',
+    name: 'Track @mention routing',
     description:
-      'When a human posts with @agent in a BEVEL channel, hydrate history from Postgres and dispatch the agent via realtime.',
+      'When a human posts with @agent in a track, hydrate history from Postgres and dispatch the agent via realtime.',
     engine: 'bevel',
     steps: ['Message POST', 'Mention extract', 'Agent dispatch', 'Persist reply'],
     tags: ['realtime', 'postgres', 'agents'],
@@ -45,7 +45,7 @@ const WORKFLOWS: Workflow[] = [
     id: 'n8n-deploy',
     name: 'Deploy notify (n8n)',
     description:
-      'On successful GitHub Actions deploy, n8n posts a program event into the workspace channel.',
+      'On successful GitHub Actions deploy, n8n posts a program event into the workspace track.',
     engine: 'n8n',
     steps: ['Webhook', 'Filter success', 'Format', 'program-events'],
     tags: ['ci', 'n8n'],
@@ -72,9 +72,9 @@ export default function ConsoleWorkflowsPage() {
           Workflows
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Workflows start and end in tracks and conversations. Mint an inbound
-          URL so n8n or Actions can post into ~ops or a Hermes DM, or an
-          outbound hook so a final message starts a pipeline.
+          Workflows start and end in tracks and conversations. Subscribe to
+          New messages, Mentions, or First-time welcome — or mint an incoming
+          URL so a pipeline can land in ~ops or a Hermes conversation.
         </p>
       </div>
 

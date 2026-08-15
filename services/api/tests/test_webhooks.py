@@ -77,6 +77,16 @@ def test_ingest_url_is_stable() -> None:
     assert INGEST_URL == "/api/v1/ingest/notifications"
 
 
+def test_catalog_uses_bevel_labels() -> None:
+    from bevel_api.repositories.webhooks import EVENT_CATALOG
+
+    by_id = {row["id"]: row for row in EVENT_CATALOG}
+    assert by_id["message.created"]["label"] == "New messages"
+    assert by_id["track.created"]["label"] == "Track created"
+    assert by_id["conversation.started"]["label"] == "Conversation started"
+    assert "Group" not in by_id["track.created"]["label"]
+
+
 def test_event_families_include_ftue() -> None:
     hook = _hook(events=["ftue.*"])
     assert hook_wants_event(hook, "ftue.started")
