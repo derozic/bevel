@@ -9,7 +9,16 @@ export type WebhookDirection = (typeof WEBHOOK_DIRECTIONS)[number]
 export const WEBHOOK_TARGETS = ['track', 'conversation', 'any'] as const
 export type WebhookTargetKind = (typeof WEBHOOK_TARGETS)[number]
 
-export const WEBHOOK_EVENT_CATALOG = [
+export type WebhookCatalogDirection = 'inbound' | 'outbound' | 'both'
+
+export type WebhookEventDef = {
+  id: string
+  family: string
+  direction: WebhookCatalogDirection
+  description: string
+}
+
+export const WEBHOOK_EVENT_CATALOG: readonly WebhookEventDef[] = [
   {
     id: 'ftue.started',
     family: 'ftue',
@@ -88,7 +97,7 @@ export const WEBHOOK_EVENT_CATALOG = [
     direction: 'both',
     description: 'Notification dispatch layer ingested an alert (push + optional room/timeline).',
   },
-] as const
+]
 
 export const NotificationIngestSchema = z.object({
   title: z.string().min(1).max(160),
