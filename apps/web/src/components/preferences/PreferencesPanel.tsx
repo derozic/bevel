@@ -392,17 +392,17 @@ export function PreferencesPanel() {
           className="bevel-prefs-root fixed inset-0 z-[120]"
           role="presentation"
         >
-          {/* Scrim */}
+          {/* Scrim — pointerdown so iPad Safari does not swallow the dismiss */}
           <motion.button
             type="button"
             aria-label="Close preferences"
-            className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-ink/40"
             style={{ background: 'color-mix(in srgb, var(--ink, #0a0a0a) 38%, transparent)' }}
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0 }}
+            animate={{ opacity: 1, pointerEvents: 'auto' }}
+            exit={{ opacity: 0, pointerEvents: 'none' }}
             transition={{ duration: reduceMotion ? 0.12 : 0.28, ease: easeOut }}
-            onClick={() => setOpen(false)}
+            onPointerDown={() => setOpen(false)}
           />
 
           {/* Panel */}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { BEVEL_COPY } from '@/lib/bevel'
 import type { FleetChannelSummary } from '@/lib/fleet-channels'
 
@@ -20,6 +21,11 @@ export function CreateChannelModal({
   const [tags, setTags] = useState(EMPTY.tags)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -100,10 +106,14 @@ export function CreateChannelModal({
   const fieldClass =
     'mt-1 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 focus:border-ink-900 focus:outline-none focus:ring-2 focus:ring-ink-900/10'
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <form
         onSubmit={(e) => void submit(e)}
@@ -165,6 +175,7 @@ export function CreateChannelModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -17,6 +17,10 @@ import type {
 } from '@bevel/schema'
 import { BevelRail, type FleetChannelSummary } from '@/components/BevelRail'
 import type { SessionSummary } from '@/lib/realtime'
+import {
+  markBevelInputMode,
+  useWorkspaceOverlayNav,
+} from '@/lib/workspace-nav'
 
 type BevelChatPaneContextValue = {
   openSidebar: () => void
@@ -96,11 +100,16 @@ export function BevelShell({
 }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const overlayNav = useWorkspaceOverlayNav()
 
   const { activeSlug, activeSessionId } = activeRouteFromPath(pathname ?? '')
 
   const openSidebar = useCallback(() => setSidebarOpen(true), [])
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+
+  useEffect(() => {
+    markBevelInputMode()
+  }, [])
 
   useEffect(() => {
     closeSidebar()
@@ -117,17 +126,17 @@ export function BevelShell({
 
   return (
     <div className="bevel-workspace">
-      {sidebarOpen ? (
+      {overlayNav && sidebarOpen ? (
         <button
           type="button"
           className="bevel-workspace-scrim"
           aria-label="Close channels"
-          onClick={closeSidebar}
+          onPointerDown={closeSidebar}
         />
       ) : null}
 
       <aside
-        className={`bevel-workspace-rail${sidebarOpen ? ' bevel-workspace-rail--open' : ''}`}
+        className={`bevel-workspace-rail${overlayNav && sidebarOpen ? ' bevel-workspace-rail--open' : ''}`}
         aria-label="Channels"
       >
         <BevelRail

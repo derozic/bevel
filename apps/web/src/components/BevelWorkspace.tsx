@@ -5,6 +5,10 @@ import { XMarkIcon } from '@heroicons/react/24/outline'
 import { ChannelChatShell } from '@/components/ChannelChatShell'
 import { BevelRail, type FleetChannelSummary } from '@/components/BevelRail'
 import type { SessionSummary } from '@/lib/realtime'
+import {
+  markBevelInputMode,
+  useWorkspaceOverlayNav,
+} from '@/lib/workspace-nav'
 
 export function BevelWorkspace({
   roomMode = 'channel',
@@ -24,9 +28,14 @@ export function BevelWorkspace({
   initialSessions?: SessionSummary[]
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const overlayNav = useWorkspaceOverlayNav()
 
   const openSidebar = useCallback(() => setSidebarOpen(true), [])
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+
+  useEffect(() => {
+    markBevelInputMode()
+  }, [])
 
   useEffect(() => {
     closeSidebar()
@@ -43,17 +52,17 @@ export function BevelWorkspace({
 
   return (
     <div className="bevel-workspace">
-      {sidebarOpen ? (
+      {overlayNav && sidebarOpen ? (
         <button
           type="button"
           className="bevel-workspace-scrim"
           aria-label="Close channels"
-          onClick={closeSidebar}
+          onPointerDown={closeSidebar}
         />
       ) : null}
 
       <aside
-        className={`bevel-workspace-rail${sidebarOpen ? ' bevel-workspace-rail--open' : ''}`}
+        className={`bevel-workspace-rail${overlayNav && sidebarOpen ? ' bevel-workspace-rail--open' : ''}`}
         aria-label="Channels"
       >
         <BevelRail

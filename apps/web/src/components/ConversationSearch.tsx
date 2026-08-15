@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,7 @@ export function ConversationSearch({ className }: { className?: string }) {
   const router = useRouter()
   const inputId = useId()
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<SearchHitDto[]>([])
   const [loading, setLoading] = useState(false)
@@ -107,6 +109,10 @@ export function ConversationSearch({ className }: { className?: string }) {
   }, [])
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
@@ -162,13 +168,13 @@ export function ConversationSearch({ className }: { className?: string }) {
     )
   }
 
-  return (
+  const dialog = (
     <div
-      className="fixed inset-0 z-[80] flex items-start justify-center bg-black/50 px-4 pt-[12vh] backdrop-blur-[2px]"
+      className="fixed inset-0 z-[80] flex items-start justify-center bg-black/50 px-4 pt-[12vh]"
       role="dialog"
       aria-modal="true"
       aria-labelledby={inputId}
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget) close()
       }}
     >
@@ -255,4 +261,7 @@ export function ConversationSearch({ className }: { className?: string }) {
       </div>
     </div>
   )
+
+  if (!mounted) return null
+  return createPortal(dialog, document.body)
 }

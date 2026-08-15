@@ -153,7 +153,7 @@ export function ConversationRoster({
             >
               <div
                 className="bevel-roster-scrim"
-                onClick={() => setOpen(false)}
+                onPointerDown={() => setOpen(false)}
                 aria-hidden
               />
           <div className="bevel-roster-panel">

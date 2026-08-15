@@ -179,11 +179,12 @@ html[data-daypart] .bevel-workspace-root::before {
   opacity: 1;
 }
 
-html[data-daypart] .bevel-workspace,
-html[data-daypart] .bevel-workspace-rail,
-html[data-daypart] .bevel-workspace-main {
+/* Do not set position/z-index on the rail. Overlay mode needs
+   position:fixed; z-index:40 above the drawer scrim. A previous
+   z-index:1 here put the scrim on top of the rail on iPad — dark
+   wash, every tap hits the scrim, sidebar is dead. */
+html[data-daypart] .bevel-workspace {
   position: relative;
-  z-index: 1;
 }
 
 html[data-daypart] .bevel-workspace-rail {
