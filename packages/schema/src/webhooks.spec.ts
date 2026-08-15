@@ -3,6 +3,8 @@ import {
   inboundWebhookPath,
   isConversationTarget,
   NotificationIngestSchema,
+  webhookEventLabel,
+  webhookSubscriptionOptions,
   webhookWantsEvent,
   WebhookEndpointSchema,
 } from './webhooks'
@@ -33,6 +35,19 @@ describe('workflow webhooks', () => {
     expect(webhookWantsEvent(['ftue.*'], 'ftue.started')).toBe(true)
     expect(webhookWantsEvent(['ftue.*'], 'message.created')).toBe(false)
     expect(webhookWantsEvent([], 'user.created')).toBe(true)
+  })
+
+  it('uses Bevel labels instead of vendor group language', () => {
+    expect(webhookEventLabel('*')).toBe('All events')
+    expect(webhookEventLabel('message.created')).toBe('New messages')
+    expect(webhookEventLabel('track.created')).toBe('Track created')
+    expect(webhookEventLabel('conversation.started')).toBe('Conversation started')
+    expect(webhookEventLabel('workflow.failed')).toBe('Workflow failed')
+    const labels = webhookSubscriptionOptions('outbound').map((o) => o.label)
+    expect(labels).toContain('All events')
+    expect(labels).toContain('New messages')
+    expect(labels).not.toContain('Group Name Changes')
+    expect(labels).not.toContain('Participant Added')
   })
 
   it('accepts a track-bound outbound hook', () => {

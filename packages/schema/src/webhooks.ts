@@ -15,89 +15,154 @@ export type WebhookEventDef = {
   id: string
   family: string
   direction: WebhookCatalogDirection
+  label: string
   description: string
 }
+
+export type WebhookSubscriptionOption = {
+  id: string
+  label: string
+  family: string
+}
+
+/** Family chips shown first in the event subscription picker. */
+export const WEBHOOK_FAMILY_SUBSCRIPTIONS: readonly WebhookSubscriptionOption[] = [
+  { id: '*', label: 'All events', family: '*' },
+  { id: 'ftue.*', label: 'All first-time', family: 'ftue' },
+  { id: 'message.*', label: 'All messages', family: 'message' },
+  { id: 'track.*', label: 'All tracks', family: 'track' },
+  { id: 'conversation.*', label: 'All conversations', family: 'conversation' },
+  { id: 'workflow.*', label: 'All workflows', family: 'workflow' },
+  { id: 'notification.*', label: 'All notifications', family: 'notification' },
+  { id: 'user.*', label: 'All people', family: 'user' },
+]
 
 export const WEBHOOK_EVENT_CATALOG: readonly WebhookEventDef[] = [
   {
     id: 'ftue.started',
     family: 'ftue',
     direction: 'both',
-    description: 'First-time user entered Bevel (signup, claim, or inbound welcome).',
+    label: 'First-time welcome',
+    description: 'Someone entered Bevel for the first time.',
   },
   {
     id: 'ftue.first_message',
     family: 'ftue',
     direction: 'outbound',
+    label: 'First message',
     description: 'First human message in their personal conversation.',
   },
   {
     id: 'ftue.completed',
     family: 'ftue',
     direction: 'both',
-    description: 'Onboarding finished (profile, handle, or inbound complete).',
+    label: 'Onboarding finished',
+    description: 'Profile, handle, or inbound welcome completed.',
   },
   {
     id: 'user.created',
     family: 'user',
     direction: 'outbound',
-    description: 'Identity row created in Postgres.',
+    label: 'New person',
+    description: 'A person record was created.',
   },
   {
     id: 'message.created',
     family: 'message',
     direction: 'both',
-    description: 'A final message landed in a track or conversation.',
+    label: 'New messages',
+    description: 'A message landed in a track or conversation.',
   },
   {
     id: 'gesture.created',
     family: 'message',
     direction: 'outbound',
+    label: 'Gestures',
     description: 'Thumbs, star, heart, or vote on a message.',
   },
   {
     id: 'mention.created',
     family: 'message',
     direction: 'outbound',
+    label: 'Mentions',
     description: '@handle or ^handle extracted from a message.',
   },
   {
     id: 'track.created',
     family: 'track',
     direction: 'outbound',
+    label: 'Track created',
     description: 'A new track (~slug) was created.',
   },
   {
     id: 'conversation.started',
     family: 'conversation',
     direction: 'outbound',
-    description: 'First turn in a direct thread (dm-*).',
+    label: 'Conversation started',
+    description: 'First turn in a direct thread.',
   },
   {
     id: 'workflow.started',
     family: 'workflow',
     direction: 'both',
-    description: 'External pipeline began; can post into a room.',
+    label: 'Workflow started',
+    description: 'An external pipeline began and can post into a room.',
   },
   {
     id: 'workflow.completed',
     family: 'workflow',
     direction: 'both',
-    description: 'External pipeline finished in a track or conversation.',
+    label: 'Workflow finished',
+    description: 'An external pipeline finished in a track or conversation.',
   },
   {
     id: 'workflow.failed',
     family: 'workflow',
     direction: 'both',
-    description: 'External pipeline failed; posted as a system turn.',
+    label: 'Workflow failed',
+    description: 'An external pipeline failed; posted as a system turn.',
   },
   {
     id: 'notification.dispatched',
     family: 'notification',
     direction: 'both',
-    description: 'Notification dispatch layer ingested an alert (push + optional room/timeline).',
+    label: 'Notification ingested',
+    description: 'The dispatch layer ingested an alert (push, room, or timeline).',
   },
 ]
+
+export function webhookEventLabel(id: string): string {
+  const family = WEBHOOK_FAMILY_SUBSCRIPTIONS.find((item) => item.id === id)
+  if (family) return family.label
+  const event = WEBHOOK_EVENT_CATALOG.find((item) => item.id === id)
+  return event?.label ?? id
+}
+
+export function webhookSubscriptionOptions(
+  direction: WebhookDirection | 'both' = 'outbound',
+): WebhookSubscriptionOption[] {
+  const families = WEBHOOK_FAMILY_SUBSCRIPTIONS.filter((item) => {
+    if (item.id === '*') return true
+    return WEBHOOK_EVENT_CATALOG.some(
+      (event) =>
+        event.family === item.family &&
+        (direction === 'both' ||
+          event.direction === 'both' ||
+          event.direction === direction),
+    )
+  })
+  const events = WEBHOOK_EVENT_CATALOG.filter(
+    (event) =>
+      direction === 'both' ||
+      event.direction === 'both' ||
+      event.direction === direction,
+  ).map((event) => ({
+    id: event.id,
+    label: event.label,
+    family: event.family,
+  }))
+  return [...families, ...events]
+}
 
 export const NotificationIngestSchema = z.object({
   title: z.string().min(1).max(160),
