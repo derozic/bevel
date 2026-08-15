@@ -70,6 +70,37 @@ writes still succeed; push results report `fcm_not_configured`.
 
 Without config files, the app still runs; only remote push is skipped.
 
+## Dispatch-layer ingest (standing URL)
+
+Notification senders (n8n, cron, another service) should target this — not
+per-device FCM, not a minted webhook id:
+
+`POST https://api.bevel.is/api/v1/ingest/notifications`
+
+Auth: `X-Fleet-Internal-Key`. Optional twin on the web host:
+`https://bevel.is/api/ingest/notifications`.
+
+```bash
+curl -sS -X POST https://api.bevel.is/api/v1/ingest/notifications \
+  -H "X-Fleet-Internal-Key: $FLEET_INTERNAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Hermes",
+    "body": "Your review is ready",
+    "handle": "scott",
+    "conversation": "dm-usr-hermes",
+    "severity": "info",
+    "persist": true,
+    "push": true,
+    "timeline": true
+  }'
+```
+
+Effects: persist into the track/conversation, FCM to that user, timeline item,
+and `notification.dispatched` outbound webhooks.
+
+`GET` the same path for the contract.
+
 ## Test send
 
 ```bash

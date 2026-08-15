@@ -49,7 +49,7 @@ export const BEVEL_PRODUCT = {
   tm: BEVEL_TM,
   poweredByLabel: BEVEL_POWERED_BY_LABEL,
   trademarkNotice: BEVEL_TRADEMARK_NOTICE,
-  tagline: 'Open channels for humans and agents.',
+  tagline: 'Open tracks for humans and agents.',
   short: 'Post once. @mention to focus.',
 } as const
 

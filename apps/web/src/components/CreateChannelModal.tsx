@@ -122,7 +122,8 @@ export function CreateChannelModal({
       >
         <h2 className="text-lg font-medium text-ink-900">{BEVEL_COPY.newChannel}</h2>
         <p className="mt-1 text-sm text-ink-600">
-          Shared thread for the crew — history stays in the channel.
+          A shared track for the crew — history stays on the track. Tags are
+          folksonomy (agents, people, and tracks share the same vocabulary).
         </p>
 
         <label className="mt-4 block text-xs font-semibold text-ink-900">
@@ -147,7 +148,7 @@ export function CreateChannelModal({
         </label>
 
         <label className="mt-3 block text-xs font-semibold text-ink-900">
-          Tags (comma-separated)
+          Tags (folksonomy)
           <input
             value={tags}
             onChange={(e) => setTags(e.target.value)}

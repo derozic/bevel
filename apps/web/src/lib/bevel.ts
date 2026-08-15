@@ -61,10 +61,21 @@ export const BEVEL_TIMELINE_PATH = '/timeline'
  * Primary post-login home on the platform apex.
  */
 export const BEVEL_PRIVATE_PATH = '/me'
+/** Folksonomy browse: /tags/product */
+export const BEVEL_TAGS_PATH = '/tags'
 /** Default personal agent when user has no personalAgentId set */
 export const BEVEL_DEFAULT_PERSONAL_AGENT = 'hermes'
 
 /** User lookup / connection card for @handle and ^handle */
+export function bevelTagPath(slug: string): string {
+  const clean = slug
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return `${BEVEL_TAGS_PATH}/${encodeURIComponent(clean || 'tag')}`
+}
+
 export function bevelUserPath(handle: string): string {
   const h = handle.trim().toLowerCase().replace(/^[@^~#]+/, '')
   return `/u/${encodeURIComponent(h || 'unknown')}`

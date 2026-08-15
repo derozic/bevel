@@ -10,6 +10,8 @@ const PUBLIC_PATHS = [
   '/api/claim',
   '/api/agent-programs',
   '/api/github/webhook',
+  '/api/webhooks/inbound',
+  '/api/ingest',
   '/api/github/agent-activity',
   // Twilio SMS (inbound webhook + JOHNNY-style vote links from the phone)
   '/api/twilio/webhook',
@@ -222,6 +224,7 @@ const BEVEL_RESERVED_SEGMENTS = new Set([
   'talk',
   'session',
   'timeline',
+  'tags',
   'c',
 ])
 

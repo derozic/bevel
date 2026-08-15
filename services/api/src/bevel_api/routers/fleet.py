@@ -92,6 +92,21 @@ async def create_channel(
         default_agent_ids=body.defaultAgentIds,
     )
     await session.commit()
+    if created:
+        try:
+            from bevel_api.repositories import webhooks as hooks_repo
+
+            await hooks_repo.emit(
+                session,
+                tenant_id=row.id,
+                tenant_slug=row.slug,
+                event="track.created",
+                data=channels_repo.to_api_dict(ch),
+                track=ch.slug,
+            )
+            await session.commit()
+        except Exception:
+            pass
     payload = channels_repo.to_api_dict(ch)
     return {
         "tenant": row.slug,
@@ -233,12 +248,87 @@ async def post_message(
             # Never block message write on timeline failures
             timeline_fanout = {"ok": False, "error": "fanout_failed"}
 
+    webhook_out = 0
+    try:
+        from bevel_api.routers.webhooks import dispatch_message_created
+
+        prior = await messages_repo.count_for_channel(
+            session, tenant_id=row.id, channel_id=ch.id
+        )
+        webhook_out = await dispatch_message_created(
+            session,
+            tenant_id=row.id,
+            tenant_slug=row.slug,
+            channel_slug=ch.slug,
+            message=messages_repo.to_api_dict(record),
+            first_in_room=prior <= 1,
+        )
+    except Exception:
+        webhook_out = 0
+
     return {
         "ok": True,
         "upserted": True,
         "message": messages_repo.to_api_dict(record),
         "timeline": timeline_fanout,
+        "webhooks": webhook_out,
     }
+
+
+class GestureBody(BaseModel):
+    kind: str = Field(min_length=2, max_length=16)
+    userId: str = Field(min_length=1, max_length=128)
+    userName: str = ""
+
+
+@router.post("/channels/{slug}/messages/{message_id}/gestures")
+async def post_message_gesture(
+    slug: str,
+    message_id: str,
+    payload: GestureBody,
+    _auth: InternalAuth,
+    session: SessionDep,
+    tenant: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Toggle an operator gesture (thumbs / star / heart / vote) on a message."""
+    kind = payload.kind.strip().lower()
+    if kind not in messages_repo.GESTURE_KINDS:
+        raise HTTPException(400, f"unknown gesture: {payload.kind}")
+    row = await _resolve_tenant(session, tenant)
+    record = await messages_repo.record_gesture(
+        session,
+        tenant_id=row.id,
+        message_id=message_id,
+        kind=kind,
+        user_id=payload.userId,
+        user_name=payload.userName,
+    )
+    if record is None:
+        raise HTTPException(404, "message not found")
+    if record.channel_slug != slug.lower().strip():
+        raise HTTPException(404, "message not found")
+    try:
+        from bevel_api.repositories import webhooks as hooks_repo
+
+        room = record.channel_slug
+        await hooks_repo.emit(
+            session,
+            tenant_id=row.id,
+            tenant_slug=row.slug,
+            event="gesture.created",
+            data={
+                "messageId": record.id,
+                "kind": kind,
+                "userId": payload.userId,
+                "userName": payload.userName,
+            },
+            track=None if room.startswith("dm-") else room,
+            conversation=room if room.startswith("dm-") else None,
+            actor={"id": payload.userId, "name": payload.userName},
+        )
+    except Exception:
+        pass
+    return {"ok": True, "message": messages_repo.to_api_dict(record)}
 
 
 @router.get("/channels/{slug}/messages/in-progress")

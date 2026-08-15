@@ -7,7 +7,9 @@ from bevel_api.db.models.push_token import PushToken
 from bevel_api.db.models.tenant import Tenant
 from bevel_api.db.models.timeline import TimelineItem, TimelineSource
 from bevel_api.db.models.trace import AgentRun, AgentTraceEvent
+from bevel_api.db.models.tagging import Tagging
 from bevel_api.db.models.user import User
+from bevel_api.db.models.webhook import Webhook, WebhookDelivery
 
 __all__ = [
     "Tenant",
@@ -24,4 +26,7 @@ __all__ = [
     "TimelineSource",
     "AgentRun",
     "AgentTraceEvent",
+    "Tagging",
+    "Webhook",
+    "WebhookDelivery",
 ]

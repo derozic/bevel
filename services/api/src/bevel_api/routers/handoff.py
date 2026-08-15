@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bevel_api.deps import get_session
 from bevel_api.lib.internal_auth import internal_ok
 from bevel_api.repositories import handoff as handoff_repo
+from bevel_api.repositories import tenants as tenants_repo
 from bevel_api.repositories import users as users_repo
+from bevel_api.repositories import webhooks as hooks_repo
 
 router = APIRouter(prefix="/v1/auth", tags=["Auth"])
 log = logging.getLogger("bevel.auth")
@@ -128,12 +130,14 @@ async def issue_handoff(
         payload_json=body.payloadJson,
         ttl_seconds=body.ttlSeconds,
     )
-    await users_repo.upsert_identity(
+    user, created = await users_repo.upsert_identity(
         session,
         email=body.email,
         name=body.name,
         image_url=body.imageUrl,
     )
+    if created:
+        await _emit_ftue(session, user, tenant_slug=body.tenantSlug)
     return {
         "ok": True,
         "code": plain,
@@ -152,12 +156,14 @@ async def redeem_handoff(
     payload = await handoff_repo.redeem(session, body.code)
     if payload is None:
         raise HTTPException(400, "Invalid or expired handoff code")
-    await users_repo.upsert_identity(
+    user, created = await users_repo.upsert_identity(
         session,
         email=payload["email"],
         name=payload.get("name") or "",
         image_url=payload.get("imageUrl"),
     )
+    if created:
+        await _emit_ftue(session, user, tenant_slug=payload.get("tenantSlug"))
     return {"ok": True, **payload}
 
 
@@ -192,12 +198,15 @@ async def google_native_login(
         callback_path=path,
         ttl_seconds=180,
     )
-    user = await users_repo.upsert_identity(
+    user, created = await users_repo.upsert_identity(
         session,
         email=email,
         name=name,
         image_url=image_url,
+        tenant_id=None,
     )
+    if created:
+        await _emit_ftue(session, user, tenant_slug=tenant)
     return {
         "ok": True,
         "code": plain,
@@ -209,3 +218,37 @@ async def google_native_login(
         "tenantSlug": tenant,
         "callbackPath": path,
     }
+
+
+async def _emit_ftue(session: AsyncSession, user: Any, *, tenant_slug: str | None) -> None:
+    slug = (tenant_slug or "2x4m").strip().lower() or "2x4m"
+    tenant = await tenants_repo.get_by_slug(session, slug)
+    if tenant is None:
+        return
+    actor = {
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "handle": user.handle,
+    }
+    data = {**actor, "personalAgentId": user.personal_agent_id or "hermes"}
+    try:
+        await hooks_repo.emit(
+            session,
+            tenant_id=tenant.id,
+            tenant_slug=tenant.slug,
+            event="user.created",
+            data=data,
+            actor=actor,
+        )
+        await hooks_repo.emit(
+            session,
+            tenant_id=tenant.id,
+            tenant_slug=tenant.slug,
+            event="ftue.started",
+            data=data,
+            conversation=f"dm-{str(user.id).replace('/', '_')}-hermes",
+            actor=actor,
+        )
+    except Exception:
+        log.exception("ftue webhook emit failed")

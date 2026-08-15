@@ -11,6 +11,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { WebhooksPanel } from '@/components/console/WebhooksPanel'
 
 type Workflow = {
   id: string
@@ -71,8 +72,9 @@ export default function ConsoleWorkflowsPage() {
           Workflows
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          First-party BEVEL control flows plus n8n partner automations. Connect n8n under Integrations
-          to run node-based pipelines against the FastAPI fleet API.
+          Workflows start and end in tracks and conversations. Mint an inbound
+          URL so n8n or Actions can post into ~ops or a Hermes DM, or an
+          outbound hook so a final message starts a pipeline.
         </p>
       </div>
 
@@ -174,6 +176,8 @@ export default function ConsoleWorkflowsPage() {
           </div>
         </motion.div>
       </div>
+
+      <WebhooksPanel />
     </div>
   )
 }

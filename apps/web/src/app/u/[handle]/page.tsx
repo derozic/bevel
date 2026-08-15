@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { UserCircleIcon } from '@heroicons/react/24/outline'
+import { FolksonomyChips } from '@/components/FolksonomyChips'
 
 type PublicUser = {
   id: string
@@ -12,6 +13,9 @@ type PublicUser = {
   imageUrl?: string | null
   personalAgentId?: string | null
   role?: string
+  tags?: string[]
+  org?: string
+  jobTitle?: string
 }
 
 export default function UserLookupPage() {
@@ -118,7 +122,22 @@ export default function UserLookupPage() {
                   {user.role}
                 </p>
               ) : null}
+              {user.jobTitle || user.org ? (
+                <p className="mt-1 text-xs text-muted">
+                  {[user.jobTitle, user.org].filter(Boolean).join(' · ')}
+                </p>
+              ) : null}
             </div>
+          </div>
+          <div className="mt-5">
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+              Tags
+            </p>
+            <FolksonomyChips
+              kind="person"
+              id={user.handle || handle}
+              initialTags={user.tags}
+            />
           </div>
           <div className="mt-6 flex flex-wrap gap-2 text-sm">
             <span className="rounded-lg bg-accent/10 px-3 py-1.5 font-medium text-accent">

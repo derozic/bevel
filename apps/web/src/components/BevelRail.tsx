@@ -21,6 +21,7 @@ import { agents } from '@/lib/agent-catalog'
 import {
   BEVEL_COPY,
   BEVEL_PRIVATE_PATH,
+  BEVEL_TAGS_PATH,
   BEVEL_TRADEMARK_NOTICE,
   bevelChannelPath,
   bevelConversationPath,
@@ -45,6 +46,7 @@ import type { SessionSummary } from '@/lib/realtime'
 import { BevelMark } from './BevelMark'
 import { SuiteNav } from './SuiteNav'
 import { WorkspaceBrand } from './WorkspaceBrand'
+import { FolksonomyChips } from './FolksonomyChips'
 import { ConversationRoster } from './ConversationRoster'
 import { ConversationSearch } from './ConversationSearch'
 import { CreateChannelModal } from './CreateChannelModal'
@@ -80,6 +82,9 @@ function BevelRailFooter({
         <Cog6ToothIcon className="h-3.5 w-3.5" />
         Preferences
       </button>
+      <Link href={BEVEL_TAGS_PATH} className="bevel-rail-footer-link">
+        Tags
+      </Link>
       <Link href="/" className="bevel-rail-footer-link">
         <ArrowLeftIcon className="h-3.5 w-3.5" />
         Home
@@ -438,6 +443,18 @@ export function BevelRail({
                   <span className="bevel-rail-channel-name">
                     {ch.name || '\u00a0'}
                   </span>
+                  {ch.tags?.length ? (
+                    <span className="mt-0.5 flex flex-wrap gap-1">
+                      {ch.tags.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-black/5 px-1.5 text-[9px] font-medium uppercase tracking-wide text-muted"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                 </Link>
                 <button
                   type="button"
@@ -463,8 +480,22 @@ export function BevelRail({
                       {channelTag(ch.slug, { escalated })} · properties
                     </p>
                     <p className="bevel-rail-channel-panel-hint">
-                      Default channels show as ~slug. Escalated channels pin to
-                      the top as ^slug.
+                      Tracks show as ~slug. Escalated tracks pin to the top as
+                      ^slug. Tags are folksonomy — anyone can add one.
+                    </p>
+                    <div className="mt-2 px-1">
+                      <FolksonomyChips
+                        kind="track"
+                        id={ch.slug}
+                        initialTags={ch.tags}
+                      />
+                    </div>
+                    <p className="bevel-rail-channel-panel-hint mt-2">
+                      Workflows land here via webhooks.{' '}
+                      <a href="/console/workflows#webhooks" className="underline">
+                        Mint an inbound URL
+                      </a>{' '}
+                      for ~{ch.slug}.
                     </p>
                     <button
                       type="button"

@@ -66,13 +66,14 @@ async def _require_user(
         if user:
             return user
         # Bootstrap identity so first timeline/profile call creates a row
-        return await users_repo.upsert_identity(
+        user, _created = await users_repo.upsert_identity(
             session,
             email=email,
             name=name or "",
             image_url=image_url,
             tenant_id=tenant_id,
         )
+        return user
     raise HTTPException(
         401, "Sign in required — pass X-Bevel-User-Id or X-Bevel-User-Email"
     )

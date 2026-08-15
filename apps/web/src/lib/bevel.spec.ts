@@ -6,6 +6,7 @@ import {
   bevelConversationPath,
   bevelDirectPersistSlug,
   bevelDirectSessionId,
+  bevelTagPath,
   bevelTalkPath,
   normalizeBevelChannelSlug,
 } from './bevel'
@@ -15,6 +16,7 @@ describe('workspace URLs', () => {
     expect(BEVEL_PRIVATE_PATH).toBe('/me')
     expect(bevelTalkPath('Hermes')).toBe('/talk/hermes')
     expect(bevelTalkPath('hermes', 'johnny')).toBe('/talk/hermes?agents=johnny')
+    expect(bevelTagPath('On Call')).toBe('/tags/on-call')
   })
 
   it('normalizes channel slugs and rejects junk', () => {

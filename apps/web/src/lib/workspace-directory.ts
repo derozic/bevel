@@ -9,6 +9,8 @@ export type WorkspacePerson = {
   handle: string
   role?: string
   avatarUrl?: string
+  bio?: string
+  tags?: string[]
   /** Future: real user id once people rooms land */
   email?: string
 }

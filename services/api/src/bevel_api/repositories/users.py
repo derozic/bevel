@@ -311,7 +311,7 @@ async def upsert_identity(
     tenant_id: str | None = None,
     role: str = "member",
     handle: str | None = None,
-) -> User:
+) -> tuple[User, bool]:
     normalized = email.strip().lower()
     existing = await get_by_email(session, normalized)
     if existing:
@@ -325,7 +325,7 @@ async def upsert_identity(
             existing.handle = normalize_handle(handle)
         existing.updated_at = _utcnow()
         await session.flush()
-        return existing
+        return existing, False
 
     derived_handle = normalize_handle(handle) or normalize_handle(
         normalized.split("@")[0]
@@ -347,4 +347,4 @@ async def upsert_identity(
     )
     session.add(row)
     await session.flush()
-    return row
+    return row, True
