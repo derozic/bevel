@@ -2,20 +2,20 @@ import { BEVEL_NAME } from './bevel'
 
 /** User-facing strings for BEVEL surfaces — single source for embed clients. */
 export const BEVEL_COPY = {
-  openingChannel: 'Opening channel…',
+  openingChannel: 'Opening track…',
   archiveLink: 'Session archive',
   archiveNav: 'Archive',
 
   channelHint: 'Toggle agents · post · @mention to focus',
-  channelsLabel: 'Channels',
+  channelsLabel: 'Tracks',
   conversationsLabel: 'Direct',
-  loadingChannels: 'Loading channels…',
+  loadingChannels: 'Loading tracks…',
   loadingConversations: 'Loading conversations…',
-  newChannel: 'New channel',
+  newChannel: 'New track',
   newConversation: 'New',
   conversationsEmpty: 'Pick an agent below to open a direct thread.',
   humanDmsSoon: 'People DMs (e.g. Peter) need a new room type — not wired yet.',
-  agentDirectHint: 'Message opens a private thread. Channel chips keep them in the room.',
+  agentDirectHint: 'Message opens a private thread. Track chips keep them in the room.',
 
   connectingChannel: (slug: string) => `Waking up ~${slug}…`,
   connectingSession: 'Dialing in…',
@@ -40,7 +40,7 @@ export const BEVEL_COPY = {
 
   loadEarlier: 'Load earlier messages',
   loadingEarlier: 'Loading earlier messages…',
-  historyCaughtUp: 'Beginning of channel',
+  historyCaughtUp: 'Beginning of track',
 
   placeholderChannel: (slug: string, sampleAgent?: string) =>
     sampleAgent

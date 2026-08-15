@@ -70,6 +70,14 @@ const nextConfig: NextConfig = {
         source: '/me',
         destination: '/bevel/me',
       },
+      {
+        source: '/tags',
+        destination: '/bevel/tags',
+      },
+      {
+        source: '/tags/:slug',
+        destination: '/bevel/tags/:slug',
+      },
     ]
   },
 }

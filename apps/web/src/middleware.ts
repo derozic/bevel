@@ -222,6 +222,7 @@ const BEVEL_RESERVED_SEGMENTS = new Set([
   'talk',
   'session',
   'timeline',
+  'tags',
   'c',
 ])
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { signIn, signOut, useSession } from 'next-auth/react'
+import { agents } from '@/lib/agent-catalog'
 import { platformLoginUrl } from '@/lib/platform'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import {
@@ -963,11 +964,9 @@ export function ProfileSection() {
             list="bevel-personal-agent-suggestions"
           />
           <datalist id="bevel-personal-agent-suggestions">
-            <option value="hermes" />
-            <option value="brain" />
-            <option value="johnny" />
-            <option value="terry" />
-            <option value="forge" />
+            {agents.map((agent) => (
+              <option key={agent.id} value={agent.id} />
+            ))}
           </datalist>
           <span className="text-[11px] text-muted">
             @mentions land in your timeline; ^escalations also trigger full
@@ -1001,10 +1000,10 @@ export function ProfileSection() {
 
         <div className="space-y-2">
           <span className="block text-sm font-medium text-foreground">
-            Capability tags
+            Folksonomy tags
           </span>
           <p className="text-xs text-muted">
-            Skills, stacks, focus areas. Press Enter or comma to add.
+            Same vocabulary as agents and tracks. Press Enter or comma to add.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (

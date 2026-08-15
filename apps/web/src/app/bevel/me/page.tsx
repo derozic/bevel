@@ -8,8 +8,10 @@ import { Button } from '@bevel/ui'
 import { BevelDaypartMark } from '@/components/BevelDaypartMark'
 import { agents } from '@/lib/agent-catalog'
 import { auth } from '@/auth'
+import { FolksonomyChips } from '@/components/FolksonomyChips'
 import {
   BEVEL_PRIVATE_PATH,
+  BEVEL_TAGS_PATH,
   BEVEL_TIMELINE_PATH,
   bevelTalkPath,
 } from '@/lib/bevel'
@@ -86,10 +88,13 @@ export default async function PrivateMePage() {
           </h2>
           <ul className="grid gap-2 sm:grid-cols-2">
             {agents.map((agent) => (
-              <li key={agent.id}>
+              <li
+                key={agent.id}
+                className="rounded-xl border border-border bg-surface/60 px-4 py-3"
+              >
                 <Link
                   href={bevelTalkPath(agent.id)}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 px-4 py-3 transition hover:border-accent/40 hover:bg-surface"
+                  className="flex items-center gap-3 transition hover:opacity-90"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {agent.avatarUrl ? (
@@ -120,6 +125,9 @@ export default async function PrivateMePage() {
                     </p>
                   </div>
                 </Link>
+                <div className="mt-2 pl-12">
+                  <FolksonomyChips kind="agent" id={agent.id} compact />
+                </div>
               </li>
             ))}
           </ul>
@@ -131,6 +139,9 @@ export default async function PrivateMePage() {
           </Button>
           <Button asChild variant="ghost" size="sm">
             <Link href="/account">Platform profile</Link>
+          </Button>
+          <Button asChild variant="ghost" size="sm">
+            <Link href={BEVEL_TAGS_PATH}>Tags</Link>
           </Button>
           <Button asChild variant="ghost" size="sm">
             <Link href={BEVEL_TIMELINE_PATH}>Timeline</Link>
