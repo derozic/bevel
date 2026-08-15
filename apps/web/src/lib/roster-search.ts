@@ -37,7 +37,6 @@ export function agentSearchBlob(
     agent.summary,
     agent.category,
     agent.industry,
-    agent.tier,
     agent.skills,
     extraTags,
   ])
