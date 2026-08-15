@@ -7,10 +7,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bevel_api.db.models.message import Message
+from bevel_api.lib.tenants import catalog_agents
 
 # @agent or @Name tokens used in chat (agents + soft person mentions)
 _MENTION_RE = re.compile(r"(?<![a-zA-Z0-9_])@([a-zA-Z0-9_-]{2,64})\b")
@@ -19,20 +20,13 @@ _ESCALATION_RE = re.compile(r"(?<![a-zA-Z0-9_])\^([a-zA-Z0-9_-]{2,64})\b")
 
 # Fleet agent ids — @these stay agent dispatch, not people timeline soft-mentions
 # (unless a real user also claims that handle; fan-out resolves users first).
-KNOWN_FLEET_AGENT_IDS: frozenset[str] = frozenset(
-    {
-        "hermes",
-        "johnny",
-        "terry",
-        "forge",
-        "brain",
-        "loom",
-        "northstar",
-        "lego",
-        "tegan",
-        "system",
-    }
-)
+def _known_fleet_agent_ids() -> frozenset[str]:
+    ids = {str(a["id"]).lower() for a in catalog_agents() if a.get("id")}
+    ids.update({"system", "terry", "forge"})
+    return frozenset(ids)
+
+
+KNOWN_FLEET_AGENT_IDS: frozenset[str] = _known_fleet_agent_ids()
 
 
 def _utcnow() -> datetime:
@@ -86,8 +80,86 @@ def extract_escalated_handles(body: str) -> list[str]:
     return _unique_tokens([m.group(1) for m in _ESCALATION_RE.finditer(body)])
 
 
+GESTURE_KINDS = frozenset({"up", "down", "star", "heart", "vote_yes", "vote_no"})
+_GESTURE_OPPOSITE = {
+    "up": "down",
+    "down": "up",
+    "vote_yes": "vote_no",
+    "vote_no": "vote_yes",
+}
+
+
+def normalize_gestures(raw: Any) -> list[dict[str, Any]]:
+    if isinstance(raw, str):
+        try:
+            import json
+
+            raw = json.loads(raw)
+        except (TypeError, ValueError):
+            return []
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        kind = str(item.get("kind") or "").strip()
+        user_id = str(item.get("userId") or item.get("user_id") or "").strip()
+        if kind not in GESTURE_KINDS or not user_id:
+            continue
+        out.append(
+            {
+                "kind": kind,
+                "userId": user_id,
+                "userName": str(item.get("userName") or item.get("user_name") or ""),
+                "ts": int(item.get("ts") or 0),
+            }
+        )
+    return out
+
+
+def apply_gesture(
+    current: list[dict[str, Any]],
+    *,
+    kind: str,
+    user_id: str,
+    user_name: str = "",
+    ts: int | None = None,
+) -> list[dict[str, Any]]:
+    """Toggle one operator gesture. Thumbs and votes are exclusive pairs."""
+    kind = kind.strip()
+    user_id = user_id.strip()
+    if kind not in GESTURE_KINDS or not user_id:
+        return current
+    stamp = int(ts or datetime.now(timezone.utc).timestamp() * 1000)
+    opposite = _GESTURE_OPPOSITE.get(kind)
+    had_same = any(g.get("userId") == user_id and g.get("kind") == kind for g in current)
+    kept = [
+        g
+        for g in current
+        if not (
+            g.get("userId") == user_id
+            and (g.get("kind") == kind or (opposite and g.get("kind") == opposite))
+        )
+    ]
+    if had_same:
+        return kept
+    kept.append(
+        {
+            "kind": kind,
+            "userId": user_id,
+            "userName": user_name.strip(),
+            "ts": stamp,
+        }
+    )
+    return kept
+
+
 def to_api_dict(row: Message) -> dict[str, Any]:
     meta = dict(row.metadata_ or {})
+    reactions = normalize_gestures(meta.get("reactions") or meta.get("gestures"))
+    vote_prompt = str(meta.get("votePrompt") or meta.get("vote_prompt") or "").strip()
+    vote_required = bool(meta.get("voteRequired") or meta.get("vote_required") or vote_prompt)
     return {
         "id": row.id,
         "speakerId": row.speaker_id,
@@ -102,6 +174,9 @@ def to_api_dict(row: Message) -> dict[str, Any]:
         "mentionedAgentIds": list(row.mentioned_agent_ids or []),
         "mentionedHandles": list(row.mentioned_handles or []),
         "escalatedHandles": list(row.escalated_handles or []),
+        "reactions": reactions,
+        "votePrompt": vote_prompt or None,
+        "voteRequired": vote_required,
         "channelSlug": row.channel_slug,
         "tenantId": row.tenant_id,
         "createdAt": row.created_at.isoformat() if row.created_at else None,
@@ -154,6 +229,20 @@ async def list_for_channel(
         rows = rows[:lim]
     rows.reverse()  # chronological
     return rows, has_more
+
+
+async def count_for_channel(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    channel_id: str,
+) -> int:
+    result = await session.execute(
+        select(func.count())
+        .select_from(Message)
+        .where(Message.tenant_id == tenant_id, Message.channel_id == channel_id)
+    )
+    return int(result.scalar_one() or 0)
 
 
 async def list_for_channel_slug(
@@ -343,6 +432,32 @@ async def append(
         created_at=created_at,
     )
     session.add(row)
+    await session.flush()
+    return row
+
+
+async def record_gesture(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    message_id: str,
+    kind: str,
+    user_id: str,
+    user_name: str = "",
+) -> Message | None:
+    """Apply an operator gesture onto message metadata and return the row."""
+    row = await get_by_id(session, message_id)
+    if row is None or row.tenant_id != tenant_id:
+        return None
+    meta = dict(row.metadata_ or {})
+    current = normalize_gestures(meta.get("reactions") or meta.get("gestures"))
+    meta["reactions"] = apply_gesture(
+        current,
+        kind=kind,
+        user_id=user_id,
+        user_name=user_name,
+    )
+    row.metadata_ = meta
     await session.flush()
     return row
 

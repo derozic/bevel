@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import String, cast, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bevel_api.db.models.user import User
@@ -55,9 +55,6 @@ def to_public_dict(
         "displayName": profile.get("displayName") or user.name,
         "bio": profile.get("bio") or "",
         "photoUrl": profile.get("photoUrl") or user.image_url,
-        "tags": list(profile.get("tags") or []),
-        "org": profile.get("org") or "",
-        "jobTitle": profile.get("jobTitle") or "",
     }
     if include_email:
         out["email"] = user.email
@@ -115,11 +112,6 @@ async def lookup_handles(
                 User.handle.ilike(like),
                 User.name.ilike(like),
                 User.email.ilike(like),
-                User.preferences["profile"]["bio"].astext.ilike(like),
-                User.preferences["profile"]["description"].astext.ilike(like),
-                User.preferences["profile"]["jobTitle"].astext.ilike(like),
-                User.preferences["profile"]["org"].astext.ilike(like),
-                cast(User.preferences["profile"]["tags"], String).ilike(like),
             )
         )
     query = query.order_by(User.handle.asc()).limit(lim)
@@ -319,7 +311,7 @@ async def upsert_identity(
     tenant_id: str | None = None,
     role: str = "member",
     handle: str | None = None,
-) -> User:
+) -> tuple[User, bool]:
     normalized = email.strip().lower()
     existing = await get_by_email(session, normalized)
     if existing:
@@ -333,7 +325,7 @@ async def upsert_identity(
             existing.handle = normalize_handle(handle)
         existing.updated_at = _utcnow()
         await session.flush()
-        return existing
+        return existing, False
 
     derived_handle = normalize_handle(handle) or normalize_handle(
         normalized.split("@")[0]
@@ -355,4 +347,4 @@ async def upsert_identity(
     )
     session.add(row)
     await session.flush()
-    return row
+    return row, True
