@@ -63,14 +63,14 @@ export function readSchemaMessages(
 export function toChatMsg(m: SchemaMessage): ChatMsg {
   return {
     id: m.id,
-    speaker: m.speaker,
+    speaker: typeof m.speaker === 'string' ? m.speaker : String(m.speaker ?? ''),
     speakerId: m.speakerId || undefined,
     speakerAvatar: m.speakerAvatar || undefined,
     speakerType: m.speakerType,
     agentId: m.agentId || undefined,
-    body: m.body,
+    body: typeof m.body === 'string' ? m.body : String(m.body ?? ''),
     status: m.status,
-    ts: m.ts,
+    ts: typeof m.ts === 'number' && Number.isFinite(m.ts) ? m.ts : Date.now(),
   }
 }
 

@@ -2,7 +2,7 @@
   "name": "bevel",
   "version": "0.1.0",
   "private": true,
-  "description": "BEVEL \u2014 multi-tenant workspace channels for humans and agents",
+  "description": "BEVEL — multi-tenant workspace channels for humans and agents",
   "packageManager": "pnpm@10.15.1",
   "scripts": {
     "dev": "nx run-many -t dev --projects=web,admin,realtime --parallel=3",
@@ -22,10 +22,13 @@
     "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
     "bevel": "pnpm exec tsx packages/cli/src/index.ts",
     "doctor": "pnpm bevel doctor",
+    "test": "pnpm test:unit && pnpm test:api",
+    "test:unit": "pnpm test:vitest && pnpm test:provision && pnpm test:mentions",
+    "test:vitest": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest",
     "test:provision": "pnpm exec tsx packages/tenant-config/src/provision.test.ts",
     "test:mentions": "pnpm exec tsx packages/realtime-client/src/lib/mentions.test.ts",
-    "test:unit": "pnpm test:provision && pnpm test:mentions",
-
+    "test:api": "cd services/api && uv run pytest -q",
     "mobile:get": "cd apps/mobile && flutter pub get",
     "mobile:test": "cd apps/mobile && flutter test",
     "mobile:run:macos": "cd apps/mobile && flutter run -d macos --dart-define=BEVEL_BASE_URL=https://bevel.is --dart-define=BEVEL_API_URL=https://api.bevel.is --dart-define=BEVEL_WORKSPACE_URL=https://bevel.2x4m.cc",
@@ -43,7 +46,8 @@
     "nx": "^21.2.0",
     "prettier": "^3.8.3",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.10"
   },
   "pnpm": {
     "overrides": {

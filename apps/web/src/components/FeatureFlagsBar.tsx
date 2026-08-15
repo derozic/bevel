@@ -45,7 +45,7 @@ export function FeatureFlagsBar({
   // Prefer showing paid/preview flags so the strip stays readable
   const highlight = activeIds.filter((id) => {
     const def = FEATURE_CATALOG[id]
-    return def.paidOnly || def.release !== 'stable'
+    return Boolean(def && (def.paidOnly || def.release !== 'stable'))
   })
   const chips = (highlight.length > 0 ? highlight : activeIds).slice(
     0,
@@ -94,6 +94,7 @@ export function FeatureFlagsBar({
         >
           {chips.map((id) => {
             const def = FEATURE_CATALOG[id]
+            if (!def) return null
             return (
               <li key={id}>
                 <FlagPill

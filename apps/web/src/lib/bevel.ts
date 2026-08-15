@@ -141,10 +141,11 @@ export function bevelSessionPath(sessionId: string): string {
 /** Prefer canonical agent chat URL for single-agent direct threads. */
 export function bevelConversationPath(summary: {
   sessionId: string
-  agentIds: string[]
+  agentIds?: string[] | null
 }): string {
-  if (summary.agentIds.length === 1) {
-    return bevelTalkPath(summary.agentIds[0]!)
+  const ids = summary.agentIds ?? []
+  if (ids.length === 1 && ids[0]) {
+    return bevelTalkPath(ids[0])
   }
   return bevelSessionPath(summary.sessionId)
 }

@@ -446,10 +446,15 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     const accessibility = prefs?.accessibility
     if (!appearance || !accessibility) return
     root.dataset.bevelDensity = appearance.density
-    root.style.setProperty(
-      '--bevel-ui-zoom',
-      `${accessibility.zoomPercent / 100}`,
-    )
+    const zoomPercent = accessibility.zoomPercent ?? 100
+    // Do not set zoom:1 — iOS Safari still engages the zoom compositor and flickers.
+    if (zoomPercent !== 100) {
+      root.style.setProperty('--bevel-ui-zoom', `${zoomPercent / 100}`)
+      root.dataset.bevelZoom = 'true'
+    } else {
+      root.style.removeProperty('--bevel-ui-zoom')
+      delete root.dataset.bevelZoom
+    }
     if (accessibility.simplifiedLayout) {
       root.dataset.bevelSimplified = 'true'
     } else {

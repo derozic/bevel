@@ -65,6 +65,7 @@ export function AgentChip({
   const [pinned, setPinned] = useState(false)
   const [pos, setPos] = useState<CardPosition | null>(null)
   const [mounted, setMounted] = useState(false)
+  const hoverOkRef = useRef(false)
 
   const copy = resolveAgentChipCopy(agent.id, {
     tagline: agent.tagline,
@@ -74,6 +75,9 @@ export function AgentChip({
 
   useEffect(() => {
     setMounted(true)
+    hoverOkRef.current = window.matchMedia(
+      '(hover: hover) and (pointer: fine)',
+    ).matches
   }, [])
 
   const positionCard = useCallback(() => {
@@ -266,10 +270,14 @@ export function AgentChip({
         ref={wrapRef}
         className="fleet-chat-chip-wrap"
         onMouseEnter={() => {
+          if (!hoverOkRef.current) return
           cancelClose()
           if (!pinned) openCard(false)
         }}
-        onMouseLeave={scheduleClose}
+        onMouseLeave={() => {
+          if (!hoverOkRef.current) return
+          scheduleClose()
+        }}
       >
         <button
           type="button"

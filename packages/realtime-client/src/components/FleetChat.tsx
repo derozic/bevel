@@ -257,12 +257,13 @@ function formatMessageName(
     }
     return agent.name
   }
+  const label = typeof speaker === 'string' ? speaker : ''
   // Humans: speaker is already the display string from the room
   if (nameStyle === 'display_only') {
-    const first = speaker.trim().split(/\s+/)[0]
-    return first || speaker
+    const first = label.trim().split(/\s+/)[0]
+    return first || label
   }
-  return speaker
+  return label
 }
 
 function MessageRow({
@@ -452,7 +453,8 @@ export function FleetChat({
   const tokenRef = useRef(realtimeToken)
   displayNameRef.current = displayName
   sessionTitleRef.current = newSessionTitle
-  tokenRef.current = realtimeToken
+  // Latch the last good token — a brief session blip must not tear down the room.
+  if (realtimeToken) tokenRef.current = realtimeToken
   const [sessionId, setSessionId] = useState<string | null>(() => bootSnapshot?.sessionId ?? null)
   const [sessionTitle, setSessionTitle] = useState<string | null>(
     () => bootSnapshot?.sessionTitle ?? null
@@ -473,7 +475,7 @@ export function FleetChat({
   const joinedRoomKeyRef = useRef<string | null>(null)
   const priorRoomKeyRef = useRef<string | undefined>(undefined)
   const connectGenRef = useRef(0)
-  const tokenReady = Boolean(realtimeToken)
+  const tokenReady = Boolean(tokenRef.current)
   // People currently in the room. When a userMenu (account avatar) is mounted,
   // drop the current user from presence so we do not show two identical faces —
   // the account control is the single self avatar and is the one that opens.
@@ -522,7 +524,7 @@ export function FleetChat({
     if (!el) return
     if (focusMessageId) return
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    if (distanceFromBottom < 96) {
+    if (distanceFromBottom < 96 && distanceFromBottom > 1) {
       el.scrollTop = el.scrollHeight
     }
   }, [messages, focusMessageId])
@@ -784,7 +786,9 @@ export function FleetChat({
             const synced = readSchemaMessages((state as RoomState).messages)
             if (synced.length > 0) {
               setMessages((prev) => {
-                if (prev.length >= synced.length) return dedupeMessagesById(prev)
+                // Same snapshot — keep prev so we do not re-render / re-scroll
+                // (iPad Safari treats scrollTop writes as a viewport resize).
+                if (prev.length >= synced.length) return prev
                 return dedupeMessagesById([...prev, ...synced])
               })
             }

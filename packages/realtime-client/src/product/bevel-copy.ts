@@ -26,10 +26,15 @@ export const BEVEL_COPY = {
   emptySession: 'Your agents are listening. @mention one to focus, or ask the room.',
   emptyDirectSession: (agentName: string) =>
     `${agentName} is here. Say hello — your message goes straight to them.`,
-  emptySessionMulti: (agentNames: string[]) =>
-    agentNames.length === 2
-      ? `${agentNames[0]} and ${agentNames[1]} are listening. @mention one to focus, or ask the room.`
-      : `${agentNames[0]} +${agentNames.length - 1} are listening. @mention one to focus, or ask the room.`,
+  emptySessionMulti: (agentNames: string[]) => {
+    const names = agentNames.filter(Boolean)
+    if (names.length === 0) return BEVEL_COPY.emptySession
+    if (names.length === 1) return BEVEL_COPY.emptyDirectSession(names[0]!)
+    if (names.length === 2) {
+      return `${names[0]} and ${names[1]} are listening. @mention one to focus, or ask the room.`
+    }
+    return `${names[0]} +${names.length - 1} are listening. @mention one to focus, or ask the room.`
+  },
 
   emptyEmoji: '✦',
 

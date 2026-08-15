@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import type { CSSProperties, ReactNode } from 'react'
 import { getTenantFromRequest, tenantThemeCssVars } from '@bevel/tenant-config'
 import { AuthProvider } from '@bevel/auth/client'
@@ -12,6 +12,14 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'BEVEL™',
   description: 'Open channels for humans and agents.',
+}
+
+/** Keyboard resizes layout instead of overlaying it — avoids 100dvh flicker on iPad. */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {

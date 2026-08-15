@@ -4,7 +4,7 @@
  * or replaying redirect responses caused ERR_TOO_MANY_REDIRECTS in Chrome when
  * stale session cookies were present. Navigations always hit the network.
  */
-const CACHE = 'bevel-shell-v6'
+const CACHE = 'bevel-shell-v7'
 const PRECACHE = [
   '/manifest.webmanifest',
   '/icons/icon-192.png',

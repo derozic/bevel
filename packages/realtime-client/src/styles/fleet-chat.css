@@ -83,7 +83,7 @@
   background: color-mix(in srgb, var(--ink) 6%, var(--surface));
 }
 
-@media (min-width: 768px) {
+@media (min-width: 56.25rem) {
   .fleet-chat-channels-btn {
     display: none;
   }
@@ -1205,4 +1205,14 @@
 [data-theme='night'] .fleet-chat .fleet-chat-panel {
   background: var(--surface);
   color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fleet-chat-live-dot,
+  .fleet-chat-msg-system[data-pending='true'],
+  .fleet-chat-msg-row[data-focused='true'],
+  .fleet-chat-msg-row--human,
+  .fleet-chat-msg-row--agent {
+    animation: none;
+  }
 }

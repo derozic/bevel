@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import {
   CheckIcon,
@@ -27,9 +28,30 @@ export function ConversationRoster({
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [agentIds, setAgentIds] = useState<string[]>([])
   const [peopleIds, setPeopleIds] = useState<string[]>([])
   const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Portal to body so position:fixed is not trapped by the rail's transform
+  // (iPad overlay rail). Also stop background rubber-band while open.
+  useEffect(() => {
+    if (!open) return
+    const html = document.documentElement
+    const body = document.body
+    const prevHtml = html.style.overflow
+    const prevBody = body.style.overflow
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflow = prevHtml
+      body.style.overflow = prevBody
+    }
+  }, [open])
 
   const q = query.trim().toLowerCase()
 
@@ -121,18 +143,19 @@ export function ConversationRoster({
         New conversation
       </button>
 
-      {open ? (
-        <div
-          className="bevel-roster-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="bevel-roster-title"
-        >
-          <div
-            className="bevel-roster-scrim"
-            onClick={() => setOpen(false)}
-            aria-hidden
-          />
+      {mounted && open
+        ? createPortal(
+            <div
+              className="bevel-roster-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="bevel-roster-title"
+            >
+              <div
+                className="bevel-roster-scrim"
+                onClick={() => setOpen(false)}
+                aria-hidden
+              />
           <div className="bevel-roster-panel">
             <header className="bevel-roster-header">
               <div>
@@ -307,8 +330,10 @@ export function ConversationRoster({
               </button>
             </footer>
           </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }

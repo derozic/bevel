@@ -99,7 +99,8 @@ function BevelRailFooter({
 
 function conversationLabel(summary: SessionSummary): string {
   if (summary.title?.trim()) return summary.title
-  const names = summary.agentIds.map((id) => agents.find((a) => a.id === id)?.name ?? id)
+  const ids = summary.agentIds ?? []
+  const names = ids.map((id) => agents.find((a) => a.id === id)?.name ?? id)
   if (names.length === 1) return names[0]!
   if (names.length === 2) return `${names[0]} & ${names[1]}`
   if (names.length > 2) return `${names[0]} +${names.length - 1}`
@@ -507,11 +508,13 @@ export function BevelRail({
             {/* Always list fleet agents so a DM is one click away */}
             {agents.map((agent) => {
               const href = bevelTalkPath(agent.id)
-              const live = visibleConversations.find(
-                (c) =>
-                  c.agentIds.length === 1 &&
-                  c.agentIds[0]?.toLowerCase() === agent.id.toLowerCase(),
-              )
+              const live = visibleConversations.find((c) => {
+                const ids = c.agentIds ?? []
+                return (
+                  ids.length === 1 &&
+                  ids[0]?.toLowerCase() === agent.id.toLowerCase()
+                )
+              })
               const active =
                 activeSessionId != null &&
                 (activeSessionId === live?.sessionId ||
@@ -542,7 +545,7 @@ export function BevelRail({
             })}
             {/* Multi-agent or historical sessions not covered by single-agent rows */}
             {visibleConversations
-              .filter((c) => c.agentIds.length !== 1)
+              .filter((c) => (c.agentIds ?? []).length !== 1)
               .map((conv) => (
                 <Link
                   key={conv.sessionId}
@@ -558,8 +561,8 @@ export function BevelRail({
                   </span>
                   <span className="bevel-rail-conversation-preview">
                     {conv.preview ??
-                      (conv.agentIds.length > 0
-                        ? conv.agentIds
+                      ((conv.agentIds ?? []).length > 0
+                        ? (conv.agentIds ?? [])
                             .map(
                               (id) =>
                                 agents.find((a) => a.id === id)?.name ?? id,

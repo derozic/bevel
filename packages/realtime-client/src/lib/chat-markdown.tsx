@@ -66,7 +66,8 @@ function inlineFormat(text: string, keyPrefix: string): ReactNode[] {
 
 /** Lightweight chat markdown — lists, bold, code, @mentions, ^escalations. */
 export function ChatMessageBody({ text }: { text: string }) {
-  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  const safe = typeof text === 'string' ? text : text == null ? '' : String(text)
+  const lines = safe.replace(/\r\n/g, '\n').split('\n')
   const nodes: ReactNode[] = []
   let listItems: ReactNode[] = []
   let block = 0

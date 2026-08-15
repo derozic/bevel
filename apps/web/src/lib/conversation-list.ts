@@ -5,8 +5,23 @@ const ORDER_STORAGE_KEY = 'bevel-direct-conversation-order'
 /** In-memory order survives BevelRail remounts between route navigations. */
 let conversationCache: SessionSummary[] = []
 
+function normalizeSession(s: SessionSummary): SessionSummary {
+  return {
+    ...s,
+    sessionId: s.sessionId || '',
+    title: s.title || '',
+    agentIds: Array.isArray(s.agentIds) ? s.agentIds : [],
+    messageCount: typeof s.messageCount === 'number' ? s.messageCount : 0,
+    createdAt: typeof s.createdAt === 'number' ? s.createdAt : 0,
+    updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : 0,
+  }
+}
+
 export function filterVisibleSessions(list: SessionSummary[]): SessionSummary[] {
-  return list.filter((s) => s.messageCount > 0 || s.preview)
+  return list
+    .filter((s) => s && (s.sessionId || s.preview))
+    .map(normalizeSession)
+    .filter((s) => s.messageCount > 0 || s.preview)
 }
 
 /** Deterministic order — never changes when previews or updatedAt change. */

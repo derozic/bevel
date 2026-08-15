@@ -31,34 +31,46 @@ html[data-bevel-native='1'] a[href*='//bevel.is/console'] {
   opacity: 0.55;
 }
 
-/* Lock document scroll while the workspace is mounted */
+/*
+ * Split rail above iPad portrait (744–834px). A 768px split + 100vw/100dvh
+ * made iPad Safari oscillate one CSS pixel around the breakpoint — rail
+ * slides in/out, fixed modals retarget, screen looks epileptic.
+ */
+/* Lock document scroll while the workspace is mounted.
+   Use svh (stable) not dvh: dynamic viewport height fights the iOS URL bar
+   and retriggers layout in a loop. */
 html:has(.bevel-workspace-root),
 body:has(.bevel-workspace-root) {
   height: 100%;
-  max-height: 100dvh;
+  max-height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body:has(.bevel-workspace-root) {
-  /* Prefer dvh so mobile browser chrome does not force a second scroll */
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100%;
+  max-height: 100%;
+  height: 100svh;
+  max-height: 100svh;
 }
 
-/* Full bleed inside landing-shell; hide catalog footer noise on workspace routes */
+/* Fill the layout viewport — never 100vw (includes iOS chrome / causes 1px overflow). */
 .bevel-workspace-root {
   box-sizing: border-box;
-  width: 100vw;
-  max-width: 100vw;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
   display: flex;
   flex-direction: column;
   /* Exactly one viewport — do not use min-height (that allows growth + page scroll) */
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100%;
+  max-height: 100%;
+  height: 100svh;
+  max-height: 100svh;
   min-height: 0;
   overflow: hidden;
+  touch-action: manipulation;
 }
 
 .bevel-workspace-root > header {
@@ -87,7 +99,8 @@ body:has(.bevel-workspace-root) .landing-shell {
   padding-bottom: 0;
   min-height: 0;
   height: 100%;
-  max-height: 100dvh;
+  max-height: 100%;
+  max-height: 100svh;
   overflow: hidden;
 }
 
@@ -102,6 +115,11 @@ body:has(.bevel-workspace-root) .landing-shell {
   height: auto;
   overflow: hidden;
   background: var(--cream);
+}
+
+/* Only apply zoom when the user raised it — `zoom: 1` still hits iOS's
+   zoom compositor and flickers. */
+html[data-bevel-zoom] .bevel-workspace {
   zoom: var(--bevel-ui-zoom, 1);
 }
 
@@ -121,7 +139,7 @@ html[data-bevel-simplified='true'] .bevel-workspace {
   letter-spacing: 0.01em;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 56.25rem) {
   .bevel-workspace {
     grid-template-columns: var(--bevel-rail-width) minmax(0, 1fr);
   }
@@ -134,12 +152,19 @@ html[data-bevel-simplified='true'] .bevel-workspace {
   inset: var(--platform-nav-height, 3.5rem) 0 0 0;
   z-index: 35;
   border: none;
-  background: color-mix(in srgb, var(--ink) 28%, transparent);
-  backdrop-filter: blur(2px);
+  background: color-mix(in srgb, var(--ink) 40%, transparent);
   cursor: pointer;
 }
 
-@media (min-width: 768px) {
+/* Blur over a transforming rail flickers on iPad — desktop only. */
+@media (hover: hover) and (pointer: fine) {
+  .bevel-workspace-scrim {
+    background: color-mix(in srgb, var(--ink) 28%, transparent);
+    backdrop-filter: blur(2px);
+  }
+}
+
+@media (min-width: 56.25rem) {
   .bevel-workspace-scrim {
     display: none;
   }
@@ -166,7 +191,7 @@ html[data-bevel-simplified='true'] .bevel-workspace {
   transform: translateX(0);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 56.25rem) {
   .bevel-workspace-rail {
     position: static;
     z-index: auto;
@@ -597,7 +622,7 @@ html[data-bevel-simplified='true'] .bevel-workspace {
   color: var(--ink);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 56.25rem) {
   .bevel-rail-close-btn {
     display: none;
   }
@@ -632,8 +657,14 @@ html[data-bevel-simplified='true'] .bevel-workspace {
 .bevel-roster-scrim {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--ink) 40%, transparent);
-  backdrop-filter: blur(2px);
+  background: color-mix(in srgb, var(--ink) 48%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bevel-roster-scrim {
+    background: color-mix(in srgb, var(--ink) 40%, transparent);
+    backdrop-filter: blur(2px);
+  }
 }
 
 .bevel-roster-panel {
@@ -642,7 +673,7 @@ html[data-bevel-simplified='true'] .bevel-workspace {
   display: flex;
   flex-direction: column;
   width: min(100%, 26rem);
-  max-height: min(88vh, 36rem);
+  max-height: min(88svh, 36rem);
   overflow: hidden;
   border-radius: 1rem;
   border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
