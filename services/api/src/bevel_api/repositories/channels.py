@@ -59,13 +59,26 @@ def to_api_dict(row: Channel) -> dict[str, Any]:
     }
 
 
-async def list_for_tenant(session: AsyncSession, tenant_id: str) -> list[Channel]:
+def is_direct_thread_slug(slug: str) -> bool:
+    """Direct agent threads are stored as channels but are not workspace rooms."""
+    return slug.lower().startswith("dm-")
+
+
+async def list_for_tenant(
+    session: AsyncSession,
+    tenant_id: str,
+    *,
+    include_direct: bool = False,
+) -> list[Channel]:
     result = await session.execute(
         select(Channel)
         .where(Channel.tenant_id == tenant_id)
         .order_by(Channel.slug)
     )
-    return list(result.scalars().all())
+    rows = list(result.scalars().all())
+    if include_direct:
+        return rows
+    return [row for row in rows if not is_direct_thread_slug(row.slug)]
 
 
 async def get_by_slug(

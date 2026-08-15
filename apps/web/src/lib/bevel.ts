@@ -159,6 +159,24 @@ export function bevelDirectSessionId(userId: string, agentIds: string[]): string
   return `dm-${safeUser}-${roster}`
 }
 
+/** Postgres channel slug for a direct thread (64-char, URL-safe). */
+export function bevelDirectPersistSlug(sessionId: string): string {
+  const raw = sessionId
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  const base = raw || 'dm-session'
+  if (base.length <= 64) return base
+  let h = 0x811c9dc5
+  for (let i = 0; i < base.length; i++) {
+    h ^= base.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  const hash = (h >>> 0).toString(16).padStart(8, '0')
+  return `${base.slice(0, 55)}-${hash}`
+}
+
 export function bevelConversationTitle(agentNames: string[]): string {
   if (agentNames.length === 0) return BEVEL_NAME
   if (agentNames.length === 1) return agentNames[0]!

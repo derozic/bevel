@@ -4,6 +4,7 @@ import {
   BEVEL_PRIVATE_PATH,
   bevelChannelPath,
   bevelConversationPath,
+  bevelDirectPersistSlug,
   bevelDirectSessionId,
   bevelTalkPath,
   normalizeBevelChannelSlug,
@@ -42,5 +43,25 @@ describe('workspace URLs', () => {
     const b = bevelDirectSessionId('user/1', ['hermes', 'johnny', 'hermes'])
     expect(a).toBe(b)
     expect(a).toMatch(/^dm-user_1-hermes\+johnny$/)
+  })
+
+  it('maps a Hermes DM id to a durable 64-char slug', () => {
+    expect(bevelDirectPersistSlug('dm-user_1-hermes+johnny')).toBe(
+      'dm-user_1-hermes-johnny',
+    )
+    expect(bevelDirectPersistSlug(bevelDirectSessionId('usr_1', ['hermes']))).toBe(
+      'dm-usr_1-hermes',
+    )
+    expect(bevelDirectPersistSlug('dm-Scott/foo-hermes').length).toBeLessThanOrEqual(
+      64,
+    )
+  })
+
+  it('hashes overlong DM slugs so two long threads cannot collide', () => {
+    const long = `dm-${'a'.repeat(80)}-hermes`
+    const slug = bevelDirectPersistSlug(long)
+    expect(slug.length).toBe(64)
+    expect(slug).not.toBe(bevelDirectPersistSlug(`${long}x`))
+    expect(slug).toMatch(/-[0-9a-f]{8}$/)
   })
 })

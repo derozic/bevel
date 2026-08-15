@@ -1,7 +1,22 @@
 import { Client, Room, ServerError } from 'colyseus'
 import { verifyAuthToken } from '../auth-verify.js'
 import { dispatchAgentChat } from '../agent-dispatch.js'
-import { recordEvent } from '../recording.js'
+import {
+  appendChannelMessage,
+  fetchChannelMessagesPage,
+  type FleetChannelMessageRecord,
+} from '../fleet-channel-api.js'
+import { enqueuePersist, flushPersistQueue } from '../persist-queue.js'
+import { dmPersistSlug } from '../session-persist.js'
+import {
+  applyGesture,
+  formatGestureFeedback,
+  isGestureKind,
+  parseGestures,
+  parseVotePrompt,
+  type GestureKind,
+} from '../gestures.js'
+import { readRecording, recordEvent, type SessionEvent } from '../recording.js'
 import { loadMergedRegistry } from '../registry-merge.js'
 import {
   AgentPresence,
@@ -45,6 +60,11 @@ type SpeakerProfile = {
   avatar: string
 }
 
+type GesturePayload = {
+  messageId?: string
+  kind?: string
+}
+
 type ChatPayload = {
   text: string
   speaker?: string
@@ -55,11 +75,55 @@ function uid(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
+const ROOM_HISTORY_LIMIT = 100
+
+function conversationalRecordingEvents(sessionId: string): SessionEvent[] {
+  return readRecording(sessionId).filter(
+    (e) => e.type === 'message' || e.type === 'agent_reply',
+  )
+}
+
+function eventToChatMessage(ev: SessionEvent, sessionId: string): ChatMessage {
+  const msg = new ChatMessage()
+  const meta = ev.meta ?? {}
+  msg.id = String(meta.messageId ?? `rec_${ev.ts}_${ev.speakerType}`)
+  msg.sessionId = sessionId
+  msg.speaker = ev.speaker
+  msg.speakerId = ev.agentId || ev.speaker
+  msg.speakerType = ev.speakerType
+  msg.agentId = ev.agentId ?? ''
+  msg.body = ev.body
+  msg.status = 'final'
+  msg.ts = ev.ts
+  return msg
+}
+
+function recordToChatMessage(
+  row: FleetChannelMessageRecord,
+  sessionId: string,
+): ChatMessage {
+  const msg = new ChatMessage()
+  msg.id = row.id
+  msg.sessionId = sessionId
+  msg.speaker = row.speakerName
+  msg.speakerId = row.speakerId
+  msg.speakerAvatar = row.speakerAvatar ?? ''
+  msg.speakerType = row.speakerType
+  msg.agentId = row.agentId ?? ''
+  msg.body = row.body
+  msg.status = row.status
+  msg.ts = new Date(row.createdAt).getTime() || Date.now()
+  msg.reactionsJson = JSON.stringify(row.reactions ?? [])
+  msg.votePrompt = parseVotePrompt(row.body, row.votePrompt)
+  return msg
+}
+
 export class AgentSession extends Room {
   maxClients = 32
   declare state: AgentSessionState
   private speakerNames = new Map<string, string>()
   private speakerProfiles = new Map<string, SpeakerProfile>()
+  private persistSlug = 'dm-session'
 
   static async onAuth(
     token: string,
@@ -76,9 +140,10 @@ export class AgentSession extends Room {
     return claims
   }
 
-  onCreate(options: JoinOptions) {
+  async onCreate(options: JoinOptions) {
     this.setState(new AgentSessionState())
     const sessionId = options.sessionId ?? this.roomId
+    this.persistSlug = dmPersistSlug(sessionId)
     this.state.sessionId = sessionId
     this.state.title = options.title ?? `Fleet session`
     this.state.createdAt = Date.now()
@@ -98,8 +163,12 @@ export class AgentSession extends Room {
       this.state.agents.push(row)
     }
 
-    const agentNames = this.state.agents.map((a) => a.name)
-    this.pushSystemMessage(sessionWelcome(agentNames), 'final')
+    await this.hydrateHistory(sessionId)
+
+    if (this.state.messages.length === 0) {
+      const agentNames = this.state.agents.map((a) => a.name)
+      this.pushSystemMessage(sessionWelcome(agentNames), 'final')
+    }
 
     recordEvent({
       ts: Date.now(),
@@ -107,13 +176,25 @@ export class AgentSession extends Room {
       type: 'status',
       speaker: SYSTEM_SPEAKER,
       speakerType: 'system',
-      body: sessionWelcome(agentNames),
+      body: `resume ${this.persistSlug} (${this.state.messages.length} messages)`,
       meta: { title: this.state.title, agentIds: ids },
     })
 
     this.onMessage('chat', (client, payload: ChatPayload) => {
       void this.handleChat(client.sessionId, payload)
     })
+    this.onMessage('gesture', (client, payload: GesturePayload) => {
+      void this.handleGesture(client, payload)
+    })
+  }
+
+  async onDispose() {
+    const n = await flushPersistQueue(10_000)
+    if (n > 0) {
+      console.log(
+        `[agent_session] ${this.persistSlug} disposed after draining ${n} persist(s)`,
+      )
+    }
   }
 
   onJoin(client: Client, options: JoinOptions) {
@@ -203,6 +284,67 @@ export class AgentSession extends Room {
     this.state.messages.push(msg)
   }
 
+  private async hydrateHistory(sessionId: string): Promise<void> {
+    const page = await fetchChannelMessagesPage(this.persistSlug, {
+      limit: ROOM_HISTORY_LIMIT,
+    })
+    for (const row of page.messages) {
+      this.pushMessage(recordToChatMessage(row, sessionId))
+    }
+    if (this.state.messages.length > 0) return
+
+    // Pre-persist era: JSONL recordings on disk. Promote them into Postgres
+    // so the next refresh does not depend on the file still being there.
+    const recovered = conversationalRecordingEvents(sessionId)
+    for (const ev of recovered) {
+      const msg = eventToChatMessage(ev, sessionId)
+      this.pushMessage(msg)
+      void this.persistMessage({
+        id: msg.id,
+        speakerId: msg.speakerId || msg.agentId || ev.speaker,
+        speakerName: msg.speaker,
+        speakerAvatar: msg.speakerAvatar,
+        speakerType: msg.speakerType,
+        agentId: msg.agentId || undefined,
+        body: msg.body,
+        status: msg.status || 'final',
+        createdAt: new Date(msg.ts).toISOString(),
+        votePrompt: msg.votePrompt || undefined,
+      })
+    }
+  }
+
+  private persistMessage(msg: {
+    id: string
+    speakerId: string
+    speakerName: string
+    speakerAvatar?: string
+    speakerType: string
+    agentId?: string
+    body: string
+    status: string
+    createdAt?: string
+    reactions?: ReturnType<typeof parseGestures>
+    votePrompt?: string
+  }): Promise<boolean> {
+    return enqueuePersist(msg.id, () =>
+      appendChannelMessage(this.persistSlug, {
+        id: msg.id,
+        speakerId: msg.speakerId,
+        speakerName: msg.speakerName,
+        speakerAvatar: msg.speakerAvatar,
+        speakerType: msg.speakerType,
+        agentId: msg.agentId,
+        body: msg.body,
+        status: msg.status,
+        createdAt: msg.createdAt,
+        reactions: msg.reactions,
+        votePrompt: msg.votePrompt,
+        tags: ['dm', 'direct'],
+      }),
+    )
+  }
+
   private async handleChat(clientSessionId: string, payload: ChatPayload) {
     const text = payload.text?.trim()
     if (!text) return
@@ -237,6 +379,23 @@ export class AgentSession extends Room {
       meta: { messageId: human.id },
     })
 
+    const humanOk = await this.persistMessage({
+      id: human.id,
+      speakerId: human.speakerId,
+      speakerName: human.speaker,
+      speakerAvatar: human.speakerAvatar,
+      speakerType: 'human',
+      body: text,
+      status: 'final',
+      createdAt: new Date(human.ts).toISOString(),
+    })
+    if (!humanOk) {
+      console.error('[agent_session] human message not durable', {
+        session: this.persistSlug,
+        id: human.id,
+      })
+    }
+
     const targets = this.resolveTargetAgents(text, payload.targetAgent)
     if (targets.length === 0) {
       const names = this.state.agents.map((a) => a.name)
@@ -260,10 +419,75 @@ export class AgentSession extends Room {
     return this.state.messages
       .filter((m) => m.status === 'final' && m.speakerType !== 'system')
       .slice(-12)
-      .map((m) => ({
-        role: m.speakerType === 'human' ? 'user' : 'assistant',
-        content: m.body,
-      }))
+      .map((m) => {
+        const signals = formatGestureFeedback(parseGestures(m.reactionsJson))
+        return {
+          role: m.speakerType === 'human' ? 'user' : 'assistant',
+          content: signals ? `${m.body}\n[${signals}]` : m.body,
+        }
+      })
+  }
+
+  private findMessage(id: string): ChatMessage | undefined {
+    for (let i = 0; i < this.state.messages.length; i++) {
+      const row = this.state.messages[i]
+      if (row?.id === id) return row
+    }
+    return undefined
+  }
+
+  private async handleGesture(client: Client, payload: GesturePayload) {
+    const kindRaw = String(payload.kind ?? '').trim().toLowerCase()
+    const messageId = String(payload.messageId ?? '').trim()
+    if (!messageId || !isGestureKind(kindRaw)) return
+    const kind = kindRaw as GestureKind
+    const profile = this.speakerProfiles.get(client.sessionId)
+    if (!profile) return
+    const msg = this.findMessage(messageId)
+    if (!msg || msg.speakerType === 'system') return
+    if (msg.status === 'pending' || msg.status === 'streaming') return
+    const next = applyGesture(parseGestures(msg.reactionsJson), {
+      kind,
+      userId: profile.userId,
+      userName: profile.name,
+    })
+    msg.reactionsJson = JSON.stringify(next)
+    void this.persistMessage({
+      id: msg.id,
+      speakerId: msg.speakerId || msg.agentId || 'unknown',
+      speakerName: msg.speaker,
+      speakerAvatar: msg.speakerAvatar,
+      speakerType: msg.speakerType,
+      agentId: msg.agentId,
+      body: msg.body,
+      status: msg.status || 'final',
+      reactions: next,
+      votePrompt: msg.votePrompt || undefined,
+    })
+    recordEvent({
+      ts: Date.now(),
+      sessionId: this.state.sessionId,
+      type: 'gesture',
+      speaker: profile.name,
+      speakerType: 'human',
+      body: `${kind} on ${messageId}`,
+      meta: { messageId, kind, agentId: msg.agentId },
+    })
+    if (kind === 'down' && msg.speakerType === 'agent' && msg.agentId) {
+      const agentName =
+        this.state.agents.find((a) => a.id === msg.agentId)?.name || msg.agentId
+      try {
+        const res = await dispatchAgentChat(
+          msg.agentId,
+          `${profile.name} marked your last reply with thumbs down. Briefly acknowledge and offer a better take.\n\nOriginal:\n${msg.body.slice(0, 1200)}`,
+          this.chatHistory(),
+          { personalAgent: true },
+        )
+        this.pushAgentReply(msg.agentId, agentName, res.output || 'Understood — retrying.')
+      } catch (err) {
+        console.error('[agent_session] gesture feedback dispatch failed', err)
+      }
+    }
   }
 
   private pushAgentReply(target: string, agentName: string, output: string, meta?: Record<string, unknown>) {
@@ -276,6 +500,7 @@ export class AgentSession extends Room {
     reply.body = output
     reply.status = 'final'
     reply.ts = Date.now()
+    reply.votePrompt = parseVotePrompt(output)
     this.pushMessage(reply)
 
     recordEvent({
@@ -287,6 +512,18 @@ export class AgentSession extends Room {
       agentId: target,
       body: output,
       meta: { ...meta, messageId: reply.id },
+    })
+
+    void this.persistMessage({
+      id: reply.id,
+      speakerId: target,
+      speakerName: agentName,
+      speakerType: 'agent',
+      agentId: target,
+      body: output,
+      status: 'final',
+      createdAt: new Date(reply.ts).toISOString(),
+      votePrompt: reply.votePrompt || undefined,
     })
   }
 

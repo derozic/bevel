@@ -1,9 +1,43 @@
+import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const moduleDir = dirname(fileURLToPath(import.meta.url))
 
-const repoRoot = process.env.AGENTS_REPO_ROOT ?? join(moduleDir, '../../..')
+// Fleet code lives in ~/dev/agents (runner + per-agent SOUL.md).
+// BEVEL copies registry/avatars via pnpm sync:agents; runtime still loads
+// the agents package from AGENTS_REPO_ROOT.
+function resolveAgentsRepoRoot(): string {
+  if (process.env.AGENTS_REPO_ROOT) return process.env.AGENTS_REPO_ROOT
+  const candidates = [
+    // sibling of bevel: ~/dev/agents
+    join(moduleDir, '../../../../agents'),
+    // when running from compiled dist/ under services/realtime
+    join(moduleDir, '../../../../../agents'),
+    // monorepo-style fallback (legacy)
+    join(moduleDir, '../../..'),
+  ]
+  for (const c of candidates) {
+    if (existsSync(join(c, 'dist', 'runner.js'))) return c
+    if (existsSync(join(c, 'registry.json')) && existsSync(join(c, 'src', 'agents'))) {
+      return c
+    }
+  }
+  return candidates[0]
+}
+
+const repoRoot = resolveAgentsRepoRoot()
+
+function resolveRegistryPath(): string {
+  if (process.env.AGENTS_REGISTRY_PATH) return process.env.AGENTS_REGISTRY_PATH
+  const candidates = [
+    join(repoRoot, 'registry.json'),
+    // BEVEL-synced catalog (always refresh with pnpm sync:agents)
+    join(moduleDir, '../../../registry.json'),
+    join(moduleDir, '../../../../registry.json'),
+  ]
+  return candidates.find((path) => existsSync(path)) ?? candidates[0]
+}
 
 export const config = {
   port: Number(process.env.REALTIME_PORT ?? process.env.AGENTS_REALTIME_PORT ?? 43208),
@@ -11,8 +45,7 @@ export const config = {
   repoRoot,
   workspaceRoot: process.env.AGENTS_WORKSPACE_ROOT ?? repoRoot,
   workRepo: process.env.BEVEL_WORK_REPO ?? 'derozic/2x4m',
-  registryPath:
-    process.env.AGENTS_REGISTRY_PATH ?? join(repoRoot, 'registry.json'),
+  registryPath: resolveRegistryPath(),
   federatedRoot: process.env.AGENTS_FEDERATED_ROOT ?? '',
   recordingsDir: process.env.AGENTS_SESSIONS_DIR ?? '',
 }

@@ -11,6 +11,10 @@ export class ChatMessage extends Schema {
   @type('string') body: string = ''
   @type('string') status: string = 'final' // pending | streaming | final | error
   @type('number') ts: number = 0
+  /** JSON array of operator gestures — see packages/schema/src/gestures.ts */
+  @type('string') reactionsJson: string = '[]'
+  /** Non-empty when this turn is a vote. */
+  @type('string') votePrompt: string = ''
 }
 
 export class HumanPresence extends Schema {

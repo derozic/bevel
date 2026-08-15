@@ -19,6 +19,11 @@ export REALTIME_PORT="${REALTIME_PORT:-43208}"
 export DOMAINS_PORT="${DOMAINS_PORT:-43209}"
 export REALTIME_SERVER_URL="${REALTIME_SERVER_URL:-http://127.0.0.1:${REALTIME_PORT}}"
 export NEXT_PUBLIC_REALTIME_URL="${NEXT_PUBLIC_REALTIME_URL:-https://realtime.bevel.lvh.me}"
+export API_INTERNAL_URL="${API_INTERNAL_URL:-http://127.0.0.1:${API_PORT}}"
+export FLEET_CHANNEL_API_URL="${FLEET_CHANNEL_API_URL:-$API_INTERNAL_URL}"
+# Fleet agents: catalog is synced into BEVEL; code runs from agents repo
+export AGENTS_REPO_ROOT="${AGENTS_REPO_ROOT:-$HOME/dev/agents}"
+export AGENTS_REGISTRY_PATH="${AGENTS_REGISTRY_PATH:-$ROOT/registry.json}"
 export NODE_OPTIONS="${NODE_OPTIONS:---dns-result-order=ipv4first}"
 export WATCHPACK_POLLING="${WATCHPACK_POLLING:-true}"
 export NEXT_TELEMETRY_DISABLED=1

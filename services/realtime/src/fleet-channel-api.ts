@@ -20,6 +20,14 @@ export type FleetChannelMessageRecord = {
   status: string
   tags?: string[]
   createdAt: string
+  reactions?: Array<{
+    kind: string
+    userId: string
+    userName?: string
+    ts?: number
+  }>
+  votePrompt?: string | null
+  voteRequired?: boolean
 }
 
 export type ChannelMessagesPage = {
@@ -40,7 +48,12 @@ const PERSIST_TIMEOUT_MS = 8_000
 const PERSIST_RETRIES = 5
 
 function apiBase(): string | null {
-  return process.env.API_INTERNAL_URL ?? process.env.FLEET_CHANNEL_API_URL ?? null
+  const explicit =
+    process.env.API_INTERNAL_URL ?? process.env.FLEET_CHANNEL_API_URL ?? ''
+  if (explicit.trim()) return explicit.trim()
+  // Local stack default — production must set API_INTERNAL_URL explicitly.
+  if (process.env.NODE_ENV !== 'production') return 'http://127.0.0.1:43203'
+  return null
 }
 
 function internalHeaders(): Record<string, string> {

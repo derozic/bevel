@@ -19,7 +19,7 @@ function getRecorder(): SessionRecorder {
 export type SessionEvent = {
   ts: number
   sessionId: string
-  type: 'message' | 'status' | 'join' | 'leave' | 'agent_reply' | 'program_event'
+  type: 'message' | 'status' | 'join' | 'leave' | 'agent_reply' | 'program_event' | 'gesture'
   speaker: string
   speakerType: 'human' | 'agent' | 'system'
   agentId?: string

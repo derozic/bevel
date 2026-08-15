@@ -19,6 +19,11 @@ set +a
 export REALTIME_PORT="${REALTIME_PORT:-43208}"
 export REALTIME_URL="${REALTIME_URL:-https://realtime.bevel.lvh.me}"
 export AUTH_SECRET="${AUTH_SECRET:-}"
+export API_INTERNAL_URL="${API_INTERNAL_URL:-http://127.0.0.1:${API_PORT:-43203}}"
+export FLEET_CHANNEL_API_URL="${FLEET_CHANNEL_API_URL:-$API_INTERNAL_URL}"
+# Fleet agents package (registry + SOUL/skills + dist/runner.js)
+export AGENTS_REPO_ROOT="${AGENTS_REPO_ROOT:-$HOME/dev/agents}"
+export AGENTS_REGISTRY_PATH="${AGENTS_REGISTRY_PATH:-$ROOT/registry.json}"
 
 free_port() {
   local port="$1"
