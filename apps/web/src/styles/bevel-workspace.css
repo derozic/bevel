@@ -813,6 +813,13 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   padding: 0;
 }
 
+.bevel-roster-empty {
+  margin: 0.15rem 0.5rem 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--sticker-muted);
+}
+
 .bevel-roster-row {
   display: flex;
   width: 100%;

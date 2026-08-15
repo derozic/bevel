@@ -9,8 +9,13 @@ import {
   UserGroupIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
-import { agents } from '@/lib/agent-catalog'
+import { agents, getAgentById, type Agent } from '@/lib/agent-catalog'
 import { bevelTalkPath } from '@/lib/bevel'
+import {
+  filterAgents,
+  filterPeople,
+  tokenizeRosterQuery,
+} from '@/lib/roster-search'
 import { WORKSPACE_PEOPLE, type WorkspacePerson } from '@/lib/workspace-directory'
 import { cn } from '@/lib/utils'
 
@@ -32,6 +37,9 @@ export function ConversationRoster({
   const [agentIds, setAgentIds] = useState<string[]>([])
   const [peopleIds, setPeopleIds] = useState<string[]>([])
   const [query, setQuery] = useState('')
+  const [tagAgents, setTagAgents] = useState<Agent[]>([])
+  const [remotePeople, setRemotePeople] = useState<WorkspacePerson[]>([])
+  const [extraTags, setExtraTags] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
     setMounted(true)
@@ -53,30 +61,104 @@ export function ConversationRoster({
     }
   }, [open])
 
-  const q = query.trim().toLowerCase()
+  const tokens = useMemo(() => tokenizeRosterQuery(query), [query])
 
-  const agentHits = useMemo(
-    () =>
-      agents.filter(
-        (a) =>
-          !q ||
-          a.id.includes(q) ||
-          a.name.toLowerCase().includes(q) ||
-          a.role.toLowerCase().includes(q),
-      ),
-    [q],
-  )
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    const run = async () => {
+      const nextTags: Record<string, string[]> = {}
+      const taggedAgents: Agent[] = []
+      const taggedPeople: WorkspacePerson[] = []
+
+      const tagFetches = tokens.map(async (token) => {
+        const res = await fetch(`/api/tags/${encodeURIComponent(token)}`, {
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (!res.ok) return
+        const data = (await res.json().catch(() => ({}))) as {
+          agents?: Array<{ id: string }>
+          people?: Array<{ id: string; name?: string; handle?: string }>
+        }
+        for (const row of data.agents ?? []) {
+          const agent = getAgentById(row.id)
+          if (agent) taggedAgents.push(agent)
+          nextTags[row.id] = [...(nextTags[row.id] ?? []), token]
+        }
+        for (const row of data.people ?? []) {
+          taggedPeople.push({
+            id: row.id,
+            name: row.name || row.handle || row.id,
+            handle: row.handle || row.id,
+            tags: [token],
+          })
+          nextTags[row.id] = [...(nextTags[row.id] ?? []), token]
+        }
+      })
+
+      const peopleFetch = (async () => {
+        if (tokens.length === 0) return
+        const res = await fetch(
+          `/api/users/lookup?q=${encodeURIComponent(query.trim())}&limit=20`,
+          { credentials: 'include', cache: 'no-store' },
+        )
+        if (!res.ok) return
+        const data = (await res.json().catch(() => ({}))) as {
+          users?: Array<{
+            id: string
+            name?: string
+            handle?: string | null
+            bio?: string
+            tags?: string[]
+            jobTitle?: string
+          }>
+        }
+        for (const u of data.users ?? []) {
+          if (!u.handle && !u.id) continue
+          taggedPeople.push({
+            id: u.id,
+            name: u.name || u.handle || u.id,
+            handle: u.handle || u.id,
+            bio: u.bio,
+            tags: u.tags,
+            role: u.jobTitle,
+          })
+        }
+      })()
+
+      await Promise.allSettled([...tagFetches, peopleFetch])
+      if (cancelled) return
+      setTagAgents(taggedAgents)
+      setRemotePeople(taggedPeople)
+      setExtraTags(nextTags)
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [open, query, tokens])
+
+  const directoryPeople = useMemo(() => {
+    const byId = new Map<string, WorkspacePerson>()
+    for (const p of [...WORKSPACE_PEOPLE, ...remotePeople]) {
+      byId.set(p.id, { ...byId.get(p.id), ...p })
+    }
+    return [...byId.values()]
+  }, [remotePeople])
+
+  const agentHits = useMemo(() => {
+    const local = filterAgents(agents, query, extraTags)
+    const byId = new Map(local.map((a) => [a.id, a]))
+    for (const extra of filterAgents(tagAgents, query, extraTags)) {
+      byId.set(extra.id, extra)
+    }
+    return [...byId.values()]
+  }, [query, extraTags, tagAgents])
 
   const peopleHits = useMemo(
-    () =>
-      WORKSPACE_PEOPLE.filter(
-        (p) =>
-          !q ||
-          p.id.includes(q) ||
-          p.name.toLowerCase().includes(q) ||
-          p.handle.toLowerCase().includes(q),
-      ),
-    [q],
+    () => filterPeople(directoryPeople, query, extraTags),
+    [directoryPeople, query, extraTags],
   )
 
   const selectedPeople: WorkspacePerson[] = peopleIds
@@ -167,8 +249,8 @@ export function ConversationRoster({
                   Start a conversation
                 </h2>
                 <p className="bevel-roster-sub">
-                  Add one or more agents and people (e.g. Peter). Agents open a
-                  live thread; people ride along as invitees.
+                  Search bios and tags — product, legal, whatever the
+                  folksonomy knows. Multi-select to talk to both in one room.
                 </p>
               </div>
               <button
@@ -222,7 +304,7 @@ export function ConversationRoster({
               className="bevel-roster-search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search agents and people…"
+              placeholder="Search product, legal, bios…"
               aria-label="Search roster"
             />
 
@@ -230,6 +312,13 @@ export function ConversationRoster({
               <section>
                 <h3 className="bevel-roster-section-label">Agents</h3>
                 <ul className="bevel-roster-list">
+                  {agentHits.length === 0 ? (
+                    <li className="bevel-roster-empty">
+                      {query.trim()
+                        ? `No agents match “${query.trim()}”.`
+                        : 'No agents in the catalog.'}
+                    </li>
+                  ) : null}
                   {agentHits.map((a) => {
                     const on = agentIds.includes(a.id)
                     return (
@@ -255,7 +344,7 @@ export function ConversationRoster({
                           <span className="bevel-roster-row-text">
                             <span className="bevel-roster-row-name">{a.name}</span>
                             <span className="bevel-roster-row-meta">
-                              @{a.id} · {a.role}
+                              @{a.id} · {a.tagline || a.role}
                             </span>
                           </span>
                           <span className="bevel-roster-check" aria-hidden>
@@ -275,6 +364,13 @@ export function ConversationRoster({
               <section>
                 <h3 className="bevel-roster-section-label">People</h3>
                 <ul className="bevel-roster-list">
+                  {peopleHits.length === 0 ? (
+                    <li className="bevel-roster-empty">
+                      {query.trim()
+                        ? `No people match “${query.trim()}”.`
+                        : 'No people in the directory yet.'}
+                    </li>
+                  ) : null}
                   {peopleHits.map((p) => {
                     const on = peopleIds.includes(p.id)
                     return (
@@ -294,6 +390,7 @@ export function ConversationRoster({
                             <span className="bevel-roster-row-meta">
                               @{p.handle}
                               {p.role ? ` · ${p.role}` : ''}
+                              {p.bio ? ` · ${p.bio}` : ''}
                             </span>
                           </span>
                           <span className="bevel-roster-check" aria-hidden>
@@ -315,7 +412,9 @@ export function ConversationRoster({
               <p className="bevel-roster-hint">
                 {agentIds.length === 0 && peopleIds.length > 0
                   ? 'People-only threads are soft-start until people rooms ship — invite is preserved.'
-                  : 'Pick at least one agent or person to continue.'}
+                  : query.trim()
+                    ? 'Select product and legal (or anyone else) — one room, both in it.'
+                    : 'Pick at least one agent or person to continue.'}
               </p>
               <button
                 type="button"
