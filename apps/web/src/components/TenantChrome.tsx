@@ -60,6 +60,9 @@ export function TenantChrome({ tenant }: { tenant: Tenant }) {
             alt=""
             className="h-7 w-auto max-w-[2.25rem] object-contain"
             style={{ filter: 'var(--tenant-logo-filter, none)' }}
+            onError={(e) => {
+              e.currentTarget.replaceWith(document.createElement('span'))
+            }}
           />
         ) : null}
         <span

@@ -6,6 +6,17 @@ import type { DaypartId, DaypartLogoUrls } from '@bevel/schema'
 import { BevelMark } from './BevelMark'
 import { resolveWorkspaceLogoUrl } from '@/lib/workspace-logo'
 
+/** Survive remounts — a 404 must never be requested again this tab. */
+const failedLogoUrls = new Set<string>()
+
+function rememberFailedLogo(url: string) {
+  failedLogoUrls.add(url)
+}
+
+function logoIsFailed(url: string | undefined): boolean {
+  return Boolean(url && failedLogoUrls.has(url))
+}
+
 /**
  * Workspace mark + product name for the rail header.
  * Logo is day-part aware: up to four unique marks (morning / midday /
@@ -41,11 +52,22 @@ export function WorkspaceBrand({
           logos = undefined
         }
       }
-      setFromDom({
+      const next = {
         product: el.getAttribute('data-tenant-product') || undefined,
         logo: el.getAttribute('data-tenant-logo') || undefined,
         logos,
         daypart: (el.getAttribute('data-daypart') as DaypartId) || undefined,
+      }
+      setFromDom((prev) => {
+        if (
+          prev.product === next.product &&
+          prev.logo === next.logo &&
+          prev.daypart === next.daypart &&
+          JSON.stringify(prev.logos) === JSON.stringify(next.logos)
+        ) {
+          return prev
+        }
+        return next
       })
     }
     read()
@@ -85,24 +107,26 @@ export function WorkspaceBrand({
     'BEVEL'
   // Product brand only — never the legacy "… Agents" suffix in the rail
   const name = rawName.replace(/\s+Agents$/i, '').trim() || rawName
-  const [logoFailed, setLogoFailed] = useState(false)
-  // Reset fail state when URL changes (e.g. daypart or upload)
+  const [logoFailed, setLogoFailed] = useState(() => logoIsFailed(resolvedLogo))
+
   useEffect(() => {
-    setLogoFailed(false)
+    setLogoFailed(logoIsFailed(resolvedLogo))
   }, [resolvedLogo])
 
-  const showLogo = Boolean(resolvedLogo) && !logoFailed
+  const showLogo = Boolean(resolvedLogo) && !logoFailed && !logoIsFailed(resolvedLogo)
 
   return (
     <div className="flex min-w-0 items-center gap-2">
-      {showLogo ? (
+      {showLogo && resolvedLogo ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          key={resolvedLogo}
           src={resolvedLogo}
           alt=""
           className="h-6 w-auto max-w-[1.75rem] shrink-0 object-contain"
-          onError={() => setLogoFailed(true)}
+          onError={() => {
+            rememberFailedLogo(resolvedLogo)
+            setLogoFailed(true)
+          }}
         />
       ) : (
         <span className="inline-flex shrink-0">
