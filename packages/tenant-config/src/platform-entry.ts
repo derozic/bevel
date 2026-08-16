@@ -32,6 +32,8 @@ export const PLATFORM_ENTRY_TENANT: Tenant = {
     sms: false,
     otpSms: false,
     presenceSms: false,
+    imessage: false,
+    imessageInbox: false,
     asyncStreams: true,
     liveSessions: true,
     analytics: true,
