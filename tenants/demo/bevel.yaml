@@ -1,33 +1,41 @@
 tenant: demo
 name: BEVEL Demo
-domain: bevel.lvh.me
+domain: demo.2x4m.cc
 hosts:
-  - demo.bevel.lvh.me
+  - demo.2x4m.cc
+  - demo.2x4m.lvh.me
 
 brand:
   theme: ./theme.json
   product_name: BEVEL
+  logo: ./logo.svg
 
-# Demo stays free — no SMS / paid flags unless plan is raised
-plan: free
+plan: pro
+feature_access: beta
 
 features:
   async_streams: true
   live_sessions: true
   analytics: true
+  channels: true
+  direct_messages: true
   agent_dispatch: true
-  # work_mode requires pro+; leave off on free demo
-  work_mode: false
+  work_mode: true
+  custom_branding: true
 
 auth:
   mode: google
   allowed_domains:
+    - 2x4m.cc
     - derozic.com
+  allowed_emails:
+    - scott@derozic.com
+    - s@derozic.com
+    - twobyform@gmail.com
 
 realtime:
   namespace: demo
   presence: true
-  url: https://realtime.bevel.lvh.me
 
 transports:
   asyncStream:
@@ -38,8 +46,9 @@ transports:
     protocol: websocket
 
 deployment:
-  preview_url: https://bevel.lvh.me
-  target: vercel
+  preview_url: https://demo.2x4m.lvh.me
+  production_url: https://demo.2x4m.cc
+  target: custom
 
 work_repos:
   - derozic/bevel

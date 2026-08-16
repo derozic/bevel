@@ -62,8 +62,14 @@ async def seed_if_empty(session: AsyncSession) -> dict[str, Any]:
 
 
 async def _import_jsonl_for_tenant(session: AsyncSession, tenant: Tenant) -> int:
-    """Import fleet JSONL files into messages for a tenant (seed-only)."""
-    data_dir = _fleet_data_dir()
+    """Import tenant seed JSONL, or the shared fleet dump for 2x4m only."""
+    tenant_seed = _tenant_seed_dir(tenant.slug)
+    if tenant_seed.is_dir():
+        data_dir = tenant_seed
+    elif tenant.slug == "2x4m":
+        data_dir = _fleet_data_dir()
+    else:
+        return 0
     if not data_dir.is_dir():
         return 0
 
@@ -92,6 +98,10 @@ async def _import_jsonl_for_tenant(session: AsyncSession, tenant: Tenant) -> int
     if count:
         log.info("imported %s JSONL messages for tenant %s", count, tenant.slug)
     return count
+
+
+def _tenant_seed_dir(slug: str) -> Path:
+    return settings.tenants_root() / slug / "seed"
 
 
 def _fleet_data_dir() -> Path:

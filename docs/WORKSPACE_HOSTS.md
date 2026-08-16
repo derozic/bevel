@@ -35,7 +35,7 @@ See **`docs/IDENTITY.md`**. Roster: **`tenants/memberships.yaml`**.
 
 | Email | Memberships (product) | Hosts |
 |-------|----------------------|--------|
-| `scott@derozic.com` / `s@derozic.com` | 2x4m, decli (admin) | bevel.2x4m.cc, bevel.decli.dev |
+| `scott@derozic.com` / `s@derozic.com` | 2x4m, decli, demo (admin) | bevel.2x4m.cc, bevel.decli.dev, demo.2x4m.cc |
 | `sderozic@gmail.com` | preso | bevel.pres0.com |
 | `barndough@gmail.com` | olimbic | bevel.olimbic.games |
 | `rozicscott@gmail.com` | 2ndbrain | bevel.2ndbra.in |
@@ -49,6 +49,7 @@ https://bevel.decli.lvh.me
 https://bevel.preso.lvh.me   # + bevel.pres0.lvh.me
 https://bevel.olimbic.lvh.me
 https://bevel.2ndbrain.lvh.me
+https://demo.2x4m.lvh.me     # always-on twin: https://demo.2x4m.cc
 ```
 
 Reload: `caddy reload --config ~/dev/Caddyfile.global --adapter caddyfile`
@@ -70,6 +71,7 @@ Point each production name at the Bevel edge (same IP / CNAME as bevel.is):
 - `bevel.pres0.com`
 - `bevel.olimbic.games`
 - `bevel.2ndbra.in`
+- `demo.2x4m.cc`
 
 Caddy (or your prod site config) must TLS-terminate and reverse-proxy to the same Next process as `bevel.is` / `bevel.2x4m.cc`. Host header selects the tenant.
 
