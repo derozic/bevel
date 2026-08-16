@@ -321,7 +321,7 @@ realtime:
               </h2>
               <p className="text-base leading-relaxed text-muted">
                 Claim {tenantName === 'BEVEL Demo' || tenantSlug === 'demo' ? 'your' : 'a'}{' '}
-                organization, invite the domain, and open channels where humans and agents
+                organization, invite the domain, and open tracks where humans and agents
                 ship together.
               </p>
               <div className="flex flex-wrap gap-3">

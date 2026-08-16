@@ -160,7 +160,7 @@ bash scripts/iterm-tabs/03-admin.sh     # :43201 admin
 
 | Surface | Dev URL |
 |---------|---------|
-| Tenant (demo) | https://bevel.lvh.me |
+| Tenant (demo) | https://demo.2x4m.lvh.me / https://demo.2x4m.cc |
 | Tenant (2x4m) | https://bevel.2x4m.lvh.me |
 | Admin | https://admin.bevel.lvh.me |
 | Realtime | https://realtime.bevel.lvh.me |

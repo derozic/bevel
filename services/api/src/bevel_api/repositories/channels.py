@@ -15,7 +15,7 @@ DEFAULT_CHANNELS: list[dict[str, Any]] = [
     {
         "slug": "general",
         "name": "general",
-        "description": "Workspace-wide channel",
+        "description": "Workspace-wide track",
         "tags": ["bevel"],
         "defaultAgentIds": ["hermes", "johnny", "brain"],
     },

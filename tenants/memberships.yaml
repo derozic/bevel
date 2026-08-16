@@ -17,10 +17,14 @@ people:
       role: admin
     - workspace: decli
       role: admin
+    - workspace: demo
+      role: admin
   s@derozic.com:
     - workspace: 2x4m
       role: admin
     - workspace: decli
+      role: admin
+    - workspace: demo
       role: admin
   sderozic@gmail.com:
     - workspace: preso
@@ -33,6 +37,8 @@ people:
       role: admin
   twobyform@gmail.com:
     - workspace: 2x4m
+      role: member
+    - workspace: demo
       role: member
   scott@comma.cm:
     - workspace: 2x4m

@@ -59,8 +59,10 @@ Runtime request in code: `openid email profile` (optional `hd=derozic.com`).
 https://bevel.is
 https://www.bevel.is
 https://bevel.2x4m.cc
+https://demo.2x4m.cc
 https://bevel.lvh.me
 https://bevel.2x4m.lvh.me
+https://demo.2x4m.lvh.me
 ```
 
 5. **Authorized redirect URIs** (exact match required):
@@ -69,8 +71,10 @@ https://bevel.2x4m.lvh.me
 https://bevel.is/api/auth/callback/google
 https://www.bevel.is/api/auth/callback/google
 https://bevel.2x4m.cc/api/auth/callback/google
+https://demo.2x4m.cc/api/auth/callback/google
 https://bevel.lvh.me/api/auth/callback/google
 https://bevel.2x4m.lvh.me/api/auth/callback/google
+https://demo.2x4m.lvh.me/api/auth/callback/google
 ```
 
 6. Create → copy **Client ID** + **Client secret**  
