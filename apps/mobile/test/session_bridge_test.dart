@@ -55,8 +55,10 @@ void main() {
   });
 
   group('system browser login', () {
-    test('uses a relative native-complete callback', () {
+    test('uses production Google login with a relative native-complete callback', () {
       final uri = BevelConfig.systemBrowserLoginUri();
+      expect(uri.scheme, 'https');
+      expect(uri.host, 'bevel.is');
       expect(uri.path, '/login');
       expect(uri.queryParameters['native'], '1');
       expect(uri.queryParameters['callbackUrl'], '/api/auth/native-complete');

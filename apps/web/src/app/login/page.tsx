@@ -123,6 +123,14 @@ export default async function LoginPage({
       platformEntry ||
       isPlatformTenant) &&
     isGoogleAuthConfigured()
+
+  // Native Google OAuth is registered on bevel.is. Local .lvh.me often has no
+  // Google client / redirect URI — bounce the Mac/iOS app to production.
+  if (nativeReturn && !googleOk && host !== 'bevel.is' && host !== 'www.bevel.is') {
+    redirect(
+      `https://bevel.is/login?native=1&callbackUrl=${NATIVE_COMPLETE_PATH}`,
+    )
+  }
   const githubOk =
     tenant.auth.providers.includes('github') && isGitHubAuthConfigured()
   const otpOk = isOtpAuthEnabled()

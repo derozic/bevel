@@ -42,7 +42,7 @@ class BevelConfig {
   static const String loginPath = '/login';
 
   /// Semantic version shown in About / release notes (mirrors pubspec).
-  static const String versionLabel = '0.4.4';
+  static const String versionLabel = '0.4.5';
 
   /// Magenta Extensions + analytics API.
   static const String magentaApiBase = String.fromEnvironment(
@@ -167,16 +167,14 @@ class BevelConfig {
   }
 
   /// Prefer system browser for the whole login surface (cookie + OAuth hop).
-  /// Starts on platform entry ([baseUrl]) with native return deep link.
+  /// Always start on bevel.is — Google OAuth is registered there. Local
+  /// `.lvh.me` is not configured and used to show "Google sign-in is not
+  /// configured on this server."
   static Uri systemBrowserLoginUri() {
-    // Relative callback only — login rejects absolute URLs and used to send
-    // native sign-in to /welcome, leaving the operator in Chrome.
-    return entryUri(loginPath).replace(
-      queryParameters: {
-        'native': '1',
-        'callbackUrl': '/api/auth/native-complete',
-      },
-    );
+    return Uri.https('bevel.is', loginPath, const {
+      'native': '1',
+      'callbackUrl': '/api/auth/native-complete',
+    });
   }
 
   /// True when this build points at production hosts (not local .lvh.me).

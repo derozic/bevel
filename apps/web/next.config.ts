@@ -1,8 +1,11 @@
 import type { NextConfig } from 'next'
+import { loadEnvConfig } from '@next/env'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const appDir = path.dirname(fileURLToPath(import.meta.url))
+// Monorepo secrets (AUTH_GOOGLE_*) live in the repo-root .env, not apps/web.
+loadEnvConfig(path.join(appDir, '../..'))
 
 const nextConfig: NextConfig = {
   // Monorepo: pin tracing root so parent lockfiles do not hijack app discovery.

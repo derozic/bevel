@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { issueAuthHandoffCode } from '@/lib/auth-handoff'
-import { clearNativeLogin } from '@/lib/auth-native'
+import { clearNativeLogin, NATIVE_COMPLETE_PATH } from '@/lib/auth-native'
 
 /**
  * After system-browser Google OAuth, native clients land here and bounce into
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   if (!session?.user?.email) {
     return NextResponse.redirect(
       new URL(
-        `/login?native=1&return=${encodeURIComponent('bevel://auth/complete')}`,
+        `/login?native=1&callbackUrl=${encodeURIComponent(NATIVE_COMPLETE_PATH)}`,
         origin,
       ),
     )
