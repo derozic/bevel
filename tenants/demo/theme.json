@@ -1,6 +1,12 @@
 {
-  "accent": "#7c5cff",
-  "background": "#0c0c0e",
-  "surface": "#141418",
-  "text": "#f4f4f5"
+  "accent": "#c45c26",
+  "background": "#faf6ee",
+  "surface": "#fffaf3",
+  "surface_raised": "#fff7ec",
+  "text": "#1a1410",
+  "text_muted": "#5c534c",
+  "border": "#e6e0d8",
+  "font_sans": "Inter, ui-sans-serif, system-ui, sans-serif",
+  "radius": "0.75rem",
+  "mode": "light"
 }

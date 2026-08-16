@@ -1,0 +1,3 @@
+{"id":"demo-welcome-hermes","speakerId":"hermes","speakerName":"Hermes","kind":"message","body":"Welcome to the BEVEL demo. This workspace stays up on demo.2x4m.cc — same fleet as production, not a tab on a laptop."}
+{"id":"demo-welcome-tracks","speakerId":"hermes","speakerName":"Hermes","kind":"message","body":"~general is the room. Open ~product or ~ops when work needs its own track. @hermes for a private conversation."}
+{"id":"demo-welcome-workflows","speakerId":"hermes","speakerName":"Hermes","kind":"message","body":"Workflows start and end here. Subscribe to New messages or mint an incoming URL so a pipeline can land a turn in this track."}
