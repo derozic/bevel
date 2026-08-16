@@ -26,6 +26,16 @@ import 'layout/workspace_rail.dart';
 ///
 /// Auth: when [handoffCode] is set, loads workspace `/api/auth/handoff` first so
 /// Auth.js cookies land in the WebView jar (Safari cookies are never shared).
+
+/// WKWebView's `setBackgroundColor` sets the `opaque` property, which Flutter's
+/// macOS plugin does not implement (`UnimplementedError: opaque is not
+/// implemented on macOS`). iOS / Android are fine.
+@visibleForTesting
+bool webViewSupportsBackgroundColor([TargetPlatform? platform]) {
+  final p = platform ?? defaultTargetPlatform;
+  return p == TargetPlatform.iOS || p == TargetPlatform.android;
+}
+
 class WorkspaceShellPage extends StatefulWidget {
   const WorkspaceShellPage({
     super.key,
@@ -122,7 +132,6 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF101825)) // night cream until daypart mounts
       ..setUserAgent(
         'Mozilla/5.0 (Mobile; BevelNative/${BevelConfig.versionLabel}) '
         'AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 '
@@ -217,6 +226,30 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
         ),
       )
       ..loadRequest(start);
+    _syncWebViewBackground(const Color(0xFF101825));
+  }
+
+  Color? _webViewBackground;
+
+  void _syncWebViewBackground(Color color) {
+    if (!webViewSupportsBackgroundColor()) return;
+    if (_webViewBackground == color) return;
+    _webViewBackground = color;
+    unawaited(() async {
+      try {
+        await _controller.setBackgroundColor(color);
+      } on UnimplementedError {
+        // Desktop WebKit bindings do not implement `opaque`.
+      } catch (_) {
+        /* ignore plugin gaps */
+      }
+    }());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncWebViewBackground(context.bevel.cream);
   }
 
   Future<void> _probeSessionAndChannels() async {
@@ -470,8 +503,6 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             layout.size.width >= 700);
     final showPhonePicker = !showRail;
 
-    unawaited(_controller.setBackgroundColor(p.cream));
-
     final spaceLabel = [
       if (widget.workspaceLabel != null && widget.workspaceLabel!.isNotEmpty)
         widget.workspaceLabel!,
@@ -481,6 +512,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     final webBody = Stack(
       fit: StackFit.expand,
       children: [
+        ColoredBox(color: p.cream),
         if (_error != null)
           _ErrorPane(
             message: _error!,
