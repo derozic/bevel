@@ -54,7 +54,7 @@ export type ProvisionTenantInput = {
   name: string
   /** URL-safe slug (workspace namespace) */
   slug: string
-  /** Google Workspace email domain, e.g. acme.com */
+  /** Google Workspace email domain, e.g. 2x4m.cc */
   emailDomain: string
   /** Claimant email — always allowlisted */
   ownerEmail: string

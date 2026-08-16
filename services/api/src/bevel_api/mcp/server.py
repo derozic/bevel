@@ -83,7 +83,7 @@ def bevel_list_tenants() -> str:
 
 @mcp.tool()
 def bevel_get_tenant(slug: str) -> str:
-    """Get a tenant summary by slug (e.g. demo, 2x4m, acme)."""
+    """Get a tenant summary by slug (e.g. demo, 2x4m, olimbic)."""
     return json.dumps(_get(f"/api/v1/tenants/{slug}"), indent=2)
 
 

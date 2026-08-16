@@ -38,7 +38,7 @@ delete process.env.BEVEL_PUBLIC_URL
 
 try {
   section('validates slug shape', () => {
-    assert.equal(isValidTenantSlug('acme'), true)
+    assert.equal(isValidTenantSlug('olimbic'), true)
     assert.equal(isValidTenantSlug('a'), false)
     assert.equal(isValidTenantSlug('-bad'), false)
     assert.equal(RESERVED_TENANT_SLUGS.has('admin'), true)
@@ -46,17 +46,17 @@ try {
 
   section('provisions a tenant on a writable root', () => {
     const result = provisionTenant({
-      name: 'Acme Robotics',
-      slug: 'acme-robotics',
-      emailDomain: 'acme.com',
-      ownerEmail: 'owner@acme.com',
+      name: 'Northstar Labs',
+      slug: 'northstar-labs',
+      emailDomain: 'northstar.dev',
+      ownerEmail: 'owner@northstar.dev',
     })
     assert.equal(result.ok, true)
     if (!result.ok) return
-    assert.equal(result.tenant.slug, 'acme-robotics')
-    assert.equal(result.host, 'acme-robotics.bevel.lvh.me')
-    assert.equal(existsSync(join(root, 'acme-robotics', 'bevel.yaml')), true)
-    assert.equal(existsSync(join(root, 'acme-robotics', 'theme.json')), true)
+    assert.equal(result.tenant.slug, 'northstar-labs')
+    assert.equal(result.host, 'northstar-labs.bevel.lvh.me')
+    assert.equal(existsSync(join(root, 'northstar-labs', 'bevel.yaml')), true)
+    assert.equal(existsSync(join(root, 'northstar-labs', 'theme.json')), true)
   })
 
   section('rejects reserved and taken slugs', () => {
