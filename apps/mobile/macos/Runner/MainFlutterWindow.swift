@@ -4,6 +4,8 @@ import FlutterMacOS
 class MainFlutterWindow: NSWindow {
   /// Retained for the window lifetime so media huddle discovery stays registered.
   private var mediaDeviceChannel: MediaDeviceChannel?
+  /// Local iMessage host (chat.db + AppleScript). Replaces BlueBubbles.
+  private var iMessageChannel: IMessageChannel?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -22,6 +24,9 @@ class MainFlutterWindow: NSWindow {
 
     // Host mic/speaker/camera discovery for audio huddles (CoreAudio + AVFoundation).
     mediaDeviceChannel = MediaDeviceChannel(
+      messenger: flutterViewController.engine.binaryMessenger
+    )
+    iMessageChannel = IMessageChannel(
       messenger: flutterViewController.engine.binaryMessenger
     )
 

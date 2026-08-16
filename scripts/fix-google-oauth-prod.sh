@@ -20,12 +20,14 @@ ORIGINS=(
   'https://bevel.is'
   'https://www.bevel.is'
   'https://bevel.2x4m.cc'
+  'https://demo.2x4m.cc'
   'https://bevel.lvh.me'
 )
 REDIRECTS=(
   'https://bevel.is/api/auth/callback/google'
   'https://www.bevel.is/api/auth/callback/google'
   'https://bevel.2x4m.cc/api/auth/callback/google'
+  'https://demo.2x4m.cc/api/auth/callback/google'
   'https://bevel.lvh.me/api/auth/callback/google'
 )
 

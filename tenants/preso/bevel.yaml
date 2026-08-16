@@ -13,6 +13,8 @@ feature_access: beta
 brand:
   theme: ./theme.json
   product_name: Preso
+  cmyk:
+    kit_id: preso
 
 features:
   async_streams: true

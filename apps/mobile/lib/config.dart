@@ -1,16 +1,12 @@
 /// BEVEL native client configuration.
 ///
-/// **Default is live production** (bevel.is / api.bevel.is / bevel.2x4m.cc).
-/// Local Caddy overrides only when you explicitly pass dart-defines:
+/// **Default is live production** (bevel.is / api.bevel.is / bevel.2x4m.cc)
+/// so Google Workspace login works. Local Caddy only when you pass
+/// `BEVEL_ENV=local` or explicit dart-defines:
 ///
-///   flutter run -d macos \
-///     --dart-define=BEVEL_BASE_URL=https://bevel.2x4m.lvh.me \
-///     --dart-define=BEVEL_API_URL=https://api.bevel.lvh.me \
-///     --dart-define=BEVEL_WORKSPACE_URL=https://bevel.2x4m.lvh.me
-///
-/// Release (same as defaults):
-///   ./scripts/mobile/release.sh macos
-///   # or BEVEL_ENV=local for .lvh.me
+///   flutter run -d macos
+///   pnpm mobile:run:macos:local
+///   BEVEL_ENV=local ./scripts/mobile/release.sh macos
 class BevelConfig {
   BevelConfig._();
 
@@ -18,26 +14,35 @@ class BevelConfig {
   static const String appTagline =
       'Channels for humans and agents';
 
-  /// Platform entry (login, claim, download). Live: bevel.is.
-  static const String baseUrl = String.fromEnvironment(
-    'BEVEL_BASE_URL',
-    defaultValue: 'https://bevel.is',
-  );
+  static const String _env = String.fromEnvironment('BEVEL_ENV');
+  static const String _baseUrlOverride = String.fromEnvironment('BEVEL_BASE_URL');
+  static const String _workspaceUrlOverride =
+      String.fromEnvironment('BEVEL_WORKSPACE_URL');
+  static const String _apiUrlOverride = String.fromEnvironment('BEVEL_API_URL');
 
-  /// Workspace chat origin. Live: bevel.2x4m.cc.
-  static const String _workspaceUrlRaw = String.fromEnvironment(
-    'BEVEL_WORKSPACE_URL',
-    defaultValue: 'https://bevel.2x4m.cc',
-  );
+  static bool get _useLocalHosts => _env == 'local' || _env == 'dev';
 
-  static String get workspaceUrl =>
-      _workspaceUrlRaw.isEmpty ? baseUrl : _workspaceUrlRaw;
+  /// Platform entry (login, claim, download).
+  static String get baseUrl {
+    if (_baseUrlOverride.isNotEmpty) return _baseUrlOverride;
+    return _useLocalHosts
+        ? 'https://bevel.2x4m.lvh.me'
+        : 'https://bevel.is';
+  }
+
+  /// Workspace chat origin.
+  static String get workspaceUrl {
+    if (_workspaceUrlOverride.isNotEmpty) return _workspaceUrlOverride;
+    return _useLocalHosts
+        ? 'https://bevel.2x4m.lvh.me'
+        : 'https://bevel.2x4m.cc';
+  }
 
   static const String downloadPath = '/download';
   static const String loginPath = '/login';
 
   /// Semantic version shown in About / release notes (mirrors pubspec).
-  static const String versionLabel = '0.4.3';
+  static const String versionLabel = '0.4.4';
 
   /// Magenta Extensions + analytics API.
   static const String magentaApiBase = String.fromEnvironment(
@@ -107,11 +112,13 @@ class BevelConfig {
     return isAllowedInAppHost(uri.host);
   }
 
-  /// Control-plane API — always live by default (api.bevel.is).
-  static const String apiBaseUrl = String.fromEnvironment(
-    'BEVEL_API_URL',
-    defaultValue: 'https://api.bevel.is',
-  );
+  /// Control-plane API.
+  static String get apiBaseUrl {
+    if (_apiUrlOverride.isNotEmpty) return _apiUrlOverride;
+    return _useLocalHosts
+        ? 'https://api.bevel.lvh.me'
+        : 'https://api.bevel.is';
+  }
 
   /// Optional internal key for trusted native builds (release dart-define).
   /// Required for timeline/escalation calls that assert identity headers.
@@ -162,14 +169,12 @@ class BevelConfig {
   /// Prefer system browser for the whole login surface (cookie + OAuth hop).
   /// Starts on platform entry ([baseUrl]) with native return deep link.
   static Uri systemBrowserLoginUri() {
-    // After Auth.js, land on native-complete which re-opens the app with email.
-    final returnTo = entryUri('/api/auth/native-complete').toString();
+    // Relative callback only — login rejects absolute URLs and used to send
+    // native sign-in to /welcome, leaving the operator in Chrome.
     return entryUri(loginPath).replace(
       queryParameters: {
-        ...entryUri(loginPath).queryParameters,
         'native': '1',
-        'callbackUrl': returnTo,
-        'return': returnTo,
+        'callbackUrl': '/api/auth/native-complete',
       },
     );
   }

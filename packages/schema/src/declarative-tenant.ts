@@ -25,6 +25,13 @@ export const DeclarativeDaypartLogosSchema = z.object({
   night: z.string().optional(),
 })
 
+export const DeclarativeCmykBrandKitSchema = z.object({
+  /** Numeric kit id or public slug on the CMYK BrandKit host. */
+  kit_id: z.union([z.number().int().positive(), z.string().min(1)]),
+  /** Override CMYK_BRANDKIT_URL for this workspace. */
+  host: z.string().url().optional(),
+})
+
 export const DeclarativeBrandSchema = z.object({
   /** Default / fallback logo (used when a daypart slot is empty). */
   logo: z.string().optional(),
@@ -35,6 +42,8 @@ export const DeclarativeBrandSchema = z.object({
   logos: DeclarativeDaypartLogosSchema.optional(),
   theme: z.string().default('./theme.json'),
   product_name: z.string().optional(),
+  /** CMYK BrandKit binding — paints the workspace from that kit. */
+  cmyk: DeclarativeCmykBrandKitSchema.optional(),
 })
 
 /**
@@ -55,6 +64,8 @@ export const DeclarativeFeaturesSchema = z.object({
   sms: z.boolean().optional(),
   otp_sms: z.boolean().optional(),
   presence_sms: z.boolean().optional(),
+  imessage: z.boolean().optional(),
+  imessage_inbox: z.boolean().optional(),
   sso_saml: z.boolean().optional(),
   audit_log: z.boolean().optional(),
   dedicated_support: z.boolean().optional(),

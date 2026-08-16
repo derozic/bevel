@@ -22,9 +22,11 @@ import 'ui/escalation/escalation_inbox.dart';
 import 'ui/layout/adaptive_scaffold.dart';
 import 'ui/layout/bevel_breakpoints.dart';
 import 'ui/native_hub_page.dart';
+import 'ui/onboarding/auth_shell.dart';
 import 'ui/onboarding/google_workspace_onboarding.dart';
 import 'ui/onboarding/onboarding_state.dart';
 import 'ui/settings/notification_settings_page.dart';
+import 'theme/theme.dart';
 import 'ui/workspace_picker_page.dart';
 import 'ui/workspace_shell.dart';
 import 'workspace/workspace_target.dart';
@@ -35,41 +37,43 @@ Future<void> main() async {
   runApp(const BevelApp());
 }
 
-class BevelApp extends StatelessWidget {
+class BevelApp extends StatefulWidget {
   const BevelApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    const accent = Color(0xFF22C55E);
-    final scheme = ColorScheme.fromSeed(
-      seedColor: accent,
-      brightness: Brightness.dark,
-      primary: accent,
-      surface: const Color(0xFF0F1419),
-    );
+  State<BevelApp> createState() => _BevelAppState();
+}
 
-    return MaterialApp(
-      title: BevelConfig.appName,
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: scheme,
-        scaffoldBackgroundColor: const Color(0xFF0A0E12),
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
-          elevation: 0,
-          backgroundColor: Color(0xFF0F1419),
-          foregroundColor: Color(0xFFF4F7F5),
-        ),
-        cardTheme: CardThemeData(
-          color: const Color(0xFF141A21),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF243040)),
-          ),
-        ),
+class _BevelAppState extends State<BevelApp> {
+  late final DaypartController _daypart;
+
+  @override
+  void initState() {
+    super.initState();
+    _daypart = DaypartController()..start();
+  }
+
+  @override
+  void dispose() {
+    _daypart.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DaypartScope(
+      controller: _daypart,
+      child: ListenableBuilder(
+        listenable: _daypart,
+        builder: (context, _) {
+          return MaterialApp(
+            title: BevelConfig.appName,
+            debugShowCheckedModeBanner: false,
+            theme: buildBevelTheme(_daypart.palette),
+            home: const BevelHomePage(),
+          );
+        },
       ),
-      home: const BevelHomePage(),
     );
   }
 }
@@ -375,25 +379,31 @@ class _BevelHomePageState extends State<BevelHomePage> {
     if (!mounted) return;
     final go = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141A21),
-        title: const Text('Stay on top of escalations'),
-        content: const Text(
-          'When someone writes ^yourhandle, BEVEL needs permission to '
-          'interrupt you — louder than a soft @mention. Enable notifications?',
-          style: TextStyle(color: Color(0xFFCBD5E1), height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Not now'),
+      builder: (ctx) {
+        final p = ctx.bevel;
+        return AlertDialog(
+          backgroundColor: p.surfaceRaised,
+          title: Text(
+            'Stay on top of escalations',
+            style: TextStyle(color: p.ink, fontWeight: FontWeight.w600),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Enable'),
+          content: Text(
+            'When someone writes ^yourhandle, BEVEL needs permission to '
+            'interrupt you — louder than a soft @mention. Enable notifications?',
+            style: TextStyle(color: p.muted, height: 1.45),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Enable'),
+            ),
+          ],
+        );
+      },
     );
     final granted = go == true ? await _notifications.requestPermission() : false;
     if (granted) {
@@ -667,6 +677,21 @@ class _BevelHomePageState extends State<BevelHomePage> {
 
   Future<void> _continueWithGoogle() async {
     setState(() => _status = 'Continue with Google…');
+    // Silicon Mac: Workspace login matches the web app (system browser +
+    // Auth.js). Native Google Sign-In needs an iOS-type client that we only
+    // wire for iPhone unless GOOGLE_IOS_CLIENT_ID is set.
+    final preferBrowser = defaultTargetPlatform == TargetPlatform.macOS &&
+        !GoogleNativeAuth().hasIosClientConfigured;
+    if (preferBrowser) {
+      final ok = await _oauth.openSystemLogin();
+      if (!mounted) return;
+      setState(() {
+        _status = ok
+            ? 'Finish Google Workspace in the browser — we will bring you back.'
+            : 'Could not open Google sign-in';
+      });
+      return;
+    }
     try {
       // Prefer native Google Sign-In SDK (in-app account sheet).
       final selected = _onboarding.selectedWorkspace;
@@ -718,7 +743,6 @@ class _BevelHomePageState extends State<BevelHomePage> {
           await showDialog<void>(
             context: context,
             builder: (ctx) => AlertDialog(
-              backgroundColor: const Color(0xFF141A21),
               title: const Text('Google iOS client required'),
               content: const Text(
                 'Google blocked sign-in because a WEB OAuth client was used '
@@ -727,7 +751,6 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 'with bundle id com.derozic.bevel.bevelApp, then run:\n\n'
                 './scripts/mobile/apply-google-ios-client.sh <client-id>\n\n'
                 'You can continue with browser sign-in for now.',
-                style: TextStyle(color: Color(0xFFCBD5E1), height: 1.35),
               ),
               actions: [
                 TextButton(
@@ -765,11 +788,12 @@ class _BevelHomePageState extends State<BevelHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final p = context.bevel;
     final caps = _caps;
     final isMac = caps?.platformLabel == 'macos';
     final hermesLabel = _hermesStatus?.summary;
     final layout = BevelLayoutInfo.of(context);
+    final ctrl = context.daypart;
 
     // Rich multi-step Google Workspace onboarding for first launch
     if (_onboarding.needsOnboarding && caps != null) {
@@ -790,30 +814,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
     final selected = _onboarding.selectedWorkspace;
 
     return AdaptiveScaffold(
+      backgroundColor: p.cream,
       appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'B',
-                style: TextStyle(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Text(BevelConfig.appName),
-          ],
-        ),
+        title: const BevelBrandTitle(),
         actions: [
           IconButton(
             tooltip: 'Choose workspace',
@@ -872,37 +875,113 @@ class _BevelHomePageState extends State<BevelHomePage> {
           ),
         ],
       ),
-      body: Center(
+      body: signedIn
+          ? _signedInHome(
+              context,
+              p: p,
+              layout: layout,
+              ctrl: ctrl,
+              selected: selected,
+              hermesLabel: hermesLabel,
+              isMac: isMac,
+              caps: caps,
+            )
+          : BevelAuthShell(
+              footer: Text(
+                'v${BevelConfig.versionLabel}'
+                '${caps != null ? ' · ${caps.platformLabel}' : ''}',
+                style: TextStyle(fontSize: 11, color: p.subtle),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Center(child: BevelMark(size: 36)),
+                  const SizedBox(height: 14),
+                  const Center(child: BevelWordmark(size: BevelWordmarkSize.lg)),
+                  const SizedBox(height: 18),
+                  Text(
+                    BevelConfig.appTagline,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isMac
+                        ? 'Sign in with Google Workspace in the browser, then choose Private or a workspace.'
+                        : 'Sign in with Google Workspace, then choose Private or an org.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 24),
+                  Semantics(
+                    identifier: 'bevel.home.continue_google',
+                    button: true,
+                    label: 'Continue with Google',
+                    child: FilledButton.icon(
+                      onPressed: _continueWithGoogle,
+                      icon: const Icon(Icons.login_rounded),
+                      label: const Text('Continue with Google'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Semantics(
+                    identifier: 'bevel.home.open_workspace',
+                    button: true,
+                    label: 'Choose workspace',
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openWorkspacePicker(),
+                      icon: const Icon(Icons.workspaces_outlined),
+                      label: const Text('Choose workspace'),
+                    ),
+                  ),
+                  if (_status != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _status!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: p.accent, fontSize: 13),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _signedInHome(
+    BuildContext context, {
+    required BevelPalette p,
+    required BevelLayoutInfo layout,
+    required DaypartController? ctrl,
+    required WorkspaceTarget? selected,
+    required String? hermesLabel,
+    required bool isMac,
+    required NativeCapabilities? caps,
+  }) {
+    return BevelAtmosphere(
+      child: Center(
         child: ConstrainedBox(
-          constraints:
-              BoxConstraints(maxWidth: layout.contentMaxWidth.clamp(280, 720)),
+          constraints: BoxConstraints(
+            maxWidth: layout.contentMaxWidth.clamp(280, 720),
+          ),
           child: ListView(
             padding: EdgeInsets.fromLTRB(
               layout.isFoldCover ? 16 : 24,
-              layout.isFoldCover ? 20 : 32,
+              layout.isFoldCover ? 16 : 24,
               layout.isFoldCover ? 16 : 24,
               40,
             ),
             children: [
               Text(
-                signedIn ? 'Your spaces' : BevelConfig.appTagline,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFFF4F7F5),
-                    ),
+                'Your spaces',
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
               Text(
-                signedIn
-                    ? 'Pick Private (top-level agents) or a product workspace — '
-                        'same chooser as the web.'
-                    : isMac
-                        ? 'Sign in with Google, then choose Private or a workspace.'
-                        : 'Sign in with Google Workspace, then choose Private or an org.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF9AA8B5),
-                      height: 1.45,
-                    ),
+                ctrl?.meta.greeting ??
+                    'Pick Private or a product workspace.',
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
               if (_onboarding.userEmail.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -910,48 +989,49 @@ class _BevelHomePageState extends State<BevelHomePage> {
                   _onboarding.userName.isNotEmpty
                       ? '${_onboarding.userName} · ${_onboarding.userEmail}'
                       : _onboarding.userEmail,
-                  style: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: p.muted, fontSize: 13),
                 ),
               ],
               if (selected != null) ...[
-                const SizedBox(height: 16),
-                Card(
-                  child: ListTile(
-                    leading: Icon(
-                      selected.isPrivate
-                          ? Icons.lock_outline_rounded
-                          : Icons.workspaces_outlined,
-                      color: scheme.primary,
-                    ),
-                    title: Text(selected.name),
-                    subtitle: Text(selected.subtitle ?? selected.host),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: _openSelectedSpace,
+                const SizedBox(height: 20),
+                BevelHairlineCard(
+                  highlighted: true,
+                  onTap: _openSelectedSpace,
+                  child: Row(
+                    children: [
+                      Icon(
+                        selected.isPrivate
+                            ? Icons.lock_outline_rounded
+                            : Icons.workspaces_outlined,
+                        color: p.accent,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              selected.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: p.ink,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              selected.subtitle ?? selected.host,
+                              style: TextStyle(color: p.muted, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: p.subtle),
+                    ],
                   ),
                 ),
               ],
-              const SizedBox(height: 28),
-              if (!signedIn)
-                Semantics(
-                  identifier: 'bevel.home.continue_google',
-                  button: true,
-                  label: 'Continue with Google',
-                  child: FilledButton.icon(
-                    onPressed: _continueWithGoogle,
-                    icon: const Icon(Icons.login_rounded),
-                    label: const Text('Continue with Google'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
-                    ),
-                  ),
-                ),
-              if (!signedIn) const SizedBox(height: 12),
+              const SizedBox(height: 24),
               Semantics(
                 identifier: 'bevel.home.open_workspace',
                 button: true,
@@ -959,15 +1039,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
                     ? 'Continue to ${selected.name}'
                     : 'Choose workspace',
                 child: FilledButton.icon(
-                  onPressed: () {
-                    if (selected != null) {
-                      _openSelectedSpace();
-                    } else if (signedIn) {
-                      _openWorkspacePicker();
-                    } else {
-                      _openWorkspacePicker();
-                    }
-                  },
+                  onPressed: selected != null
+                      ? _openSelectedSpace
+                      : () => _openWorkspacePicker(),
                   icon: Icon(
                     selected != null
                         ? Icons.forum_outlined
@@ -978,76 +1052,76 @@ class _BevelHomePageState extends State<BevelHomePage> {
                         ? 'Continue to ${selected.name}'
                         : 'Choose workspace',
                   ),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                  ),
                 ),
               ),
-              if (signedIn) ...[
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () => _openWorkspacePicker(),
-                  icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                  label: const Text('Switch workspace'),
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: _continueWithGoogle,
-                  icon: const Icon(Icons.login_rounded, size: 18),
-                  label: const Text('Re-authenticate'),
-                ),
-              ],
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => _openWorkspacePicker(),
+                icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                label: const Text('Switch workspace'),
+              ),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: () =>
-                    _openExternal(BevelConfig.entryUri('/workspaces')),
-                icon: const Icon(Icons.open_in_browser_rounded, size: 18),
-                label: const Text('Open chooser in browser'),
+                onPressed: _continueWithGoogle,
+                icon: const Icon(Icons.login_rounded, size: 18),
+                label: const Text('Re-authenticate'),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
+              const BevelDaypartControl(),
+              const SizedBox(height: 20),
               Text(
-                'Private = bevel.is agents. Orgs = product hosts (e.g. bevel.2x4m.cc). '
+                'Private is bevel.is agents. Orgs are product hosts. '
                 'Console stays on the web.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF64748B),
-                      height: 1.4,
-                    ),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               if (hermesLabel != null && isMac) ...[
                 const SizedBox(height: 20),
-                Card(
-                  child: ListTile(
-                    leading: Icon(
-                      _hermesStatus?.serveOnline == true
-                          ? Icons.check_circle_outline
-                          : Icons.auto_awesome_outlined,
-                      color: scheme.primary,
-                    ),
-                    title: const Text('Hermes Desktop'),
-                    subtitle: Text(hermesLabel),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => _openNativeHub(focusHermes: true),
+                BevelHairlineCard(
+                  onTap: () => _openNativeHub(focusHermes: true),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _hermesStatus?.serveOnline == true
+                            ? Icons.check_circle_outline
+                            : Icons.auto_awesome_outlined,
+                        color: p.accent,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hermes Desktop',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: p.ink,
+                              ),
+                            ),
+                            Text(
+                              hermesLabel,
+                              style: TextStyle(color: p.muted, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: p.subtle),
+                    ],
                   ),
                 ),
               ],
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               Text(
                 'v${BevelConfig.versionLabel}'
                 '${caps != null ? ' · ${caps.platformLabel}' : ''}'
                 '${_lastDeepLink != null ? '\nLast link: $_lastDeepLink' : ''}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF6B7A88),
-                      height: 1.5,
-                    ),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               if (_status != null) ...[
                 const SizedBox(height: 12),
                 Text(
                   _status!,
-                  style: TextStyle(color: scheme.primary, fontSize: 13),
+                  style: TextStyle(color: p.accent, fontSize: 13),
                 ),
               ],
             ],

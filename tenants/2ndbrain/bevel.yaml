@@ -13,6 +13,8 @@ feature_access: beta
 brand:
   theme: ./theme.json
   product_name: 2ndBrain
+  cmyk:
+    kit_id: 2ndbrain
 
 features:
   async_streams: true

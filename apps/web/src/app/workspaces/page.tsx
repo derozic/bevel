@@ -18,8 +18,13 @@ import {
   BEVEL_PRIVATE_PATH,
   BEVEL_TRADEMARK_NOTICE,
 } from '@/lib/bevel'
+import { BrandSquare } from '@/components/BrandSquare'
 import { auth } from '@/auth'
 import { issueAuthHandoffCode } from '@/lib/auth-handoff'
+import {
+  NATIVE_COMPLETE_PATH,
+  isNativeLoginPending,
+} from '@/lib/auth-native'
 
 /**
  * Chooser after apex login: **Private** (agents only) + every product workspace
@@ -29,6 +34,10 @@ export default async function WorkspacesPage() {
   const session = await auth()
   if (!session?.user?.email) {
     redirect('/login?callbackUrl=%2Fworkspaces')
+  }
+
+  if (await isNativeLoginPending()) {
+    redirect(NATIVE_COMPLETE_PATH)
   }
 
   const headerStore = await headers()
@@ -61,7 +70,7 @@ export default async function WorkspacesPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-8 px-6 py-16">
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-8 px-6 py-16">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-3">
           <div className="flex items-center gap-3">
@@ -86,35 +95,25 @@ export default async function WorkspacesPage() {
         <SuiteNav size="sm" showLabel={false} className="shrink-0" />
       </div>
 
-      <ul className="space-y-3">
-        {/* Always offer top-level private (agents only) */}
-        <li>
-          <Link
-            href={BEVEL_PRIVATE_PATH}
-            className="flex items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/5 px-5 py-4 transition hover:border-accent/50 hover:bg-accent/10"
-          >
-            <div>
-              <p className="font-semibold text-foreground">Private</p>
-              <p className="text-xs text-muted">
-                bevel.is · just you and your agents
-              </p>
-            </div>
-            <span className="text-sm font-medium text-accent">Enter</span>
-          </Link>
-        </li>
-
+      <div className="bevel-brand-square-grid bevel-brand-square-grid--wide">
+        <BrandSquare
+          href={BEVEL_PRIVATE_PATH}
+          label="Private"
+          caption="you + agents"
+          logoUrl="/brand/bevel-mark.svg"
+          processKey="private"
+        />
         {workspaces.map((ws) => (
-          <li key={ws.slug}>
-            <WorkspaceOpenLink
-              ws={ws}
-              email={session.user!.email!}
-              name={session.user?.name}
-              image={session.user?.image}
-              fromHost={host}
-            />
-          </li>
+          <WorkspaceOpenLink
+            key={ws.slug}
+            ws={ws}
+            email={session.user!.email!}
+            name={session.user?.name}
+            image={session.user?.image}
+            fromHost={host}
+          />
         ))}
-      </ul>
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <Button asChild variant="outline" size="sm">
@@ -166,17 +165,14 @@ async function WorkspaceOpenLink({
   }
 
   return (
-    <Link
+    <BrandSquare
       href={href}
-      className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface/60 px-5 py-4 transition hover:border-accent/50 hover:bg-surface"
-    >
-      <div>
-        <p className="font-semibold text-foreground">{ws.name}</p>
-        <p className="text-xs text-muted">
-          {ws.host} · namespace {ws.realtime.namespace}
-        </p>
-      </div>
-      <span className="text-sm font-medium text-accent">Enter</span>
-    </Link>
+      label={ws.theme.productName || ws.name}
+      caption={ws.host}
+      logoUrl={ws.theme.brandIconUrl || ws.theme.logoUrl || ws.theme.markUrl}
+      processKey={ws.slug}
+      process={ws.theme.accent}
+      title={`${ws.name} · ${ws.host}`}
+    />
   )
 }

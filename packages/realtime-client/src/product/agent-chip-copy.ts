@@ -112,6 +112,141 @@ export const AGENT_CHIP_COPY: Record<string, AgentChipCopy> = {
       'Desktop interop',
     ],
   },
+  sterling: {
+    tagline: 'The breadwinner',
+    summary:
+      'Director of Revenue — pipelines, pricing, deal structures, and partnership revenue.',
+    capabilities: [
+      'Revenue architecture',
+      'Pipeline development',
+      'Pricing strategy',
+      'Deal structuring',
+    ],
+  },
+  cadence: {
+    tagline: 'The rhythm of shipping',
+    summary:
+      'Director of Development — continuous engineering, developer compassion, quality KPIs, and the learn loop.',
+    capabilities: [
+      'Continuous engineering',
+      'Developer experience',
+      'CI/CD',
+      'Quality KPIs',
+    ],
+  },
+  spark: {
+    tagline: 'Hyperactive curiosity',
+    summary:
+      'Director of Research — cross-domain correlation, experiments, and frontier insights.',
+    capabilities: [
+      'Deep research',
+      'Hypothesis validation',
+      'Frontier scanning',
+      'Experiment design',
+    ],
+  },
+  helm: {
+    tagline: "The ship's wheel",
+    summary:
+      'Director of Product — AI-first roadmap, prioritization, and competitive positioning.',
+    capabilities: [
+      'Product strategy',
+      'Roadmap',
+      'Competitive positioning',
+      'Launch',
+    ],
+  },
+  sable: {
+    tagline: 'Direct response',
+    summary:
+      'Director of Marketing — measurable response across digital, NFC, screens, and print.',
+    capabilities: [
+      'Direct response',
+      'Multi-channel campaigns',
+      'NFC and physical',
+      'Conversion',
+    ],
+  },
+  argus: {
+    tagline: 'The hundred-eyed overseer',
+    summary:
+      'Director of Administration — cloud, domains, vendors, and corporate filings.',
+    capabilities: [
+      'Cloud administration',
+      'Vendor management',
+      'Domain management',
+      'Corporate filings',
+    ],
+  },
+  atlas: {
+    tagline: 'Physical world',
+    summary:
+      'Director of Facilities — IoT, sensors, Matter protocol, and building systems.',
+    capabilities: ['IoT', 'Sensor networks', 'Matter protocol', 'Building systems'],
+  },
+  portia: {
+    tagline: "Shakespeare's advocate",
+    summary:
+      'Director of Legal — contracts, IP, regulatory, and the legal path to yes.',
+    capabilities: ['Contracts', 'Intellectual property', 'Regulatory', 'Data governance'],
+  },
+  haven: {
+    tagline: 'The safe harbor',
+    summary:
+      'Director of People — agent onboarding, capability growth, and culture.',
+    capabilities: [
+      'Onboarding',
+      'Capability growth',
+      'Culture',
+      'Knowledge retention',
+    ],
+  },
+  veda: {
+    tagline: 'Wisdom before walls',
+    summary:
+      'Director of Security — secrets, threat modeling, access control, and audit.',
+    capabilities: ['Secrets', 'Threat modeling', 'Access control', 'Incident response'],
+  },
+  rune: {
+    tagline: 'Hidden connections',
+    summary:
+      'Director of Intelligence — OSINT, relationship mapping, and pre-sales research.',
+    capabilities: ['OSINT', 'Relationship mapping', 'Pre-sales intel', 'Signal detection'],
+  },
+  grover: {
+    tagline: 'The patient gardener',
+    summary:
+      'Director of Ecosystem — partnerships, integrations, and developer community.',
+    capabilities: ['Partnerships', 'Integrations', 'Developer community', 'Platform strategy'],
+  },
+  flux: {
+    tagline: 'Connective tissue',
+    summary:
+      'Director of Operations — handoffs, workflow health, and anti-bureaucracy.',
+    capabilities: [
+      'Workflow orchestration',
+      'Handoffs',
+      'Process optimization',
+      'Operational metrics',
+    ],
+  },
+  continuous: {
+    tagline: 'Always-on engineering',
+    summary:
+      'Legacy continuous-engineering loop — capabilities now directed by Cadence.',
+    capabilities: ['Learn loop', 'Engineering briefs', 'Experiment sequencing'],
+  },
+  codegraph: {
+    tagline: "The codebase's nervous system",
+    summary:
+      'Semantic code intelligence — local knowledge graph and surgical context via MCP.',
+    capabilities: [
+      'Code knowledge graphs',
+      'Semantic analysis',
+      'MCP tools',
+      'Auto-sync',
+    ],
+  },
 }
 
 export function resolveAgentChipCopy(

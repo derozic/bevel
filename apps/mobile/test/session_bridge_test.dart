@@ -1,5 +1,7 @@
+import 'package:bevel_app/config.dart';
 import 'package:bevel_app/native/deep_links.dart';
 import 'package:bevel_app/native/session_bridge.dart';
+import 'package:bevel_app/ui/gesture_haptics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -39,6 +41,29 @@ void main() {
       expect(SessionBridge.isChatPath('/~general'), isTrue);
       expect(SessionBridge.isChatPath('/talk/hermes'), isTrue);
       expect(SessionBridge.isChatPath('/console'), isFalse);
+    });
+  });
+
+  group('gesture haptics', () {
+    test('heart is heavy, thumbs-down is medium, dock is a tick', () {
+      expect(hapticForGesture('heart'), BevelHaptic.heavy);
+      expect(hapticForGesture('down'), BevelHaptic.medium);
+      expect(hapticForGesture('vote_no'), BevelHaptic.medium);
+      expect(hapticForGesture('dock'), BevelHaptic.selection);
+      expect(hapticForGesture('up'), BevelHaptic.light);
+    });
+  });
+
+  group('system browser login', () {
+    test('uses a relative native-complete callback', () {
+      final uri = BevelConfig.systemBrowserLoginUri();
+      expect(uri.path, '/login');
+      expect(uri.queryParameters['native'], '1');
+      expect(uri.queryParameters['callbackUrl'], '/api/auth/native-complete');
+      expect(
+        uri.queryParameters['callbackUrl']!.startsWith('/'),
+        isTrue,
+      );
     });
   });
 

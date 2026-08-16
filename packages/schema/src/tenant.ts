@@ -65,6 +65,8 @@ export const TenantFeaturesSchema = z.object({
   sms: z.boolean().default(false),
   otpSms: z.boolean().default(false),
   presenceSms: z.boolean().default(false),
+  imessage: z.boolean().default(false),
+  imessageInbox: z.boolean().default(false),
   asyncStreams: z.boolean().default(true),
   liveSessions: z.boolean().default(true),
   analytics: z.boolean().default(true),
@@ -117,6 +119,10 @@ export const TenantThemeSchema = z.object({
    */
   logoUrlsByDaypart: DaypartLogoUrlsSchema.optional(),
   productName: z.string().optional(),
+  /** CMYK BrandKit id (numeric or slug) that owns this workspace look. */
+  cmykKitId: z.union([z.string(), z.number()]).optional(),
+  cmykHost: z.string().url().optional(),
+  brandIconUrl: logoPathSchema.optional(),
 })
 
 export const TenantRealtimeSchema = z.object({
@@ -192,6 +198,8 @@ export function withResolvedFeatures(tenant: Tenant): Tenant {
       sms: featureSet.sms,
       otpSms: featureSet.otpSms,
       presenceSms: featureSet.presenceSms,
+      imessage: featureSet.imessage,
+      imessageInbox: featureSet.imessageInbox,
       asyncStreams: featureSet.asyncStreams,
       liveSessions: featureSet.liveSessions,
       analytics: featureSet.analytics,

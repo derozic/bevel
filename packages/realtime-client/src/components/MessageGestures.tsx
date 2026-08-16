@@ -1,0 +1,370 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import {
+  CheckIcon,
+  HandThumbDownIcon,
+  HandThumbUpIcon,
+  HeartIcon,
+  StarIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline'
+import {
+  HandThumbDownIcon as HandThumbDownSolid,
+  HandThumbUpIcon as HandThumbUpSolid,
+  HeartIcon as HeartSolid,
+  StarIcon as StarSolid,
+} from '@heroicons/react/24/solid'
+import {
+  applyGesture,
+  gestureCounts,
+  stripVoteMarker,
+  userGestureKinds,
+  type GestureKind,
+} from '@bevel/schema'
+import type { ChatMsg } from '../lib/colyseus-messages'
+import { isPlayfulTouch, notifyNativeGesture } from '../lib/bubble-gestures'
+
+const SIGNALS: Array<{
+  kind: GestureKind
+  label: string
+  Outline: typeof HandThumbUpIcon
+  Solid: typeof HandThumbUpSolid
+}> = [
+  { kind: 'up', label: 'Thumbs up', Outline: HandThumbUpIcon, Solid: HandThumbUpSolid },
+  { kind: 'down', label: 'Thumbs down', Outline: HandThumbDownIcon, Solid: HandThumbDownSolid },
+  { kind: 'star', label: 'Star', Outline: StarIcon, Solid: StarSolid },
+  { kind: 'heart', label: 'Heart', Outline: HeartIcon, Solid: HeartSolid },
+]
+
+export function displayMessageBody(m: ChatMsg): string {
+  return stripVoteMarker(m.body)
+}
+
+const BURST_ICONS: Record<
+  GestureKind,
+  typeof HandThumbUpSolid
+> = {
+  up: HandThumbUpSolid,
+  down: HandThumbDownSolid,
+  star: StarSolid,
+  heart: HeartSolid,
+  vote_yes: CheckIcon,
+  vote_no: XMarkIcon,
+}
+
+/** Floating confirm that plays on the bubble after a signal. */
+export function GestureBurstMark({ kind }: { kind: GestureKind }) {
+  const Icon = BURST_ICONS[kind] ?? HeartSolid
+  return (
+    <span className="fleet-chat-burst" data-kind={kind} aria-hidden>
+      <span className="fleet-chat-burst-ring" />
+      <span className="fleet-chat-burst-ring fleet-chat-burst-ring--late" />
+      <Icon className="fleet-chat-burst-icon" />
+    </span>
+  )
+}
+
+function GestureButton({
+  kind,
+  label,
+  Outline,
+  Solid,
+  active,
+  count,
+  large,
+  onPick,
+}: {
+  kind: GestureKind
+  label: string
+  Outline: typeof HandThumbUpIcon
+  Solid: typeof HandThumbUpSolid
+  active: boolean
+  count: number
+  large?: boolean
+  onPick: (kind: GestureKind) => void
+}) {
+  const Icon = active ? Solid : Outline
+  const [pop, setPop] = useState(false)
+  return (
+    <button
+      type="button"
+      className={large ? 'fleet-chat-gesture fleet-chat-gesture--dock' : 'fleet-chat-gesture'}
+      data-kind={kind}
+      data-active={active ? 'true' : 'false'}
+      data-pop={pop ? 'true' : undefined}
+      aria-pressed={active}
+      aria-label={count ? `${label}, ${count}` : label}
+      onClick={() => {
+        setPop(true)
+        window.setTimeout(() => setPop(false), 420)
+        onPick(kind)
+      }}
+    >
+      <Icon className="fleet-chat-gesture-icon" />
+      {count > 0 ? <span className="fleet-chat-gesture-count">{count}</span> : null}
+    </button>
+  )
+}
+
+export function MessageGestures({
+  message,
+  selfId,
+  incoming,
+  dockOpen = false,
+  onToggle,
+  onCloseDock,
+}: {
+  message: ChatMsg
+  selfId: string
+  incoming: boolean
+  dockOpen?: boolean
+  onToggle: (kind: GestureKind) => void
+  onCloseDock?: () => void
+}) {
+  const gestures = message.reactions ?? []
+  const counts = gestureCounts(gestures)
+  const mine = userGestureKinds(gestures, selfId)
+  const votePrompt = message.votePrompt?.trim()
+  const [playful, setPlayful] = useState(false)
+  const [hint, setHint] = useState(false)
+
+  useEffect(() => {
+    const touch = isPlayfulTouch()
+    setPlayful(touch)
+    if (!touch || typeof window === 'undefined') return
+    try {
+      setHint(window.localStorage.getItem('bevel.gesture.hint') !== '1')
+    } catch {
+      setHint(true)
+    }
+  }, [])
+
+  const pick = (kind: GestureKind) => {
+    notifyNativeGesture(kind)
+    onToggle(kind)
+    if (hint) {
+      setHint(false)
+      try {
+        window.localStorage.setItem('bevel.gesture.hint', '1')
+      } catch {
+        /* ignore */
+      }
+    }
+    onCloseDock?.()
+  }
+
+  const showBar = incoming || Boolean(votePrompt) || gestures.length > 0
+  if (!showBar || message.status === 'pending' || message.status === 'streaming') {
+    return null
+  }
+
+  const showChips =
+    !playful ||
+    gestures.length > 0 ||
+    Boolean(votePrompt)
+
+  return (
+    <div
+      className="fleet-chat-gestures"
+      data-incoming={incoming ? 'true' : 'false'}
+      data-playful={playful ? 'true' : 'false'}
+      data-dock={dockOpen ? 'true' : 'false'}
+    >
+      {votePrompt ? (
+        <div className="fleet-chat-vote" role="group" aria-label="Vote">
+          <p className="fleet-chat-vote-prompt">{votePrompt}</p>
+          <div className="fleet-chat-vote-row">
+            <button
+              type="button"
+              className="fleet-chat-gesture fleet-chat-gesture--vote"
+              data-active={mine.has('vote_yes') ? 'true' : 'false'}
+              aria-pressed={mine.has('vote_yes')}
+              aria-label={`Yes${counts.vote_yes ? ` ${counts.vote_yes}` : ''}`}
+              onClick={() => pick('vote_yes')}
+            >
+              <CheckIcon className="fleet-chat-gesture-icon" />
+              <span>Yes</span>
+              {counts.vote_yes > 0 ? <span>{counts.vote_yes}</span> : null}
+            </button>
+            <button
+              type="button"
+              className="fleet-chat-gesture fleet-chat-gesture--vote"
+              data-active={mine.has('vote_no') ? 'true' : 'false'}
+              aria-pressed={mine.has('vote_no')}
+              aria-label={`No${counts.vote_no ? ` ${counts.vote_no}` : ''}`}
+              onClick={() => pick('vote_no')}
+            >
+              <XMarkIcon className="fleet-chat-gesture-icon" />
+              <span>No</span>
+              {counts.vote_no > 0 ? <span>{counts.vote_no}</span> : null}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {incoming && dockOpen && !playful ? (
+        <div className="fleet-chat-gesture-dock" role="dialog" aria-label="React">
+          {SIGNALS.map((s) => (
+            <GestureButton
+              key={s.kind}
+              {...s}
+              active={mine.has(s.kind)}
+              count={counts[s.kind]}
+              large
+              onPick={pick}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {incoming && showChips ? (
+        <div className="fleet-chat-gesture-row" role="group" aria-label="Message signals">
+          {SIGNALS.map((s) => {
+            const count = counts[s.kind]
+            if (playful && count === 0 && !mine.has(s.kind)) return null
+            return (
+              <GestureButton
+                key={s.kind}
+                {...s}
+                active={mine.has(s.kind)}
+                count={count}
+                onPick={pick}
+              />
+            )
+          })}
+        </div>
+      ) : null}
+
+      {incoming && playful && hint && gestures.length === 0 && !votePrompt ? (
+        <p className="fleet-chat-gesture-hint">
+          Tap to react · swipe for up or down · tap twice to heart
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+/** Fat bottom tray — sits above the composer in the thumb zone. */
+export function GestureThumbTray({
+  message,
+  selfId,
+  speaker,
+  burst,
+  onToggle,
+  onClose,
+}: {
+  message: ChatMsg
+  selfId: string
+  speaker: string
+  burst?: GestureKind | null
+  onToggle: (kind: GestureKind) => void
+  onClose: () => void
+}) {
+  const gestures = message.reactions ?? []
+  const counts = gestureCounts(gestures)
+  const mine = userGestureKinds(gestures, selfId)
+  const votePrompt = message.votePrompt?.trim()
+  const [popKind, setPopKind] = useState<GestureKind | null>(null)
+
+  const pick = (kind: GestureKind) => {
+    notifyNativeGesture(kind)
+    setPopKind(kind)
+    window.setTimeout(() => setPopKind((cur) => (cur === kind ? null : cur)), 480)
+    onToggle(kind)
+    try {
+      window.localStorage.setItem('bevel.gesture.hint', '1')
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="fleet-chat-thumb-tray" role="dialog" aria-label="React to message">
+      <div className="fleet-chat-thumb-tray-head">
+        <p className="fleet-chat-thumb-tray-title">
+          React to {speaker}
+        </p>
+        <button
+          type="button"
+          className="fleet-chat-thumb-tray-close"
+          aria-label="Close reactions"
+          onClick={onClose}
+        >
+          <XMarkIcon className="fleet-chat-gesture-icon" />
+        </button>
+      </div>
+      {votePrompt ? (
+        <div className="fleet-chat-thumb-vote" role="group" aria-label="Vote">
+          <p className="fleet-chat-vote-prompt">{votePrompt}</p>
+          <div className="fleet-chat-thumb-vote-row">
+            <button
+              type="button"
+              className="fleet-chat-thumb-btn fleet-chat-thumb-btn--vote"
+              data-active={mine.has('vote_yes') ? 'true' : 'false'}
+              data-pop={popKind === 'vote_yes' ? 'true' : undefined}
+              onClick={() => pick('vote_yes')}
+            >
+              <CheckIcon className="fleet-chat-thumb-icon" />
+              <span>Yes{counts.vote_yes ? ` ${counts.vote_yes}` : ''}</span>
+            </button>
+            <button
+              type="button"
+              className="fleet-chat-thumb-btn fleet-chat-thumb-btn--vote"
+              data-active={mine.has('vote_no') ? 'true' : 'false'}
+              data-pop={popKind === 'vote_no' ? 'true' : undefined}
+              onClick={() => pick('vote_no')}
+            >
+              <XMarkIcon className="fleet-chat-thumb-icon" />
+              <span>No{counts.vote_no ? ` ${counts.vote_no}` : ''}</span>
+            </button>
+          </div>
+        </div>
+      ) : null}
+      <div className="fleet-chat-thumb-grid">
+        {SIGNALS.map(({ kind, label, Outline, Solid }, i) => {
+          const active = mine.has(kind)
+          const Icon = active ? Solid : Outline
+          const count = counts[kind]
+          return (
+            <button
+              key={kind}
+              type="button"
+              className="fleet-chat-thumb-btn"
+              data-kind={kind}
+              data-active={active ? 'true' : 'false'}
+              data-pop={popKind === kind || burst === kind ? 'true' : undefined}
+              style={{ animationDelay: `${i * 35}ms` }}
+              aria-pressed={active}
+              aria-label={count ? `${label}, ${count}` : label}
+              onClick={() => pick(kind)}
+            >
+              <Icon className="fleet-chat-thumb-icon" />
+              <span className="fleet-chat-thumb-label">{label}</span>
+              {count > 0 ? (
+                <span className="fleet-chat-thumb-count">{count}</span>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Optimistic local apply used by FleetChat before the room echoes. */
+export function optimisticGesture(
+  message: ChatMsg,
+  kind: GestureKind,
+  userId: string,
+  userName: string,
+): ChatMsg {
+  return {
+    ...message,
+    reactions: applyGesture(message.reactions ?? [], {
+      kind,
+      userId,
+      userName,
+    }),
+  }
+}

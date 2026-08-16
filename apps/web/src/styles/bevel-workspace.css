@@ -6,7 +6,7 @@
 :root {
   /* Full-width platform strip removed — brand lives in rail only */
   --platform-nav-height: 0rem;
-  --bevel-rail-width: clamp(13rem, 18vw, 20rem);
+  --bevel-rail-width: clamp(14.5rem, 22vw, 22rem);
 }
 
 /* Flutter / native WebView shell (data-bevel-native set by SessionBridge inject) */
@@ -130,7 +130,8 @@ html[data-bevel-density='compact'] .bevel-workspace {
 
 html[data-bevel-density='compact'] .bevel-rail-channel,
 html[data-bevel-density='compact'] .bevel-rail-conversation {
-  height: 2.65rem;
+  min-height: 2.65rem;
+  height: auto;
   padding-top: 0.28rem;
   padding-bottom: 0.28rem;
   font-size: 0.8125rem;
@@ -303,15 +304,17 @@ html[data-bevel-simplified='true'] .bevel-workspace {
   position: relative;
   display: block;
   min-width: 0;
-  height: 3.125rem;
+  min-height: 2.75rem;
+  height: auto;
   box-sizing: border-box;
   border-radius: 0.5rem;
   border: 1px solid transparent;
-  padding: 0.35rem 0.625rem 0.35rem 0.75rem;
+  padding: 0.4rem 0.625rem 0.4rem 0.75rem;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--sticker-muted);
   text-decoration: none;
+  overflow: hidden;
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease,
@@ -336,6 +339,43 @@ html[data-bevel-simplified='true'] .bevel-workspace {
   font-weight: 500;
   line-height: 1.35;
   color: var(--sticker-subtle);
+}
+
+.bevel-rail-channel-tags {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.2rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.bevel-rail-channel-tag {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 6.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 5%, var(--surface));
+  padding: 0.08rem 0.4rem;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sticker-muted);
+  line-height: 1.35;
+}
+
+.bevel-rail-channel-tag--more {
+  flex: 0 0 auto;
+  max-width: none;
+  background: transparent;
+  padding-left: 0.15rem;
+  padding-right: 0.15rem;
+  letter-spacing: 0.02em;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -489,6 +529,101 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   border: 1px solid color-mix(in srgb, #ef4444 35%, transparent);
   background: color-mix(in srgb, #ef4444 10%, var(--surface));
   color: var(--ink);
+}
+
+.bevel-brand-square-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.35rem, 1fr));
+  gap: 0.4rem;
+  padding: 0.15rem 0.15rem 0.35rem;
+}
+
+.bevel-brand-square-grid--wide {
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+}
+
+.bevel-brand-square {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.28rem;
+  padding: 0.15rem;
+  border-radius: 0.7rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.bevel-brand-square-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--tile-process, var(--bevel-accent)) 28%, transparent);
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--tile-process, var(--bevel-accent)) 22%, var(--surface)) 0%,
+      var(--surface) 62%
+    );
+  box-shadow: inset 0 -0.35rem 0 0 color-mix(in srgb, var(--tile-process, var(--bevel-accent)) 55%, transparent);
+}
+
+.bevel-brand-square-logo {
+  width: 58%;
+  height: 58%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--ink) 12%, transparent));
+}
+
+.bevel-brand-square-fallback {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--tile-process, var(--bevel-accent));
+}
+
+.bevel-brand-square-label,
+.bevel-brand-square-caption {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.bevel-brand-square-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.bevel-brand-square-caption {
+  margin-top: -0.1rem;
+  font-size: 0.5625rem;
+  font-weight: 500;
+  color: var(--sticker-muted);
+}
+
+.bevel-brand-square:hover .bevel-brand-square-face {
+  border-color: color-mix(in srgb, var(--tile-process, var(--bevel-accent)) 55%, transparent);
+}
+
+.bevel-brand-square[data-active='true'] .bevel-brand-square-face {
+  border-color: var(--bevel-accent);
+  box-shadow:
+    inset 0 -0.35rem 0 0 var(--bevel-accent),
+    0 0 0 2px color-mix(in srgb, var(--bevel-accent) 28%, transparent);
+}
+
+.bevel-brand-square[data-escalated='true'] .bevel-brand-square-face {
+  border-color: color-mix(in srgb, #d97706 55%, transparent);
+  box-shadow: inset 0 -0.35rem 0 0 #d97706;
 }
 
 .bevel-rail-section {
@@ -931,4 +1066,99 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
 
 .bevel-roster-start:not(:disabled):hover {
   filter: brightness(1.05);
+}
+
+.bevel-brand-square-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.35rem, 1fr));
+  gap: 0.4rem;
+  padding: 0.15rem 0.15rem 0.35rem;
+}
+
+.bevel-brand-square-grid--wide {
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+}
+
+.bevel-brand-square {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.28rem;
+  padding: 0.15rem;
+  border-radius: 0.7rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.bevel-brand-square-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--tile-process, var(--bevel-accent)) 28%, transparent);
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--tile-process, var(--bevel-accent)) 22%, var(--surface)) 0%,
+      var(--surface) 62%
+    );
+  box-shadow: inset 0 -0.35rem 0 0 color-mix(in srgb, var(--tile-process, var(--bevel-accent)) 55%, transparent);
+}
+
+.bevel-brand-square-logo {
+  width: 58%;
+  height: 58%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--ink) 12%, transparent));
+}
+
+.bevel-brand-square-fallback {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--tile-process, var(--bevel-accent));
+}
+
+.bevel-brand-square-label,
+.bevel-brand-square-caption {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.bevel-brand-square-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.bevel-brand-square-caption {
+  margin-top: -0.1rem;
+  font-size: 0.5625rem;
+  font-weight: 500;
+  color: var(--sticker-muted);
+}
+
+.bevel-brand-square:hover .bevel-brand-square-face {
+  border-color: color-mix(in srgb, var(--tile-process, var(--bevel-accent)) 55%, transparent);
+}
+
+.bevel-brand-square[data-active='true'] .bevel-brand-square-face {
+  border-color: var(--bevel-accent);
+  box-shadow:
+    inset 0 -0.35rem 0 0 var(--bevel-accent),
+    0 0 0 2px color-mix(in srgb, var(--bevel-accent) 28%, transparent);
+}
+
+.bevel-brand-square[data-escalated='true'] .bevel-brand-square-face {
+  border-color: color-mix(in srgb, #d97706 55%, transparent);
+  box-shadow: inset 0 -0.35rem 0 0 #d97706;
 }

@@ -73,16 +73,20 @@ class GoogleNativeAuth {
         defaultTargetPlatform == TargetPlatform.macOS;
 
     // iOS: require a real iOS client — WEB client causes Error 400 custom scheme.
+    // macOS: native Google Sign-In is optional; Workspace login uses the
+    // system browser (same Auth.js flow as the web app).
     String? clientId;
     if (isApple) {
       final ios = iosClientId.trim();
       if (ios.isEmpty) {
         throw StateError(
-          'Missing GOOGLE_IOS_CLIENT_ID. Create an OAuth client of type iOS '
-          '(bundle id com.derozic.bevel.bevelApp) in Google Cloud project '
-          'x4m-493516 / 2x4m, then rebuild with '
-          '--dart-define=GOOGLE_IOS_CLIENT_ID=….apps.googleusercontent.com '
-          'and set the matching REVERSED_CLIENT_ID URL scheme in Info.plist.',
+          defaultTargetPlatform == TargetPlatform.macOS
+              ? 'macos-browser-oauth'
+              : 'Missing GOOGLE_IOS_CLIENT_ID. Create an OAuth client of type iOS '
+                  '(bundle id com.derozic.bevel.bevelApp) in Google Cloud project '
+                  'x4m-493516 / 2x4m, then rebuild with '
+                  '--dart-define=GOOGLE_IOS_CLIENT_ID=….apps.googleusercontent.com '
+                  'and set the matching REVERSED_CLIENT_ID URL scheme in Info.plist.',
         );
       }
       clientId = ios;

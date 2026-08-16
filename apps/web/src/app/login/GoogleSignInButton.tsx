@@ -77,11 +77,11 @@ function OAuthSignInButton({
 
   // Full-width pill CTA (platform + workspace login)
   const baseClass =
-    'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60'
+    'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60'
   const variantClass =
     variant === 'primary'
-      ? 'border-2 border-gray-900 bg-gray-900 text-white hover:bg-white hover:text-gray-900'
-      : 'border-2 border-gray-300 bg-white text-gray-900 hover:border-gray-900'
+      ? 'border-2 border-cta bg-cta text-cta-fg hover:opacity-90'
+      : 'border-2 border-border bg-surface text-foreground hover:border-foreground'
 
   // Preferred: plain form POST (full navigation → Google). Refresh CSRF on submit
   // so a long-open tab cannot post a stale token after a cookie rotate.

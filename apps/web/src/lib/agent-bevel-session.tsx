@@ -9,6 +9,7 @@ import {
 } from '@/lib/bevel'
 import { parseChatAgentsParam } from '@/lib/chat-agents'
 import { sessionActorId } from '@/lib/session-user'
+import { NATIVE_COMPLETE_PATH, isNativeLoginPending } from '@/lib/auth-native'
 
 /**
  * Direct agent session body — rendered inside /bevel layout (BevelShell).
@@ -42,6 +43,9 @@ export async function AgentBevelSessionView({
   const sessionTitle = bevelConversationTitle(agentNames)
 
   const actorId = sessionActorId(session)
+  if (await isNativeLoginPending()) {
+    redirect(NATIVE_COMPLETE_PATH)
+  }
   // Email-only sessions must not redirect to /login — login sees email and
   // sends them right back here (full-page flicker).
   if (!actorId) {

@@ -9,6 +9,14 @@ import {
   type FleetChannelMessageRecord,
 } from '../fleet-channel-api.js'
 import { enqueuePersist, flushPersistQueue } from '../persist-queue.js'
+import {
+  applyGesture,
+  formatGestureFeedback,
+  isGestureKind,
+  parseGestures,
+  parseVotePrompt,
+  type GestureKind,
+} from '../gestures.js'
 import { logAgentWorkToProduct } from '../product-log.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { recordEvent } from '../recording.js'
@@ -69,6 +77,11 @@ type LoadHistoryPayload = {
   limit?: number
 }
 
+type GesturePayload = {
+  messageId?: string
+  kind?: string
+}
+
 /** Initial room hydrate size (Colyseus shared state). Older history is paged per-client. */
 const ROOM_HISTORY_LIMIT = 100
 const PAGE_HISTORY_LIMIT = 50
@@ -98,6 +111,8 @@ function recordToChatMessage(row: FleetChannelMessageRecord, channelSlug: string
   msg.body = row.body
   msg.status = row.status
   msg.ts = new Date(row.createdAt).getTime() || Date.now()
+  msg.reactionsJson = JSON.stringify(row.reactions ?? [])
+  msg.votePrompt = parseVotePrompt(row.body, row.votePrompt)
   return msg
 }
 
@@ -188,6 +203,10 @@ export class FleetChannel extends Room {
 
     this.onMessage('load_history', (client, payload: LoadHistoryPayload) => {
       void this.handleLoadHistory(client, payload)
+    })
+
+    this.onMessage('gesture', (client, payload: GesturePayload) => {
+      void this.handleGesture(client, payload)
     })
   }
 
@@ -294,6 +313,8 @@ export class FleetChannel extends Room {
       status: string
       tags?: string[]
       createdAt?: string
+      reactions?: ReturnType<typeof parseGestures>
+      votePrompt?: string
     },
   ): Promise<boolean> {
     return enqueuePersist(msg.id, () =>
@@ -308,8 +329,83 @@ export class FleetChannel extends Room {
         status: msg.status,
         tags: msg.tags,
         createdAt: msg.createdAt,
+        reactions: msg.reactions,
+        votePrompt: msg.votePrompt,
       }),
     )
+  }
+
+  private findMessage(id: string): ChatMessage | undefined {
+    for (let i = 0; i < this.state.messages.length; i++) {
+      const row = this.state.messages[i]
+      if (row?.id === id) return row
+    }
+    return undefined
+  }
+
+  private async handleGesture(client: Client, payload: GesturePayload) {
+    const kindRaw = String(payload.kind ?? '').trim().toLowerCase()
+    const messageId = String(payload.messageId ?? '').trim()
+    if (!messageId || !isGestureKind(kindRaw)) return
+    const kind = kindRaw as GestureKind
+    const profile = this.speakerProfiles.get(client.sessionId)
+    if (!profile) return
+    const msg = this.findMessage(messageId)
+    if (!msg || msg.status === 'pending' || msg.status === 'streaming') return
+    if (msg.speakerType === 'system') return
+
+    const next = applyGesture(parseGestures(msg.reactionsJson), {
+      kind,
+      userId: profile.userId,
+      userName: profile.name,
+    })
+    msg.reactionsJson = JSON.stringify(next)
+
+    recordEvent({
+      ts: Date.now(),
+      sessionId: this.channelSlug,
+      type: 'gesture',
+      speaker: profile.name,
+      speakerType: 'human',
+      body: `${kind} on ${messageId}`,
+      meta: { messageId, kind, agentId: msg.agentId },
+    })
+
+    void this.persistMessage({
+      id: msg.id,
+      speakerId: msg.speakerId || msg.agentId || 'unknown',
+      speakerName: msg.speaker,
+      speakerAvatar: msg.speakerAvatar,
+      speakerType: msg.speakerType,
+      agentId: msg.agentId,
+      body: msg.body,
+      status: msg.status || 'final',
+      reactions: next,
+      votePrompt: msg.votePrompt || undefined,
+    })
+
+    // Thumbs-down on an agent turn is an immediate course-correct signal.
+    if (kind === 'down' && msg.speakerType === 'agent' && msg.agentId) {
+      void this.dispatchGestureFeedback(msg, profile.name)
+    }
+  }
+
+  private async dispatchGestureFeedback(msg: ChatMessage, operatorName: string) {
+    const agentId = msg.agentId
+    if (!agentId) return
+    const agentName =
+      this.state.agents.find((a) => a.id === agentId)?.name || agentId
+    try {
+      const res = await dispatchAgentChat(
+        agentId,
+        `${operatorName} marked your last reply with thumbs down. Briefly acknowledge and offer a better take.\n\nOriginal:\n${msg.body.slice(0, 1200)}`,
+        this.chatHistory(),
+        { channelSlug: this.channelSlug },
+      )
+      await this.pushAgentReply(agentId, agentName, res.output || 'Understood — retrying.')
+    } catch (err) {
+      console.error('[fleet_channel] gesture feedback dispatch failed', err)
+    }
   }
 
   private async handleLoadHistory(client: Client, payload: LoadHistoryPayload) {
@@ -344,6 +440,8 @@ export class FleetChannel extends Room {
         body: m.body,
         status: m.status,
         ts: new Date(m.createdAt).getTime() || Date.now(),
+        reactions: m.reactions ?? [],
+        votePrompt: parseVotePrompt(m.body, m.votePrompt),
       })),
       hasMore: page.hasMore,
       nextBefore: page.nextBefore,
@@ -433,10 +531,16 @@ export class FleetChannel extends Room {
     return this.state.messages
       .filter((m) => m.status === 'final' && m.speakerType !== 'system')
       .slice(-24)
-      .map((m) => ({
-        role: m.speakerType === 'human' ? 'user' : 'assistant',
-        content: `${m.speaker}: ${m.body}`,
-      }))
+      .map((m) => {
+        const signals = formatGestureFeedback(parseGestures(m.reactionsJson))
+        const content = signals
+          ? `${m.speaker}: ${m.body}\n[${signals}]`
+          : `${m.speaker}: ${m.body}`
+        return {
+          role: m.speakerType === 'human' ? 'user' : 'assistant',
+          content,
+        }
+      })
   }
 
   private async pushAgentReply(
@@ -476,6 +580,9 @@ export class FleetChannel extends Room {
     reply.body = output
     reply.status = opts.status ?? 'final'
     reply.ts = Date.now()
+    if (reply.status === 'final') {
+      reply.votePrompt = parseVotePrompt(output, reply.votePrompt)
+    }
 
     recordEvent({
       ts: reply.ts,
@@ -506,6 +613,7 @@ export class FleetChannel extends Room {
       status: reply.status,
       tags: opts.work ? ['work', 'github'] : undefined,
       createdAt: new Date(reply.ts).toISOString(),
+      votePrompt: reply.votePrompt || undefined,
     })
 
     // Accountability: every work-mode agent move lands in ^product with repo context

@@ -7,11 +7,11 @@ Native client for **iOS**, **Android**, and **macOS Apple Silicon**.
 ```bash
 cd apps/mobile
 flutter pub get
-# Live production (default)
+# Live production (default) — Google Workspace login works here
 flutter run -d macos
 # or: pnpm mobile:run:macos
 
-# Local Caddy only when you need it
+# Local Caddy only when you need it (Google may be unconfigured)
 pnpm mobile:run:macos:local
 # Device: flutter run -d <ios|android device id>
 ```
@@ -60,13 +60,15 @@ See [docs/NATIVE_RELEASE.md](../../docs/NATIVE_RELEASE.md).
 
 ## Configuration
 
-| Define | Local default | Production (`BEVEL_ENV=production`) |
-|--------|---------------|-------------------------------------|
-| `BEVEL_BASE_URL` | `https://bevel.is` | platform entry / login |
-| `BEVEL_WORKSPACE_URL` | `https://bevel.2x4m.cc` | chat shell |
-| `BEVEL_API_URL` | `https://api.bevel.is` | control plane (always live by default) |
+| Define | Local (`BEVEL_ENV=local`) | Production (default) |
+|--------|---------------------------|----------------------|
+| `BEVEL_BASE_URL` | `https://bevel.2x4m.lvh.me` | `https://bevel.is` |
+| `BEVEL_WORKSPACE_URL` | `https://bevel.2x4m.lvh.me` | `https://bevel.2x4m.cc` |
+| `BEVEL_API_URL` | `https://api.bevel.lvh.me` | `https://api.bevel.is` |
 
 Override to local Caddy with `BEVEL_ENV=local` or `pnpm mobile:run:macos:local`.
+System-browser Google always uses a relative `/api/auth/native-complete`
+callback so the desktop app comes back via `bevel://auth/complete`.
 
 First login uses system browser Google OAuth → `/api/auth/native-complete` mints a
 one-time handoff code → `bevel://auth/complete?code=…` → the in-app WebView redeems

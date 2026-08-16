@@ -21,6 +21,20 @@ describe('room messages', () => {
     expect(msg.speaker).toBe('')
     expect(typeof msg.ts).toBe('number')
     expect(Number.isFinite(msg.ts)).toBe(true)
+    expect(msg.reactions).toEqual([])
+  })
+
+  it('reads gestures and vote prompts from schema rows', () => {
+    const msg = toChatMsg({
+      id: 'm2',
+      body: '[vote: Ship it?] Ready when you are.',
+      speakerType: 'agent',
+      reactionsJson: JSON.stringify([
+        { kind: 'up', userId: 'u1', userName: 'Scott', ts: 1 },
+      ]),
+    } as SchemaMessage)
+    expect(msg.votePrompt).toBe('Ship it?')
+    expect(msg.reactions?.[0]?.kind).toBe('up')
   })
 
   it('reads array-like room state without crashing on holes', () => {

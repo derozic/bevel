@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/theme.dart';
 import '../onboarding/onboarding_state.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
@@ -36,20 +37,21 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.bevel;
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E12),
+      backgroundColor: p.cream,
       appBar: AppBar(
-        title: const Text('Notifications'),
-        backgroundColor: const Color(0xFF0F1419),
+        title: const BevelBrandTitle(subtitle: 'Notifications'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const Text(
-            'Escalations (^handle) are louder than soft @mentions: push, '
-            'login popup, and optional email.',
-            style: TextStyle(color: Color(0xFF94A3B8), height: 1.4),
-          ),
+      body: BevelAtmosphere(
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Text(
+              'Escalations (^handle) are louder than soft @mentions: push, '
+              'login popup, and optional email.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           const SizedBox(height: 20),
           if (!_state.notificationPermissionGranted) ...[
             FilledButton.icon(
@@ -87,7 +89,10 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             value: _state.emailEscalations,
             onChanged: (v) => _patch(_state.copyWith(emailEscalations: v)),
           ),
+          const SizedBox(height: 28),
+          const BevelDaypartControl(),
         ],
+      ),
       ),
     );
   }

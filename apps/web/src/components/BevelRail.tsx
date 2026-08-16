@@ -27,6 +27,7 @@ import {
   bevelConversationPath,
   bevelTalkPath,
   channelTag,
+  isRedundantChannelName,
   sortChannelsByEscalation,
 } from '@/lib/bevel'
 import { FeatureFlagsBar } from '@/components/FeatureFlagsBar'
@@ -51,6 +52,7 @@ import { ConversationRoster } from './ConversationRoster'
 import { ConversationSearch } from './ConversationSearch'
 import { CreateChannelModal } from './CreateChannelModal'
 import { DaypartControl } from './DaypartControl'
+import { BrandSquare, BrandSquareGrid } from './BrandSquare'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 
 function BevelRailFooter({
@@ -155,6 +157,15 @@ export function BevelRail({
     return new Set(list.map((s) => s.trim().toLowerCase()).filter(Boolean))
   }, [prefs?.prefs.home.escalatedChannels])
   const [propertiesSlug, setPropertiesSlug] = useState<string | null>(null)
+  const [brandMarkUrl, setBrandMarkUrl] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    const root = document.documentElement
+    const read = () =>
+      root.getAttribute('data-tenant-logo') ||
+      getComputedStyle(root).getPropertyValue('--brand-icon-url').trim() ||
+      undefined
+    setBrandMarkUrl(read() || undefined)
+  }, [])
   // SSR-safe initial state only — localStorage is applied in useEffect (React #418).
   const [channels, setChannels] = useState<FleetChannelSummary[]>(() => {
     if (privateAgentsOnly) return []
@@ -303,6 +314,8 @@ export function BevelRail({
     [channels, prefs?.prefs.home.escalatedChannels],
   )
   const visibleConversations = conversations.slice(0, 24)
+  const propertiesChannel =
+    visible.find((ch) => ch.slug === propertiesSlug) ?? null
 
   const toggleEscalated = useCallback(
     (slug: string) => {
@@ -413,119 +426,103 @@ export function BevelRail({
           </Link>
         </nav>
         <nav aria-label={BEVEL_COPY.channelsLabel}>
-          {privateAgentsOnly
-            ? null
-            : visible.map((ch) => {
-            const escalated = escalatedSet.has(ch.slug.toLowerCase())
-            const propsOpen = propertiesSlug === ch.slug
-            return (
-              <div key={ch.slug} className="bevel-rail-channel-wrap">
-                <Link
-                  href={bevelChannelPath(ch.slug)}
-                  onClick={(e) => onChannelClick(e, ch.slug)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setPropertiesSlug((s) => (s === ch.slug ? null : ch.slug))
-                  }}
-                  data-active={activeSlug === ch.slug ? 'true' : 'false'}
-                  data-escalated={escalated ? 'true' : 'false'}
-                  className="bevel-rail-channel"
-                  aria-busy={loading ? true : undefined}
-                  title={
-                    escalated
-                      ? `${channelTag(ch.slug, { escalated: true })} — high priority. Ctrl/Cmd+click to remove.`
-                      : `${channelTag(ch.slug)} — Ctrl/Cmd+click to escalate (^)`
-                  }
-                >
-                  <span className="bevel-rail-channel-slug">
-                    {channelTag(ch.slug, { escalated })}
-                  </span>
-                  <span className="bevel-rail-channel-name">
-                    {ch.name || '\u00a0'}
-                  </span>
-                  {ch.tags?.length ? (
-                    <span className="mt-0.5 flex flex-wrap gap-1">
-                      {ch.tags.slice(0, 3).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-black/5 px-1.5 text-[9px] font-medium uppercase tracking-wide text-muted"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </span>
-                  ) : null}
-                </Link>
-                <button
-                  type="button"
-                  className="bevel-rail-channel-props"
-                  aria-label={`Channel properties for ${ch.slug}`}
-                  aria-expanded={propsOpen}
-                  title="Channel properties"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setPropertiesSlug((s) => (s === ch.slug ? null : ch.slug))
-                  }}
-                >
-                  <Cog6ToothIcon className="h-3 w-3" />
-                </button>
-                {propsOpen ? (
-                  <div
-                    className="bevel-rail-channel-panel"
-                    role="dialog"
-                    aria-label={`${ch.name || ch.slug} properties`}
-                  >
-                    <p className="bevel-rail-channel-panel-title">
-                      {channelTag(ch.slug, { escalated })} · properties
-                    </p>
-                    <p className="bevel-rail-channel-panel-hint">
-                      Tracks show as ~slug. Escalated tracks pin to the top as
-                      ^slug. Tags are folksonomy — anyone can add one.
-                    </p>
-                    <div className="mt-2 px-1">
-                      <FolksonomyChips
-                        kind="track"
-                        id={ch.slug}
-                        initialTags={ch.tags}
-                      />
-                    </div>
-                    <p className="bevel-rail-channel-panel-hint mt-2">
-                      Workflows land here via webhooks.{' '}
-                      <a href="/console/workflows#webhooks" className="underline">
-                        Mint an inbound URL
-                      </a>{' '}
-                      for ~{ch.slug}.
-                    </p>
-                    <button
-                      type="button"
-                      className="bevel-rail-channel-panel-action"
-                      data-escalated={escalated ? 'true' : 'false'}
-                      onClick={() => {
-                        toggleEscalated(ch.slug)
+          {privateAgentsOnly ? null : (
+            <>
+              <BrandSquareGrid label={BEVEL_COPY.channelsLabel}>
+                {visible.map((ch) => {
+                  const escalated = escalatedSet.has(ch.slug.toLowerCase())
+                  const distinctName = !isRedundantChannelName(ch.slug, ch.name)
+                  return (
+                    <BrandSquare
+                      key={ch.slug}
+                      href={bevelChannelPath(ch.slug)}
+                      label={channelTag(ch.slug, { escalated })}
+                      caption={distinctName ? ch.name : undefined}
+                      logoUrl={brandMarkUrl}
+                      processKey={ch.slug}
+                      active={activeSlug === ch.slug}
+                      escalated={escalated}
+                      busy={loading}
+                      onClick={(e) => onChannelClick(e, ch.slug)}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        setPropertiesSlug((s) =>
+                          s === ch.slug ? null : ch.slug,
+                        )
                       }}
-                    >
-                      <ExclamationTriangleIcon className="h-3.5 w-3.5" />
-                      {escalated
-                        ? 'Remove high priority'
-                        : 'Escalate channel (^)'}
-                    </button>
-                    <p className="bevel-rail-channel-panel-meta">
-                      Tip: Ctrl/Cmd+click the channel, or right-click for this
-                      panel.
-                    </p>
-                    <button
-                      type="button"
-                      className="bevel-rail-channel-panel-close"
-                      onClick={() => setPropertiesSlug(null)}
-                    >
-                      Close
-                    </button>
+                      title={
+                        escalated
+                          ? `${channelTag(ch.slug, { escalated: true })} — high priority. Ctrl/Cmd+click to remove.`
+                          : `${channelTag(ch.slug)} — Ctrl/Cmd+click to escalate (^)`
+                      }
+                    />
+                  )
+                })}
+              </BrandSquareGrid>
+              {propertiesChannel ? (
+                <div
+                  className="bevel-rail-channel-panel"
+                  role="dialog"
+                  aria-label={`${propertiesChannel.name || propertiesChannel.slug} properties`}
+                >
+                  <p className="bevel-rail-channel-panel-title">
+                    {channelTag(propertiesChannel.slug, {
+                      escalated: escalatedSet.has(
+                        propertiesChannel.slug.toLowerCase(),
+                      ),
+                    })}{' '}
+                    · properties
+                  </p>
+                  <p className="bevel-rail-channel-panel-hint">
+                    Tracks show as ~slug. Escalated tracks pin to the top as
+                    ^slug. Tags are folksonomy — anyone can add one.
+                  </p>
+                  <div className="mt-2 px-1">
+                    <FolksonomyChips
+                      kind="track"
+                      id={propertiesChannel.slug}
+                      initialTags={propertiesChannel.tags}
+                    />
                   </div>
-                ) : null}
-              </div>
-            )
-          })}
+                  <p className="bevel-rail-channel-panel-hint mt-2">
+                    Workflows land here via webhooks.{' '}
+                    <a href="/console/workflows#webhooks" className="underline">
+                      Mint an inbound URL
+                    </a>{' '}
+                    for ~{propertiesChannel.slug}.
+                  </p>
+                  <button
+                    type="button"
+                    className="bevel-rail-channel-panel-action"
+                    data-escalated={
+                      escalatedSet.has(propertiesChannel.slug.toLowerCase())
+                        ? 'true'
+                        : 'false'
+                    }
+                    onClick={() => {
+                      toggleEscalated(propertiesChannel.slug)
+                    }}
+                  >
+                    <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                    {escalatedSet.has(propertiesChannel.slug.toLowerCase())
+                      ? 'Remove high priority'
+                      : 'Escalate channel (^)'}
+                  </button>
+                  <p className="bevel-rail-channel-panel-meta">
+                    Tip: Ctrl/Cmd+click the channel, or right-click for this
+                    panel.
+                  </p>
+                  <button
+                    type="button"
+                    className="bevel-rail-channel-panel-close"
+                    onClick={() => setPropertiesSlug(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )}
         </nav>
 
         <div className="bevel-rail-section">

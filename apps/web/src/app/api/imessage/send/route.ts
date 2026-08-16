@@ -9,7 +9,7 @@ import {
  * POST /api/imessage/send
  * { "to": "+15551234567", "body": "You have a new BEVEL workspace" }
  *
- * Platform/dev helper to exercise local BlueBubbles.
+ * Send via the optional BEVEL Mac iMessage host (BlueBubbles API subset).
  *
  * Auth (production-hardened):
  * - Production: requires x-fleet-internal-key matching FLEET_INTERNAL_API_KEY
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
       error: result.error,
       // Do not echo full BlueBubbles raw payloads (may include PII)
       configured: isBlueBubblesConfigured(cfg),
-      guide: 'docs/BLUEBUBBLES_IMESSAGE.md',
+      guide: 'docs/IMESSAGE.md',
     },
     { status: result.ok ? 200 : result.status || 502 },
   )
@@ -104,9 +104,9 @@ export async function GET(req: Request) {
       ? cfg.url.replace(/\/\/([^/@]+)@/, '//***@')
       : null,
     hint: isBlueBubblesConfigured(cfg)
-      ? 'POST /api/imessage/send with { to, body }'
-      : 'Set BLUEBUBBLES_URL + BLUEBUBBLES_PASSWORD; install BlueBubbles on this Mac',
+      ? 'POST /api/imessage/send with { to, body } — BEVEL Mac host or leftover BlueBubbles'
+      : 'Enable iMessage in the BEVEL Silicon app, or set BEVEL_IMESSAGE_PASSWORD',
     hermesPrompt: cfg.url || 'http://127.0.0.1:1234',
-    docs: 'docs/BLUEBUBBLES_IMESSAGE.md',
+    docs: 'docs/IMESSAGE.md',
   })
 }

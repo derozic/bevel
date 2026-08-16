@@ -29,6 +29,7 @@
     "test:provision": "pnpm exec tsx packages/tenant-config/src/provision.test.ts",
     "test:mentions": "pnpm exec tsx packages/realtime-client/src/lib/mentions.test.ts",
     "test:api": "cd services/api && uv run pytest -q",
+    "sync:agents": "node scripts/sync-agents.mjs",
     "mobile:get": "cd apps/mobile && flutter pub get",
     "mobile:test": "cd apps/mobile && flutter test",
     "mobile:run:macos": "cd apps/mobile && flutter run -d macos --dart-define=BEVEL_BASE_URL=https://bevel.is --dart-define=BEVEL_API_URL=https://api.bevel.is --dart-define=BEVEL_WORKSPACE_URL=https://bevel.2x4m.cc",

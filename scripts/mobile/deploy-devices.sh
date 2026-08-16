@@ -16,11 +16,30 @@ MOBILE="$ROOT/apps/mobile"
 cd "$MOBILE"
 
 TARGET="${1:-both}"
+# Load native Google iOS client if applied (apps/mobile/.env.google)
+ENV_GOOGLE="$MOBILE/.env.google"
+if [[ -f "$ENV_GOOGLE" ]]; then
+  # shellcheck disable=SC1090
+  set -a
+  # Only KEY=VALUE lines
+  # shellcheck disable=SC1091
+  source <(grep -E '^[A-Z0-9_]+=' "$ENV_GOOGLE" || true)
+  set +a
+  echo "==> loaded $ENV_GOOGLE"
+fi
 DEFINES=(
   --dart-define=BEVEL_BASE_URL="${BEVEL_BASE_URL:-https://bevel.is}"
   --dart-define=BEVEL_API_URL="${BEVEL_API_URL:-https://api.bevel.is}"
   --dart-define=BEVEL_WORKSPACE_URL="${BEVEL_WORKSPACE_URL:-https://bevel.2x4m.cc}"
 )
+if [[ -n "${GOOGLE_IOS_CLIENT_ID:-}" ]]; then
+  DEFINES+=(--dart-define=GOOGLE_IOS_CLIENT_ID="$GOOGLE_IOS_CLIENT_ID")
+fi
+if [[ -n "${GOOGLE_SERVER_CLIENT_ID:-}" ]]; then
+  DEFINES+=(--dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID")
+elif [[ -n "${GOOGLE_IOS_CLIENT_ID:-}" ]]; then
+  DEFINES+=(--dart-define=GOOGLE_SERVER_CLIENT_ID=336973686985-0ggvfg30mh3junprhcfmdgdtepbnqfb0.apps.googleusercontent.com)
+fi
 
 echo "==> BEVEL device deploy"
 echo "    defines: production hosts"
@@ -69,12 +88,10 @@ deploy_ios() {
     return 1
   fi
   echo "==> iOS → $id"
-  # Build release then install/launch (more reliable than flutter run wireless VM)
-  flutter build ios --release --no-codesign "${DEFINES[@]}" 2>&1 | tail -5 || true
-  # Prefer codesigned device build via flutter install
-  flutter install -d "$id" "${DEFINES[@]}" 2>&1 || \
-    flutter run -d "$id" --release "${DEFINES[@]}" 2>&1
-  # Best-effort launch via CoreDevice
+  echo "    dart-defines: ${DEFINES[*]}"
+  # Codesigned release install via flutter run (install does not accept --dart-define)
+  flutter run -d "$id" --release "${DEFINES[@]}" 2>&1
+  # Best-effort launch via CoreDevice if run detached
   xcrun devicectl device process launch --device "$id" com.derozic.bevel.bevelApp 2>&1 || true
   echo "    iOS: open BEVEL on the phone if launch was blocked (unlock first)."
 }

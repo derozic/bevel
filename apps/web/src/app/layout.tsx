@@ -1,6 +1,13 @@
 import type { Metadata, Viewport } from 'next'
 import type { CSSProperties, ReactNode } from 'react'
-import { getTenantFromRequest, tenantThemeCssVars } from '@bevel/tenant-config'
+import {
+  fetchCmykBrandKitTheme,
+  getTenantFromRequest,
+  mergeBrandKitIntoTheme,
+  processFromKit,
+  resolveCmykKitId,
+  tenantThemeCssVars,
+} from '@bevel/tenant-config'
 import { AuthProvider } from '@bevel/auth/client'
 import { PreferencesHost } from '@/components/preferences/PreferencesHost'
 import { PwaRegister } from '@/components/PwaRegister'
@@ -23,12 +30,24 @@ export const viewport: Viewport = {
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const tenant = await getTenantFromRequest()
+  const resolved = await getTenantFromRequest()
+  const kitId = resolveCmykKitId(resolved)
+  const kitTheme = kitId
+    ? await fetchCmykBrandKitTheme({
+        kitId,
+        host: resolved?.theme.cmykHost,
+      })
+    : null
+  const tenant =
+    resolved && kitTheme ? mergeBrandKitIntoTheme(resolved, kitTheme) : resolved
   const themeAttr = tenant?.slug ?? 'default'
-  const themeStyle = tenantThemeCssVars(tenant) as CSSProperties
+  const themeStyle = tenantThemeCssVars(
+    tenant,
+    processFromKit(kitTheme),
+  ) as CSSProperties
   const productName = (tenant?.theme.productName ?? tenant?.name ?? undefined)
     ?.replace(/\s+Agents$/i, '')
-  const logoUrl = tenant?.theme.logoUrl
+  const logoUrl = tenant?.theme.brandIconUrl || tenant?.theme.logoUrl
   const logoUrlsByDaypart = tenant?.theme.logoUrlsByDaypart
   const logosAttr =
     logoUrlsByDaypart && Object.keys(logoUrlsByDaypart).length > 0

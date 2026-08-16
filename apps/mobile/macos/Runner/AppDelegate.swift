@@ -23,4 +23,14 @@ class AppDelegate: FlutterAppDelegate {
     }
     return true
   }
+
+  // Keep FlutterAppDelegate's plugin forwarding (app_links) and bring the
+  // window forward after bevel://auth/complete from the system browser.
+  override func application(_ application: NSApplication, open urls: [URL]) {
+    super.application(application, open: urls)
+    NSApp.activate(ignoringOtherApps: true)
+    for window in application.windows {
+      window.makeKeyAndOrderFront(self)
+    }
+  }
 }

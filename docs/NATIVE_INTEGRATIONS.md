@@ -1,6 +1,6 @@
 # BEVEL native integrations (iOS · Android · macOS)
 
-Deep platform APIs — not a thin WebView wrapper. The Flutter client at `apps/mobile` owns **sharing**, **Health**, **notifications**, **deep links**, **Hermes Desktop interop**, **media device discovery (audio huddles)**, and **icon / HIG standards**.
+Deep platform APIs — not a thin WebView wrapper. The Flutter client at `apps/mobile` owns **sharing**, **Health**, **notifications**, **deep links**, **Hermes Desktop interop**, **optional iMessage / SMS hosts**, **media device discovery (audio huddles)**, and **icon / HIG standards**.
 
 ## Install dual-track (product decision)
 
@@ -23,9 +23,14 @@ lib/native/
   hermes_bridge.dart         # Hermes.app / CLI / gateway probe + launch
   hermes_handoff.dart        # v1 clipboard + deep-link payload
   media_device_discovery.dart  # mic/speaker/camera inventory (huddles)
+  imessage_bridge.dart       # optional Messages.app host (macOS)
+  sms_host_bridge.dart       # optional Android SMS host (Google Messages inbox)
   call_service.dart          # CallKit / ConnectionService scaffold
 macos/Runner/
   MediaDeviceChannel.swift   # CoreAudio + AVFoundation enumeration
+  IMessageChannel.swift      # chat.db + AppleScript (no BlueBubbles)
+android/.../bevel_app/
+  SmsHostChannel.kt          # telephony SMS send/read (not RCS)
 lib/ui/native_hub_page.dart  # operator / QA surface for integrations
 ```
 
@@ -38,6 +43,8 @@ lib/ui/native_hub_page.dart  # operator / QA surface for integrations
 | Hermes Desktop | — | — | **Bridge + handoffs** |
 | Device discovery (huddles) | planned | planned | **CoreAudio + AVFoundation** |
 | Audio huddles | WebRTC later | WebRTC later | discovery first → WebRTC |
+| iMessage host | — | — | **optional, chat.db + AppleScript** |
+| SMS host (Google Messages inbox) | — | **optional, telephony SMS** | — |
 | Icons | Icon Composer layered set | Adaptive + mono | dock icons |
 
 Hermes details: [HERMES_DESKTOP.md](./HERMES_DESKTOP.md).
@@ -169,6 +176,8 @@ Health and notification strings must match real behavior. Document data use in A
 - [ ] Notification permission + test alert  
 - [ ] `bevel://channel/test` opens cold and warm  
 - [ ] Hermes Probe + Open Hermes on macOS  
+- [ ] iMessage Probe + Grant access + Test send (macOS, Full Disk Access + Automation)  
+- [ ] SMS host Probe + Grant SMS + Enable + Test send + Scan life timeline (Android)  
 - [ ] `bevel://hermes/status` focuses Hermes card  
 - [ ] **Discover devices** lists mic/speaker/camera on Silicon  
 - [ ] Adaptive icon + monochrome look correct on Pixel / iPhone  
@@ -178,5 +187,7 @@ Health and notification strings must match real behavior. Document data use in A
 ## Related
 
 - [HERMES_DESKTOP.md](./HERMES_DESKTOP.md) — Hermes Desktop interop  
+- [IMESSAGE.md](./IMESSAGE.md) — optional Mac iMessage host (replaces BlueBubbles)  
+- [GOOGLE_MESSAGES.md](./GOOGLE_MESSAGES.md) — optional Android SMS host  
 - [NATIVE_RELEASE.md](./NATIVE_RELEASE.md) — build bundles  
 - Download page: `/download` on the web app  

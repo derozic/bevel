@@ -1,3 +1,9 @@
+/**
+ * Web fleet catalog — derived from the synced ~/dev/agents registry.
+ * Refresh with `pnpm sync:agents`.
+ */
+import fleetRegistry from './fleet-registry.json'
+
 export type AgentAvatarIcon =
   | 'building-office-2'
   | 'cpu-chip'
@@ -21,162 +27,110 @@ export interface Agent {
   skillMd: string
   tagline?: string
   summary?: string
+  tier?: string
+  reportsTo?: string
 }
 
-const SEED_AGENTS: Agent[] = [
-  {
-    id: 'brain',
-    name: 'Brain',
-    avatar: 'cpu-chip',
-    avatarUrl: '/avatars/brain.svg',
-    accent: '#7c5cff',
-    industry: 'Platform',
-    category: 'Orchestration',
-    role: 'Fleet coordinator',
-    bio: 'Routes work across the agent fleet.',
-    skills: ['routing', 'handoffs'],
+type RegistryAgent = {
+  id: string
+  name: string
+  tier?: string
+  category?: string
+  role?: string
+  description?: string
+  avatar?: string
+  accent?: string
+  reportsTo?: string
+  skills?: string[]
+  soul?: string
+  recursiveSkills?: string[]
+  run?: { hint?: string }
+}
+
+function iconFor(agent: RegistryAgent): AgentAvatarIcon {
+  const category = (agent.category ?? '').toLowerCase()
+  const tier = (agent.tier ?? '').toLowerCase()
+  if (tier === 'co-founder' || category.includes('leadership')) return 'cpu-chip'
+  if (category.includes('design')) return 'building-office-2'
+  if (
+    category.includes('evaluat') ||
+    category.includes('monitor') ||
+    category.includes('product') ||
+    category.includes('research')
+  ) {
+    return 'star'
+  }
+  if (
+    category.includes('continuous') ||
+    category.includes('operation') ||
+    category.includes('admin')
+  ) {
+    return 'arrow-path'
+  }
+  if (
+    category.includes('engineer') ||
+    category.includes('develop') ||
+    category.includes('test') ||
+    category.includes('qa') ||
+    category.includes('platform')
+  ) {
+    return 'wrench-screwdriver'
+  }
+  return 'cpu-chip'
+}
+
+/** Prefer the synced SVG portrait; fall back to the registry path. */
+function avatarUrlFor(agent: RegistryAgent): string {
+  if (agent.id) return `/avatars/${agent.id}.svg`
+  const raw = agent.avatar?.trim()
+  return raw && raw.startsWith('/') ? raw : '/avatars/hermes.svg'
+}
+
+function taglineFor(agent: RegistryAgent): string {
+  const soul = (agent.soul ?? '').trim()
+  if (soul) {
+    const head = soul.split(/\s[—–-]\s/)[0]?.trim()
+    if (head && head.length <= 56) return head
+  }
+  const hint = agent.run?.hint?.split('.')[0]?.trim()
+  if (hint) return hint
+  return agent.role || agent.name
+}
+
+function mapRegistryAgent(agent: RegistryAgent): Agent {
+  const category = agent.category || 'Fleet'
+  return {
+    id: agent.id,
+    name: agent.name,
+    avatar: iconFor(agent),
+    avatarUrl: avatarUrlFor(agent),
+    accent: agent.accent,
+    industry: category,
+    category,
+    role: agent.role || agent.name,
+    bio: agent.description || agent.soul || '',
+    skills: agent.skills ?? [],
     directives: [],
-    soulMd: '',
-    skillMd: '',
-    tagline: 'Fleet brain',
-  },
-  {
-    id: 'loom',
-    name: 'Loom',
-    avatar: 'arrow-path',
-    avatarUrl: '/avatars/loom.svg',
-    accent: '#a855f7',
-    industry: 'Platform',
-    category: 'Prompting',
-    role: 'Prompt engineer',
-    bio: 'Shapes prompts and tool plans.',
-    skills: ['prompting', 'tools'],
-    directives: [],
-    soulMd: '',
-    skillMd: '',
-    tagline: 'Thread weaver',
-  },
-  {
-    id: 'northstar',
-    name: 'Northstar',
-    avatar: 'star',
-    avatarUrl: '/avatars/northstar.svg',
-    accent: '#f59e0b',
-    industry: 'Platform',
-    category: 'Reliability',
-    role: 'SRE partner',
-    bio: 'Watches signals and suggests fixes.',
-    skills: ['monitoring', 'incidents'],
-    directives: [],
-    soulMd: '',
-    skillMd: '',
-    tagline: 'Signal scout',
-  },
-  {
-    id: 'lego',
-    name: 'Lego',
-    avatar: 'wrench-screwdriver',
-    avatarUrl: '/avatars/lego.svg',
-    accent: '#22c55e',
-    industry: 'Engineering',
-    category: 'Testing',
-    role: 'Test builder',
-    bio: 'Builds and runs test harnesses.',
-    skills: ['vitest', 'playwright'],
-    directives: [],
-    soulMd: '',
-    skillMd: '',
-    tagline: 'Test stack',
-  },
-  {
-    id: 'tegan',
-    name: 'Tegan',
-    avatar: 'building-office-2',
-    avatarUrl: '/avatars/tegan.svg',
-    accent: '#ec4899',
-    industry: 'Design',
-    category: 'UI',
-    role: 'Design systems',
-    bio: 'Layout, accessibility, and design-system craft. Not LLM usage meters.',
-    skills: ['a11y', 'layout', 'craft'],
-    directives: [],
-    soulMd: '',
-    skillMd: '',
-    tagline: 'Surface craft',
-  },
-  {
-    id: 'mildred',
-    name: 'Mildred',
-    avatar: 'cpu-chip',
-    avatarUrl: '/avatars/mildred.svg',
-    accent: '#059669',
-    industry: 'Finance',
-    category: 'Cost Accounting',
-    role: 'Token & cost books',
-    bio: 'LLM tokens in/out, OpenRouter, QuickBooks-style cost accounting, 2x4m box calcs.',
-    skills: ['tokens', 'openrouter', 'qbo', 'box-calcs'],
-    directives: [],
-    soulMd: '',
-    skillMd: '',
-    tagline: 'Bean counting',
-  },
-  {
-    id: 'johnny',
-    name: 'Johnny',
-    avatar: 'wrench-screwdriver',
-    avatarUrl: '/avatars/johnny.svg',
-    accent: '#38bdf8',
-    industry: 'Ops',
-    category: 'Patrol',
-    role: 'Platform patrol',
-    bio: 'Heals infra and keeps lanes green.',
-    skills: ['patrol', 'caddy'],
-    directives: [],
-    soulMd: '',
-    skillMd: '',
-    tagline: 'Night shift',
-  },
-  {
-    id: 'hermes',
-    name: 'Hermes',
-    avatar: 'cpu-chip',
-    avatarUrl: '/avatars/hermes.svg',
-    accent: '#0d9488',
-    industry: 'Leadership',
-    category: 'Co-Founder',
-    role: 'Co-founder & general-purpose coding agent',
-    bio: 'Primary personal agent and fleet co-founder — owns outcomes, ships code, convenes specialists, partners with Hermes Desktop.',
-    skills: [
-      'co-founder',
-      'coding',
-      'openrouter',
-      'fleet-handoffs',
-      'desktop-interop',
-    ],
-    directives: [],
-    soulMd: '',
-    skillMd: '',
-    tagline: 'Co-founder peer',
-  },
-  {
-    id: 'continuous',
-    name: 'Continuous',
-    avatar: 'arrow-path',
-    avatarUrl: '/avatars/loom.svg',
-    accent: '#64748b',
-    industry: 'Engineering',
-    category: 'Continuous Engineering',
-    role: 'Always-on engineering loop',
-    bio: 'Keeps long-running engineering loops and CI-shaped work moving.',
-    skills: ['continuous', 'loops'],
-    directives: [],
-    soulMd: '',
-    skillMd: '',
-    tagline: 'Always-on eng',
-  },
-]
+    soulMd: agent.soul ?? '',
+    skillMd: (agent.recursiveSkills ?? []).join('\n'),
+    tagline: taglineFor(agent),
+    summary: agent.description || agent.soul,
+    tier: agent.tier,
+    reportsTo: agent.reportsTo,
+  }
+}
+
+const SEED_AGENTS: Agent[] = (fleetRegistry.agents as RegistryAgent[]).map(
+  mapRegistryAgent,
+)
 
 export const agents = SEED_AGENTS
+
+export const fleetRegistryMeta = {
+  version: (fleetRegistry as { version?: string }).version ?? '0',
+  lastUpdated: (fleetRegistry as { lastUpdated?: string }).lastUpdated ?? '',
+  source: 'dev/agents',
+}
 
 export function getAgentById(id: string): Agent | undefined {
   return agents.find((a) => a.id.toLowerCase() === id.toLowerCase())

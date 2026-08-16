@@ -6,7 +6,10 @@ import '../config.dart';
 import '../native/deep_links.dart';
 import '../native/health_service.dart';
 import '../native/hermes_bridge.dart';
+import '../native/imessage_bridge.dart';
 import '../native/media_device_discovery.dart';
+import '../native/sms_host_bridge.dart';
+import '../native/sms_life_index.dart';
 import '../native/native_capabilities.dart';
 import '../native/notification_service.dart';
 import '../native/sharing_service.dart';
@@ -45,13 +48,31 @@ class _NativeHubPageState extends State<NativeHubPage> {
   bool _notifAuthed = false;
   HermesBridgeStatus? _hermesStatus;
   MediaDeviceInventory? _mediaDevices;
+  IMessageHostStatus? _iMessage;
+  List<IMessageChatPreview> _iMessageChats = const [];
+  SmsHostStatus? _smsHost;
+  List<SmsHostThread> _smsThreads = const [];
+  List<SmsLifeMoment> _smsMoments = const [];
   final _discovery = MediaDeviceDiscovery();
+  final _iMessageBridge = IMessageBridge();
+  final _smsHostBridge = SmsHostBridge();
   final _hermesKey = GlobalKey();
+  final _iMessageKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _hermesStatus = widget.initialHermesStatus;
+    if (widget.capabilities.supportsIMessage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _probeIMessage();
+      });
+    }
+    if (widget.capabilities.supportsSmsHost) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _probeSmsHost();
+      });
+    }
     if (widget.focusHermes) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final ctx = _hermesKey.currentContext;
@@ -150,6 +171,212 @@ class _NativeHubPageState extends State<NativeHubPage> {
     });
   }
 
+  Future<void> _probeIMessage() async {
+    if (!widget.capabilities.supportsIMessage) {
+      await _setStatus('iMessage host needs the Silicon Mac app');
+      return;
+    }
+    final status = await _iMessageBridge.status();
+    List<IMessageChatPreview> chats = const [];
+    if (status.fullDiskAccess) {
+      chats = await _iMessageBridge.listRecentChats(limit: 8);
+    }
+    if (!mounted) return;
+    setState(() {
+      _iMessage = status;
+      _iMessageChats = chats;
+      _status = status.summary;
+    });
+  }
+
+  Future<void> _grantIMessagePermissions() async {
+    final status = await _iMessageBridge.requestPermissions();
+    if (!mounted) return;
+    setState(() {
+      _iMessage = status;
+      _status = status.summary;
+    });
+  }
+
+  Future<void> _setIMessageEnabled(bool on) async {
+    final status = await _iMessageBridge.setEnabled(on);
+    if (!mounted) return;
+    setState(() {
+      _iMessage = status;
+      _status = on
+          ? 'iMessage host ${status.apiRunning ? status.apiUrl : 'starting'}'
+          : 'iMessage host off — agents will not text this Apple ID';
+    });
+  }
+
+  Future<void> _setIMessageMode(IMessageAccountMode mode) async {
+    final status = await _iMessageBridge.setAccountMode(mode);
+    if (!mounted) return;
+    setState(() {
+      _iMessage = status;
+      _status = 'Account mode: ${mode == IMessageAccountMode.personal ? 'personal' : 'dedicated'}';
+    });
+  }
+
+  Future<void> _testSendIMessage() async {
+    final addressCtrl = TextEditingController();
+    final bodyCtrl = TextEditingController(text: 'BEVEL iMessage host test');
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Test iMessage'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: addressCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Phone or Apple ID',
+                  hintText: '+15551234567',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: bodyCtrl,
+                maxLength: 1500,
+                decoration: const InputDecoration(labelText: 'Body'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
+    );
+    final address = addressCtrl.text;
+    final body = bodyCtrl.text;
+    addressCtrl.dispose();
+    bodyCtrl.dispose();
+    if (sent != true) return;
+    await _setStatus('Sending iMessage…');
+    final result = await _iMessageBridge.send(address: address, body: body);
+    await _setStatus(
+      result.ok
+          ? 'Sent via ${result.method ?? 'Messages.app'} to ${result.address}'
+          : 'Send failed: ${result.error ?? 'unknown'}',
+    );
+  }
+
+  Future<void> _probeSmsHost() async {
+    if (!widget.capabilities.supportsSmsHost) {
+      await _setStatus('SMS host needs the Android app');
+      return;
+    }
+    final status = await _smsHostBridge.status();
+    List<SmsHostThread> threads = const [];
+    if (status.canRead) {
+      threads = await _smsHostBridge.listRecentThreads(limit: 8);
+    }
+    if (!mounted) return;
+    setState(() {
+      _smsHost = status;
+      _smsThreads = threads;
+      _status = status.summary;
+    });
+  }
+
+  Future<void> _grantSmsHostPermissions() async {
+    final status = await _smsHostBridge.requestPermissions();
+    if (!mounted) return;
+    setState(() {
+      _smsHost = status;
+      _status = status.summary;
+    });
+  }
+
+  Future<void> _scanSmsLife() async {
+    await _setStatus('Scanning SMS for life moments…');
+    final moments = await _smsHostBridge.scanLifeMoments();
+    if (!mounted) return;
+    setState(() {
+      _smsMoments = moments;
+      _status = moments.isEmpty
+          ? 'No high-signal SMS in the recent inbox (OTPs and chatter ignored)'
+          : '${moments.length} life moments (hospital, travel, kin, work…)';
+    });
+  }
+
+  Future<void> _setSmsHostEnabled(bool on) async {
+    final status = await _smsHostBridge.setEnabled(on);
+    if (!mounted) return;
+    setState(() {
+      _smsHost = status;
+      _status = on
+          ? 'Agents may prompt you over SMS on this number'
+          : 'SMS host off — agents will not text this phone';
+    });
+  }
+
+  Future<void> _testSendSms() async {
+    final addressCtrl = TextEditingController();
+    final bodyCtrl = TextEditingController(text: 'BEVEL SMS host test');
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Test SMS'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: addressCtrl,
+                autofocus: true,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Phone number',
+                  hintText: '+15551234567',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: bodyCtrl,
+                maxLength: 1500,
+                decoration: const InputDecoration(labelText: 'Body'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
+    );
+    final address = addressCtrl.text;
+    final body = bodyCtrl.text;
+    addressCtrl.dispose();
+    bodyCtrl.dispose();
+    if (sent != true) return;
+    await _setStatus('Sending SMS…');
+    final result = await _smsHostBridge.send(address: address, body: body);
+    await _setStatus(
+      result.ok
+          ? 'Sent SMS to ${result.address}'
+          : 'Send failed: ${result.error ?? 'unknown'}',
+    );
+  }
+
   Future<void> _discoverMediaDevices() async {
     if (!widget.capabilities.supportsDeviceDiscovery) {
       await _setStatus(
@@ -190,12 +417,9 @@ class _NativeHubPageState extends State<NativeHubPage> {
           const SizedBox(height: 8),
           Text(
             'Sharing, ${c.supportsHealthKit ? 'Apple HealthKit' : c.supportsHealthConnect ? 'Health Connect' : 'Health'}, '
-            'notifications, Hermes Desktop, media device discovery for audio huddles, '
+            'notifications, Hermes Desktop, optional iMessage / SMS hosts, media device discovery, '
             'deep links — computer integration the browser install cannot match.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF9AA8B5),
-                  height: 1.45,
-                ),
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 20),
           _ActionCard(
@@ -232,6 +456,364 @@ class _NativeHubPageState extends State<NativeHubPage> {
             },
           ),
           const SizedBox(height: 20),
+          if (c.supportsIMessage) ...[
+            Card(
+              key: _iMessageKey,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.chat_bubble_outline, color: scheme.primary),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'iMessage',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        if (_iMessage?.ready == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              'host',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.primary,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _iMessage?.summary ??
+                          'Optional. Let agents prompt you on this Mac via iMessage. '
+                              'Off unless you grant access. No BlueBubbles, no Firebase.',
+                      style: const TextStyle(
+                        color: Color(0xFF9AA8B5),
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        _IMessageChip(
+                          label: _iMessage?.fullDiskAccess == true
+                              ? 'Full Disk Access'
+                              : 'Need Full Disk Access',
+                          ok: _iMessage?.fullDiskAccess == true,
+                        ),
+                        _IMessageChip(
+                          label: _iMessage?.automationGranted == true
+                              ? 'Messages Automation'
+                              : 'Need Automation',
+                          ok: _iMessage?.automationGranted == true,
+                        ),
+                        _IMessageChip(
+                          label: _iMessage?.accountMode ==
+                                  IMessageAccountMode.personal
+                              ? 'Personal Apple ID'
+                              : 'Dedicated Apple ID',
+                          ok: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Enable agent prompts on iMessage'),
+                      subtitle: Text(
+                        _iMessage?.apiRunning == true
+                            ? 'BEVEL is the host at ${_iMessage?.apiUrl} (BlueBubbles.app not required)'
+                            : 'Off by default. Speaks the BlueBubbles API so Hermes / Bevel can send.',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B7A88),
+                        ),
+                      ),
+                      value: _iMessage?.enabled == true,
+                      onChanged: _setIMessageEnabled,
+                    ),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton(
+                          onPressed: _probeIMessage,
+                          child: const Text('Probe'),
+                        ),
+                        FilledButton.tonal(
+                          onPressed: _grantIMessagePermissions,
+                          child: const Text('Grant access'),
+                        ),
+                        OutlinedButton(
+                          onPressed: () => _iMessageBridge.openPrivacyPane('fda'),
+                          child: const Text('Full Disk Access'),
+                        ),
+                        OutlinedButton(
+                          onPressed: _testSendIMessage,
+                          child: const Text('Test send'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Text(
+                          'Apple ID',
+                          style: TextStyle(
+                            color: Color(0xFF6B7A88),
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ChoiceChip(
+                          label: const Text('Dedicated'),
+                          selected: _iMessage?.accountMode !=
+                              IMessageAccountMode.personal,
+                          onSelected: (_) =>
+                              _setIMessageMode(IMessageAccountMode.dedicated),
+                        ),
+                        const SizedBox(width: 6),
+                        ChoiceChip(
+                          label: const Text('Personal'),
+                          selected: _iMessage?.accountMode ==
+                              IMessageAccountMode.personal,
+                          onSelected: (_) =>
+                              _setIMessageMode(IMessageAccountMode.personal),
+                        ),
+                      ],
+                    ),
+                    if (_iMessageChats.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Recent threads (not synced until bound)',
+                        style: TextStyle(
+                          color: Color(0xFF6B7A88),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ..._iMessageChats.take(5).map(
+                            (chat) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                '${chat.title}  ·  ${chat.lastBody}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF9AA8B5),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                    ],
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Optional agent-prompt channel for Mac operators. Dedicated '
+                      'Apple ID is recommended. Only threads you bind later leave this Mac.',
+                      style: TextStyle(
+                        color: Color(0xFF6B7A88),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (c.supportsSmsHost) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.sms_outlined, color: scheme.primary),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Google Messages · SMS',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        if (_smsHost?.ready == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              'host',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.primary,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _smsHost?.summary ??
+                          'Optional. Let agents prompt you on this Android via SMS '
+                          'using your number. Same idea as iMessage on Mac.',
+                      style: const TextStyle(
+                        color: Color(0xFF9AA8B5),
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        _IMessageChip(
+                          label: _smsHost?.canRead == true
+                              ? 'Read SMS'
+                              : 'Need Read SMS',
+                          ok: _smsHost?.canRead == true,
+                        ),
+                        _IMessageChip(
+                          label: _smsHost?.canSend == true
+                              ? 'Send SMS'
+                              : 'Need Send SMS',
+                          ok: _smsHost?.canSend == true,
+                        ),
+                        _IMessageChip(
+                          label: _smsHost?.googleMessagesInstalled == true
+                              ? 'Google Messages'
+                              : 'Messages app not found',
+                          ok: _smsHost?.googleMessagesInstalled == true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Enable agent prompts on this number'),
+                      subtitle: const Text(
+                        'Off by default. Twilio is a different, paid Bevel number.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF6B7A88)),
+                      ),
+                      value: _smsHost?.enabled == true,
+                      onChanged: _setSmsHostEnabled,
+                    ),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton(
+                          onPressed: _probeSmsHost,
+                          child: const Text('Probe'),
+                        ),
+                        FilledButton.tonal(
+                          onPressed: _grantSmsHostPermissions,
+                          child: const Text('Grant SMS'),
+                        ),
+                        OutlinedButton(
+                          onPressed: _testSendSms,
+                          child: const Text('Test send'),
+                        ),
+                        OutlinedButton(
+                          onPressed: _scanSmsLife,
+                          child: const Text('Scan life timeline'),
+                        ),
+                      ],
+                    ),
+                    if (_smsMoments.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Approximation of what mattered (${_smsMoments.length})',
+                        style: const TextStyle(
+                          color: Color(0xFF6B7A88),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ..._smsMoments.take(8).map(
+                            (m) => Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                '${m.signal.name} · ${m.tags.join(', ')} · ${m.address}\n${m.body}',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF9AA8B5),
+                                  fontSize: 12,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ),
+                    ],
+                    if (_smsThreads.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Recent SMS threads (not synced until bound)',
+                        style: TextStyle(
+                          color: Color(0xFF6B7A88),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ..._smsThreads.take(5).map(
+                            (t) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                '${t.title}  ·  ${t.lastBody}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF9AA8B5),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      _smsHost?.rcsNote ??
+                          'RCS stays in Google Messages. Android does not give '
+                          'third-party apps an RCS API. This host is SMS only.',
+                      style: const TextStyle(
+                        color: Color(0xFF6B7A88),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (c.supportsDeviceDiscovery) ...[
             _ActionCard(
               title: 'Audio huddles · device discovery',
@@ -502,6 +1084,34 @@ class _NativeHubPageState extends State<NativeHubPage> {
             label: const Text('Native integrations docs'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _IMessageChip extends StatelessWidget {
+  const _IMessageChip({required this.label, required this.ok});
+
+  final String label;
+  final bool ok;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = ok ? scheme.primary : const Color(0xFF9AA8B5);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }

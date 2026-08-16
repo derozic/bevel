@@ -21,6 +21,8 @@ class NativeCapabilities {
     required this.supportsHermesBridge,
     required this.supportsDeviceDiscovery,
     required this.supportsAudioHuddles,
+    required this.supportsIMessage,
+    required this.supportsSmsHost,
     required this.isAppleSiliconMac,
   });
 
@@ -41,6 +43,10 @@ class NativeCapabilities {
   final bool supportsDeviceDiscovery;
   /// Audio huddles require device discovery + WebRTC path.
   final bool supportsAudioHuddles;
+  /// Local Messages.app host (chat.db + AppleScript). macOS only.
+  final bool supportsIMessage;
+  /// Optional Android SMS host (telephony / Google Messages inbox).
+  final bool supportsSmsHost;
   final bool isAppleSiliconMac;
 
   static Future<NativeCapabilities> probe() async {
@@ -107,6 +113,8 @@ class NativeCapabilities {
     // Device discovery for huddles: native macOS first; iOS/Android next.
     final supportsDeviceDiscovery = !kIsWeb && Platform.isMacOS;
     final supportsAudioHuddles = supportsDeviceDiscovery;
+    final supportsIMessage = !kIsWeb && Platform.isMacOS;
+    final supportsSmsHost = !kIsWeb && Platform.isAndroid;
 
     return NativeCapabilities(
       platformLabel: platformLabel,
@@ -124,6 +132,8 @@ class NativeCapabilities {
       supportsHermesBridge: desktop,
       supportsDeviceDiscovery: supportsDeviceDiscovery,
       supportsAudioHuddles: supportsAudioHuddles,
+      supportsIMessage: supportsIMessage,
+      supportsSmsHost: supportsSmsHost,
       isAppleSiliconMac: isAppleSiliconMac,
     );
   }

@@ -44,6 +44,8 @@ This is **orthogonal to plan**. Examples:
 | `workMode`, `customBranding`, `sms`, … | pro | stable |
 | `liveMedia`, `ssoSaml` | team | stable |
 | `auditLog`, `dedicatedSupport` | enterprise | stable |
+| `imessage` | pro | **beta** |
+| `imessageInbox` | enterprise | **beta** |
 | `agentMemory` | pro | **beta** |
 | `voiceRooms` | team | **beta** |
 | `matrix` | pro | **beta** |

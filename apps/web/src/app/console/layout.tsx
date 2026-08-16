@@ -16,6 +16,7 @@ import {
   BookOpen,
   MessageSquare,
   ArrowLeft,
+  Users,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
@@ -38,6 +39,7 @@ const navigation: NavigationItem[] = [
   { name: "Integrations", href: "/console/integrations", icon: Package, shortcut: "⌘I" },
   { name: "API Keys", href: "/console/api-keys", icon: Key, shortcut: "⌘A" },
   { name: "Workflows", href: "/console/workflows", icon: GitBranch, shortcut: "⌘W" },
+  { name: "Agent org", href: "/console/org", icon: Users, shortcut: "⌘O" },
   { name: "Status", href: "/console/status", icon: Activity, shortcut: "⌘S" },
   { name: "Commands", href: "/console/commands", icon: Command, shortcut: "⌘C" },
   { name: "API Docs", href: "/console/docs", icon: BookOpen, shortcut: "⌘D" },

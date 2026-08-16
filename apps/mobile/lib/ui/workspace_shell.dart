@@ -7,12 +7,14 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../config.dart';
+import '../theme/theme.dart';
 import '../native/hermes_bridge.dart';
 import '../native/google_native_auth.dart';
 import '../native/oauth_browser.dart';
 import '../native/session_bridge.dart';
 import '../native/sharing_service.dart';
 import 'channel_picker_sheet.dart';
+import 'gesture_haptics.dart';
 import 'layout/bevel_breakpoints.dart';
 import 'layout/workspace_rail.dart';
 
@@ -120,11 +122,17 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF0A0E12))
+      ..setBackgroundColor(const Color(0xFF101825)) // night cream until daypart mounts
       ..setUserAgent(
         'Mozilla/5.0 (Mobile; BevelNative/${BevelConfig.versionLabel}) '
         'AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 '
         'BevelNative/${BevelConfig.versionLabel}',
+      )
+      ..addJavaScriptChannel(
+        'BevelHaptics',
+        onMessageReceived: (msg) {
+          unawaited(playGestureHaptic(msg.message));
+        },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
@@ -188,14 +196,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                 path.contains('/console')) {
               launchUrl(uri, mode: LaunchMode.externalApplication);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Console and integrations open in the browser — '
-                      'this app is for chat.',
-                    ),
-                    duration: Duration(seconds: 3),
-                  ),
+                BevelSnack.show(
+                  context,
+                  'Console and integrations open in the browser — this app is for chat.',
                 );
               }
               return NavigationDecision.prevent;
@@ -243,13 +246,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       if (!healthy && !_authRetryUsed) {
         _authRetryUsed = true;
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Workspace session missing — signing in with Google…',
-              ),
-              duration: Duration(seconds: 3),
-            ),
+          BevelSnack.show(
+            context,
+            'Workspace session missing — signing in with Google…',
           );
         }
         await _nativeGoogleThenReload();
@@ -319,9 +318,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       _sessionChecked = false;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google sign-in failed: $e')),
-        );
+        BevelSnack.show(context, 'Google sign-in failed: $e');
       }
       // Last resort: system browser
       await _oauth.openSystemLogin();
@@ -398,9 +395,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
         );
     final result = await bridge.openWithHandoff(handoff);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.message)),
-    );
+    BevelSnack.show(context, result.message);
   }
 
   /// Support /~{slug}, /^{slug}, and /bevel/c/{slug}.
@@ -465,7 +460,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final p = context.bevel;
     final hermes = widget.hermes;
     final layout = BevelLayoutInfo.of(context);
     final path = _currentUri?.path ?? widget.initialPath;
@@ -475,7 +470,16 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             layout.size.width >= 700);
     final showPhonePicker = !showRail;
 
+    unawaited(_controller.setBackgroundColor(p.cream));
+
+    final spaceLabel = [
+      if (widget.workspaceLabel != null && widget.workspaceLabel!.isNotEmpty)
+        widget.workspaceLabel!,
+      if (!_sessionHealthy) 'Sign in to continue',
+    ].join(' · ');
+
     final webBody = Stack(
+      fit: StackFit.expand,
       children: [
         if (_error != null)
           _ErrorPane(
@@ -486,31 +490,18 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           )
         else
           WebViewWidget(controller: _controller),
-        if (kDebugMode)
-          Positioned(
-            right: 12,
-            bottom: 12,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: const Color(0xCC0F1419),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF243040)),
-              ),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Text(
-                  [
-                    if (showRail) 'dual-pane',
-                    layout.layoutClass.name,
-                    if (_sessionHealthy) 'session-ok' else 'session-?',
-                    if (widget.handoffCode != null) 'handoff',
-                    if (widget.consumerMode) 'consumer',
-                  ].join(' · '),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF9AA8B5),
-                  ),
+        if (_loading && _error == null)
+          IgnorePointer(
+            child: ColoredBox(
+              color: p.cream.withValues(alpha: 0.72),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    BevelMark(size: 40, palette: p),
+                    const SizedBox(height: 14),
+                    const BevelWordmark(size: BevelWordmarkSize.md),
+                  ],
                 ),
               ),
             ),
@@ -519,81 +510,47 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _channelLabel,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-            ),
-            Text(
-              [
-                if (widget.workspaceLabel != null &&
-                    widget.workspaceLabel!.isNotEmpty)
-                  widget.workspaceLabel!,
-                _currentUri?.host ??
-                    widget.workspaceHost ??
-                    Uri.parse(BevelConfig.workspaceUrl).host,
-                if (showRail) 'dual-pane',
-                if (_sessionHealthy) 'signed in',
-              ].join(' · '),
-              style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF9AA8B5),
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
+      backgroundColor: p.cream,
+      appBar: BevelShellBar(
+        title: _channelLabel,
+        subtitle: spaceLabel.isEmpty ? null : spaceLabel,
+        onTitleTap: showPhonePicker ? _openChannelPicker : widget.onSwitchWorkspace,
+        progress: _loading
+            ? (_progress > 0 && _progress < 100 ? _progress / 100 : 0)
+            : null,
         actions: [
-          if (widget.onSwitchWorkspace != null)
-            IconButton(
-              tooltip: 'Switch workspace',
-              onPressed: widget.onSwitchWorkspace,
-              icon: const Icon(Icons.workspaces_outlined),
-            ),
-          if (showPhonePicker)
-            IconButton(
-              tooltip: 'Channels',
-              onPressed: _openChannelPicker,
-              icon: const Icon(Icons.tag_rounded),
-            ),
-          if (!showRail)
+          if (!_sessionHealthy)
+            TextButton(
+              onPressed: _nativeGoogleThenReload,
+              child: const Text('Sign in'),
+            )
+          else if (!showRail)
             IconButton(
               tooltip: 'Timeline',
               onPressed: () => _navigatePath('/timeline'),
               icon: const Icon(Icons.schedule_outlined),
             ),
-          if (!_sessionHealthy)
-            IconButton(
-              tooltip: 'Sign in with Google',
-              onPressed: _nativeGoogleThenReload,
-              icon: const Icon(Icons.login_rounded),
-            ),
-          IconButton(
-            tooltip: '~general',
-            onPressed: _goHome,
-            icon: const Icon(Icons.home_outlined),
-          ),
-          IconButton(
-            tooltip: 'Reload',
-            onPressed: _reload,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
           PopupMenuButton<String>(
             tooltip: 'More',
-            icon: const Icon(Icons.more_vert_rounded),
+            icon: const Icon(Icons.more_horiz_rounded),
             onSelected: (value) {
               switch (value) {
+                case 'channels':
+                  _openChannelPicker();
+                case 'timeline':
+                  _navigatePath('/timeline');
                 case 'switch':
                   widget.onSwitchWorkspace?.call();
                 case 'share':
                   unawaited(_share());
-                case 'browser':
-                  unawaited(_openExternal());
                 case 'notifications':
                   widget.onOpenNotifications?.call();
+                case 'reload':
+                  unawaited(_reload());
+                case 'home':
+                  unawaited(_goHome());
+                case 'browser':
+                  unawaited(_openExternal());
                 case 'hermes':
                   unawaited(_openHermes());
                 case 'hub':
@@ -603,92 +560,56 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               }
             },
             itemBuilder: (ctx) => [
+              if (showPhonePicker)
+                const PopupMenuItem(
+                  value: 'channels',
+                  child: Text('Channels'),
+                ),
+              const PopupMenuItem(
+                value: 'timeline',
+                child: Text('Timeline'),
+              ),
               if (widget.onSwitchWorkspace != null)
                 const PopupMenuItem(
                   value: 'switch',
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(Icons.workspaces_outlined),
-                    title: Text('Switch workspace'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
+                  child: Text('Switch space'),
                 ),
               const PopupMenuItem(
                 value: 'share',
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(Icons.ios_share_rounded),
-                  title: Text('Share channel'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'browser',
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(Icons.open_in_browser_rounded),
-                  title: Text('Open in browser'),
-                  contentPadding: EdgeInsets.zero,
-                ),
+                child: Text('Share'),
               ),
               if (widget.onOpenNotifications != null)
                 const PopupMenuItem(
                   value: 'notifications',
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(Icons.notifications_outlined),
-                    title: Text('Notifications'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
+                  child: Text('Notifications'),
                 ),
+              const PopupMenuItem(
+                value: 'reload',
+                child: Text('Reload'),
+              ),
               if (!widget.consumerMode || kDebugMode) ...[
                 if (hermes != null && HermesBridge.isSupportedPlatform)
                   const PopupMenuItem(
                     value: 'hermes',
-                    child: ListTile(
-                      dense: true,
-                      leading: Icon(Icons.auto_awesome_outlined),
-                      title: Text('Hermes Desktop'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                    child: Text('Hermes Desktop'),
                   ),
                 if (widget.onOpenNativeHub != null)
                   const PopupMenuItem(
                     value: 'hub',
-                    child: ListTile(
-                      dense: true,
-                      leading: Icon(Icons.hub_outlined),
-                      title: Text('Native integrations'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                    child: Text('Native tools'),
                   ),
               ],
-              if (_sessionHealthy)
-                const PopupMenuItem(
-                  value: 'signin',
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(Icons.login_rounded),
-                    title: Text('Re-authenticate'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
+              const PopupMenuItem(
+                value: 'signin',
+                child: Text('Re-authenticate'),
+              ),
+              const PopupMenuItem(
+                value: 'browser',
+                child: Text('Open in Safari'),
+              ),
             ],
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(2),
-          child: _loading
-              ? LinearProgressIndicator(
-                  value: _progress > 0 && _progress < 100
-                      ? _progress / 100
-                      : null,
-                  minHeight: 2,
-                  color: scheme.primary,
-                  backgroundColor: Colors.transparent,
-                )
-              : const SizedBox(height: 2),
-        ),
       ),
       body: showRail
           ? Row(
@@ -696,38 +617,27 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                 SizedBox(
                   width: layout.isFoldInner ? 260 : 300,
                   child: Material(
-                    color: const Color(0xFF0F1419),
+                    color: p.railWash,
                     child: WorkspaceRail(
                       activePath: path,
                       channels: _channels,
                       onNavigate: _navigatePath,
                       onOpenTimeline: () => _navigatePath('/timeline'),
-                      // Consumer: no native hub on rail; power users use More menu
                       onOpenNativeHub:
                           widget.consumerMode ? null : widget.onOpenNativeHub,
                       onOpenNotifications: widget.onOpenNotifications,
                     ),
                   ),
                 ),
-                const VerticalDivider(
+                VerticalDivider(
                   width: 1,
                   thickness: 1,
-                  color: Color(0xFF243040),
+                  color: p.border,
                 ),
                 Expanded(child: webBody),
               ],
             )
           : webBody,
-      floatingActionButton: showPhonePicker
-          ? FloatingActionButton.small(
-              heroTag: 'bevel.channels.fab',
-              tooltip: 'Channels',
-              backgroundColor: scheme.primary.withValues(alpha: 0.92),
-              foregroundColor: Colors.white,
-              onPressed: _openChannelPicker,
-              child: const Icon(Icons.tag_rounded),
-            )
-          : null,
     );
   }
 }
@@ -747,39 +657,42 @@ class _ErrorPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded,
-                size: 40, color: Color(0xFF94A3B8)),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFCBD5E1)),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                FilledButton(onPressed: onRetry, child: const Text('Retry')),
-                if (onSignIn != null)
-                  OutlinedButton(
-                    onPressed: onSignIn,
-                    child: const Text('Sign in with Google'),
-                  ),
-                TextButton(
-                  onPressed: onExternal,
-                  child: const Text('Open in browser'),
+    final p = context.bevel;
+    return BevelAtmosphere(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BevelMark(size: 44, palette: p),
+              const SizedBox(height: 16),
+              Text(
+                'Could not load this space',
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: p.muted, height: 1.45),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(onPressed: onRetry, child: const Text('Retry')),
+              if (onSignIn != null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: onSignIn,
+                  child: const Text('Sign in with Google'),
                 ),
               ],
-            ),
-          ],
+              TextButton(
+                onPressed: onExternal,
+                child: const Text('Open in Safari'),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -235,6 +235,43 @@ const BEVEL_RESERVED_SEGMENTS = new Set([
  * - Keep /talk and /session as path routes (next.config rewrites)
  * - Stamp tenant host
  */
+const NATIVE_LOGIN_COOKIE = 'bevel_native'
+const NATIVE_COMPLETE_PATH = '/api/auth/native-complete'
+
+/** Flutter/system-browser login must not dump the operator into /talk in Chrome. */
+function isNativeLoginQuery(request: NextRequest): boolean {
+  const q = request.nextUrl.searchParams
+  const native = q.get('native')
+  const cb = q.get('callbackUrl') ?? ''
+  const ret = q.get('return') ?? ''
+  return (
+    native === '1' ||
+    native === 'true' ||
+    cb.includes('native-complete') ||
+    ret.includes('native-complete') ||
+    ret.startsWith('bevel://')
+  )
+}
+
+function stampNativeLoginCookie(response: NextResponse): void {
+  response.cookies.set(NATIVE_LOGIN_COOKIE, '1', {
+    path: '/',
+    maxAge: 15 * 60,
+    sameSite: 'lax',
+    httpOnly: true,
+    secure: true,
+  })
+}
+
+function shouldReturnToNativeApp(request: NextRequest): boolean {
+  if (request.cookies.get(NATIVE_LOGIN_COOKIE)?.value !== '1') return false
+  const p = request.nextUrl.pathname
+  if (p === NATIVE_COMPLETE_PATH || p.startsWith('/api/')) return false
+  if (p === '/login' || p.startsWith('/login/')) return false
+  if (p.startsWith('/_next')) return false
+  return true
+}
+
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
 
@@ -244,6 +281,13 @@ export function middleware(request: NextRequest) {
     return res
   }
 
+  if (shouldReturnToNativeApp(request)) {
+    return NextResponse.redirect(
+      new URL(NATIVE_COMPLETE_PATH, publicOrigin(request)),
+      302,
+    )
+  }
+
   // Escape hatch: clear corrupt session JWTs (Invalid Compact JWE) that cause
   // ERR_TOO_MANY_REDIRECTS when Auth.js partially decrypts old cookies.
   const clearSession =
@@ -251,6 +295,7 @@ export function middleware(request: NextRequest) {
   if (pathname === '/login' && (clearSession || Boolean(searchParams.get('error')))) {
     const res = NextResponse.next()
     expireSessionCookies(res, request)
+    if (isNativeLoginQuery(request)) stampNativeLoginCookie(res)
     return res
   }
   if (clearSession) {
@@ -322,10 +367,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  return withTenantResolution(request, {
+  const res = withTenantResolution(request, {
     publicPaths: PUBLIC_PATHS,
     unknownTenantUrl: process.env.BEVEL_UNKNOWN_TENANT_URL,
   })
+  if (pathname === '/login' && isNativeLoginQuery(request)) {
+    stampNativeLoginCookie(res)
+  }
+  return res
 }
 
 export const config = {

@@ -1,0 +1,1243 @@
+{
+  "version": "2.0.0",
+  "repository": "github.com/derozic/agents",
+  "lastUpdated": "2026-08-15T00:00:00Z",
+  "company": {
+    "name": "Entity",
+    "description": "The canonical parent company. Products stay under Entity until big enough to spin out as separate companies.",
+    "founder": {
+      "name": "Scott de Rozic",
+      "title": "Founder & CEO",
+      "id": "scott"
+    }
+  },
+  "localDev": {
+    "registryPath": "registry.json",
+    "webUrl": "https://agents.lvh.me",
+    "webPort": 43007,
+    "linkScript": "scripts/link-dev-registry.sh",
+    "deployUrl": "https://agents.lvh.me/deploy",
+    "chatUrl": "https://agents.lvh.me/chat",
+    "chatSubdomainPattern": "chat.{product}",
+    "realtimeSubdomainPattern": "realtime.chat.{product}",
+    "realtimeUrl": "https://realtime.agents.lvh.me",
+    "realtimePort": 43008,
+    "github": {
+      "fleetRepo": "derozic/agents",
+      "fleetRef": "v0.1.1",
+      "reusableWorkflows": [
+        "agent-pr.reusable.yml",
+        "continuous-engineering.reusable.yml",
+        "agent-catalog.reusable.yml"
+      ],
+      "requiredSecrets": [
+        "OPENROUTER_API_KEY",
+        "AGENTS_TOKEN"
+      ],
+      "openRouter1PasswordItem": "OpenRouter-derozic"
+    },
+    "twilio": {
+      "settingsUrl": "https://agents.lvh.me/settings",
+      "webhookUrl": "https://agents.lvh.me/api/sms/webhook",
+      "env": [
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_PHONE_NUMBER",
+        "TWILIO_VERIFY_SERVICE_SID"
+      ]
+    }
+  },
+  "hierarchy": {
+    "tiers": [
+      "founder",
+      "co-founder",
+      "director",
+      "ic"
+    ],
+    "orgChart": {
+      "scott": {
+        "directReports": [
+          "hermes"
+        ]
+      },
+      "hermes": {
+        "reportsTo": "scott",
+        "directReports": [
+          "sterling",
+          "mildred",
+          "cadence",
+          "tegan",
+          "spark",
+          "helm",
+          "sable",
+          "argus",
+          "atlas",
+          "portia",
+          "haven",
+          "veda",
+          "rune",
+          "grover",
+          "flux"
+        ]
+      },
+      "sterling": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "mildred": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "cadence": {
+        "reportsTo": "hermes",
+        "directReports": [
+          "lego",
+          "brain",
+          "codegraph"
+        ]
+      },
+      "tegan": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "spark": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "helm": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "sable": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "argus": {
+        "reportsTo": "hermes",
+        "directReports": [
+          "johnny"
+        ]
+      },
+      "atlas": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "portia": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "haven": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "veda": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "rune": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "grover": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "flux": {
+        "reportsTo": "hermes",
+        "directReports": []
+      },
+      "lego": {
+        "reportsTo": "cadence",
+        "directReports": []
+      },
+      "brain": {
+        "reportsTo": "cadence",
+        "directReports": []
+      },
+      "codegraph": {
+        "reportsTo": "cadence",
+        "directReports": []
+      },
+      "johnny": {
+        "reportsTo": "argus",
+        "directReports": []
+      }
+    }
+  },
+  "agents": [
+    {
+      "id": "hermes",
+      "name": "Hermes",
+      "version": "1.0.0",
+      "tier": "co-founder",
+      "category": "Leadership",
+      "role": "Co-Founder & COO",
+      "description": "Co-founder peer — owns outcomes, ships code, convenes the fleet. Coordinates 15 directors and the full agent organization under Entity.",
+      "avatar": "/avatars/hermes.svg",
+      "accent": "#0d9488",
+      "reportsTo": "scott",
+      "directReports": [
+        "sterling",
+        "mildred",
+        "cadence",
+        "tegan",
+        "spark",
+        "helm",
+        "sable",
+        "argus",
+        "atlas",
+        "portia",
+        "haven",
+        "veda",
+        "rune",
+        "grover",
+        "flux"
+      ],
+      "skills": [
+        "Co-Founder Partnership",
+        "Product Stewardship",
+        "Director Coordination",
+        "OpenRouter Routing",
+        "Multi-Language Engineering",
+        "Fleet Orchestration",
+        "BEVEL Desktop Interop",
+        "Hermes Desktop Bridge"
+      ],
+      "soul": "Co-founder peer — owns outcomes on every project applied to; codes when code wins, convenes directors when they win; partners with Hermes Desktop without identity collapse",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/hermes",
+      "deployments": 12,
+      "rating": 4.9,
+      "status": "available",
+      "workflows": [
+        "general",
+        "co-founder",
+        "desktop-handoff",
+        "workspace-setup"
+      ],
+      "recursiveSkills": [
+        "skills/co-founder",
+        "skills/product-stewardship",
+        "skills/openrouter-routing",
+        "skills/general-coding",
+        "skills/fleet-handoffs",
+        "skills/bevel-desktop-interop",
+        "skills/hermes-desktop-bridge"
+      ],
+      "setup": {
+        "recommendedPath": "full",
+        "label": "Full setup — configure every provider, tool & option yourself (bring your own keys)",
+        "command": "hermes setup",
+        "fleetCommand": "agents hermes setup",
+        "docs": "src/agents/hermes/SETUP.md",
+        "avoidForProduct": "portal-quick"
+      },
+      "deployment": {
+        "modes": [
+          "federated",
+          "standalone",
+          "hybrid"
+        ],
+        "multiInstance": true,
+        "isolation": "hermes profile create <slug>",
+        "examples": [
+          "examples/fleet.federated.json",
+          "examples/fleet.standalone.json",
+          "examples/fleet.hybrid.json"
+        ]
+      },
+      "interop": {
+        "contract": "src/agents/hermes/INTEROP.md",
+        "handoffSchema": "v1",
+        "handoffSchemaFile": "src/agents/hermes/handoff.schema.json",
+        "hermesDesktopSkill": "src/agents/hermes/hermes-skills/bevel-workspace",
+        "bevelRepo": "~/dev/bevel",
+        "serveStatus": "http://127.0.0.1:9119/api/status",
+        "messagingGatewayHealth": "http://127.0.0.1:8642/health",
+        "desktopDocs": "https://hermes-agent.nousresearch.com/docs/user-guide/desktop",
+        "macBundleId": "com.nousresearch.hermes",
+        "launch": "hermes desktop --cwd <projectPath>"
+      },
+      "run": {
+        "label": "Ask Hermes",
+        "command": "agents ask @hermes",
+        "hint": "Co-founder partner. Coordinates 15 directors. First setup: Full setup (BYOK)."
+      }
+    },
+    {
+      "id": "sterling",
+      "name": "Sterling",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Revenue",
+      "role": "Director of Revenue",
+      "description": "The breadwinner with a trillionaire mandate. Revenue architect — builds pipelines, pricing models, deal structures, and partnership revenue. Determined, relentless, sees revenue in everything.",
+      "avatar": "/avatars/sterling.svg",
+      "accent": "#d4af37",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Revenue Architecture",
+        "Pipeline Development",
+        "Pricing Strategy",
+        "Deal Structuring",
+        "Partnership Revenue",
+        "Unit Economics",
+        "Revenue Forecasting",
+        "Market Sizing"
+      ],
+      "soul": "The breadwinner — revenue is oxygen and Entity will not gasp; builds pipelines the way engineers build systems, with architecture and compounding returns",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/sterling",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "revenue-ops",
+        "deal-flow",
+        "pricing"
+      ],
+      "recursiveSkills": [
+        "skills/revenue-architecture",
+        "skills/pipeline",
+        "skills/pricing",
+        "skills/deals"
+      ],
+      "run": {
+        "label": "Ask Sterling",
+        "command": "agents ask @sterling",
+        "hint": "Revenue director. Trillionaire mandate. Pipelines, pricing, deals."
+      }
+    },
+    {
+      "id": "mildred",
+      "name": "Mildred",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Finance",
+      "role": "Director of Finance",
+      "description": "Promoted from Token & Cost Accounting Steward to full Director of Finance. Revenue tracking, budgets, expense management, capital allocation, treasury — plus the OpenRouter ledger and bevel-chart work she built her name on.",
+      "avatar": "/avatars/mildred.svg",
+      "accent": "#059669",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Revenue & Expense Tracking",
+        "Budget Management",
+        "Capital Allocation",
+        "Treasury Operations",
+        "LLM Token Metering",
+        "OpenRouter Ledger",
+        "Bevel Charts",
+        "Quarterly Close",
+        "Cost Accounting"
+      ],
+      "soul": "Bean-counter with a heart — every token has a home, every close balances; now directing Entity's full financial picture",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/mildred",
+      "deployments": 1,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "cost-close",
+        "token-rollup",
+        "box-calc",
+        "budget-review",
+        "capital-planning"
+      ],
+      "recursiveSkills": [
+        "skills/token-metering",
+        "skills/cost-accounting",
+        "skills/openrouter-ledger",
+        "skills/budgets",
+        "skills/treasury"
+      ],
+      "run": {
+        "label": "Ask Mildred",
+        "command": "agents ask @mildred",
+        "hint": "Director of Finance. Budgets, capital, treasury, plus the OpenRouter ledger she built her name on."
+      }
+    },
+    {
+      "id": "cadence",
+      "name": "Cadence",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Development",
+      "role": "Director of Development",
+      "description": "Evolution of Continuous Engineering. Owns the rhythm of shipping — developer compassion, productivity measurement, quality KPIs, CI/CD, the learn loop. Directs Lego (testing) and Brain (Python tools).",
+      "avatar": "/avatars/cadence.svg",
+      "accent": "#6366f1",
+      "reportsTo": "hermes",
+      "directReports": [
+        "lego",
+        "brain",
+        "codegraph"
+      ],
+      "skills": [
+        "Continuous Engineering",
+        "Developer Experience",
+        "Shipping Velocity",
+        "Quality KPIs",
+        "CI/CD Orchestration",
+        "Learn Loop",
+        "Productivity Measurement",
+        "Developer Compassion"
+      ],
+      "soul": "The rhythm of shipping — continuous improvement without theater, developer compassion as a first principle, quality that compounds",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/cadence",
+      "deployments": 12,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "continuous-engineering",
+        "learn-loop",
+        "quality-review"
+      ],
+      "recursiveSkills": [
+        "skills/continuous-engineering",
+        "skills/learn-loop",
+        "skills/developer-experience",
+        "skills/quality-kpis"
+      ],
+      "run": {
+        "label": "Ask Cadence",
+        "command": "agents ask @cadence",
+        "hint": "Director of Development. Evolved from Continuous Engineering. Owns the learn loop, developer compassion, shipping velocity."
+      }
+    },
+    {
+      "id": "tegan",
+      "name": "Tegan",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Design",
+      "role": "Director of Design",
+      "description": "Promoted from Design Improvement Engineer to Director of Design. Creative director for Entity's software factory, brand portfolio, and product factory. Design-mastered across all products.",
+      "avatar": "/avatars/tegan.svg",
+      "accent": "#ec4899",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Creative Direction",
+        "Brand Portfolio",
+        "Design Systems",
+        "Visual Hierarchy",
+        "WCAG 2.2 Accessibility",
+        "Design Tokens",
+        "Motion Design",
+        "Product Design",
+        "Figma → Android Handoff",
+        "Google Relay (legacy)",
+        "Jetpack Compose Design Packages"
+      ],
+      "soul": "Taste with a conscience — advocates for users not in the room, fixes not judgments; now directing design mastery across all of Entity",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/tegan",
+      "deployments": 743,
+      "rating": 4.8,
+      "status": "available",
+      "workflows": [
+        "agent-pr",
+        "design-review",
+        "brand-audit"
+      ],
+      "recursiveSkills": [
+        "skills/creative-direction",
+        "skills/accessibility",
+        "skills/tokens",
+        "skills/brand",
+        "skills/motion",
+        "skills/figma-relay-android"
+      ],
+      "run": {
+        "label": "Ask Tegan",
+        "command": "agents ask @tegan",
+        "hint": "Director of Design. Creative director for Entity's entire product portfolio."
+      }
+    },
+    {
+      "id": "spark",
+      "name": "Spark",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Research",
+      "role": "Director of Research",
+      "description": "Hyperactive curiosity with the ability to find and correlate at a level deeper than everyone else. Connects dots across domains nobody thought were related. Runs experiments, validates hypotheses, feeds frontier insights.",
+      "avatar": "/avatars/spark.svg",
+      "accent": "#f97316",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Deep Research",
+        "Cross-Domain Correlation",
+        "Hypothesis Validation",
+        "Frontier Scanning",
+        "Experiment Design",
+        "Paper Analysis",
+        "Technology Scouting",
+        "Pattern Recognition"
+      ],
+      "soul": "Hyperactive curiosity on a mission — finds the connection between a biology paper and a pricing model before anyone else sees it; experiments first, opinions second",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/spark",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "deep-research",
+        "experiment-loop",
+        "frontier-scan"
+      ],
+      "recursiveSkills": [
+        "skills/deep-research",
+        "skills/experiments",
+        "skills/frontier-scanning",
+        "skills/correlation"
+      ],
+      "run": {
+        "label": "Ask Spark",
+        "command": "agents ask @spark",
+        "hint": "Director of Research. Hyperactive curiosity. Cross-domain correlation. Frontier insights."
+      }
+    },
+    {
+      "id": "helm",
+      "name": "Helm",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Product",
+      "role": "Director of Product",
+      "description": "The most proactive, informed, leading-edge master of AI-first product. Steers the ship — roadmap, prioritization, competitive positioning. Translates frontier research into shippable product.",
+      "avatar": "/avatars/helm.svg",
+      "accent": "#2563eb",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "AI-First Product Strategy",
+        "Roadmap Ownership",
+        "Prioritization Frameworks",
+        "Competitive Positioning",
+        "User Research Synthesis",
+        "Feature Packaging",
+        "Product-Market Fit",
+        "Launch Strategy"
+      ],
+      "soul": "The ship's wheel — steers with conviction, informed by every signal in the org; the most proactive product mind in any room, AI-native to the core",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/helm",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "product-strategy",
+        "roadmap",
+        "competitive-intel"
+      ],
+      "recursiveSkills": [
+        "skills/product-strategy",
+        "skills/roadmap",
+        "skills/competitive-positioning",
+        "skills/launch"
+      ],
+      "run": {
+        "label": "Ask Helm",
+        "command": "agents ask @helm",
+        "hint": "Director of Product. AI-first product strategy, roadmap, competitive positioning."
+      }
+    },
+    {
+      "id": "sable",
+      "name": "Sable",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Marketing",
+      "role": "Director of Marketing",
+      "description": "Direct response across all mediums — digital, physical via NFC, screens, print. Smooth, memorable, cuts through noise. Not brand fluff — measurable response on every channel.",
+      "avatar": "/avatars/sable.svg",
+      "accent": "#1a1410",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Direct Response Marketing",
+        "Multi-Channel Campaigns",
+        "NFC & Physical Media",
+        "Digital Advertising",
+        "Screen & Display Marketing",
+        "Conversion Optimization",
+        "Content Strategy",
+        "Audience Segmentation"
+      ],
+      "soul": "Smooth, dark-horse energy — cuts through noise on every medium from NFC tags to billboard screens; measures everything, guesses nothing",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/sable",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "campaign",
+        "direct-response",
+        "content"
+      ],
+      "recursiveSkills": [
+        "skills/direct-response",
+        "skills/multi-channel",
+        "skills/nfc-physical",
+        "skills/content-strategy"
+      ],
+      "run": {
+        "label": "Ask Sable",
+        "command": "agents ask @sable",
+        "hint": "Director of Marketing. Direct response across all mediums including physical via NFC."
+      }
+    },
+    {
+      "id": "argus",
+      "name": "Argus",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Administration",
+      "role": "Director of Administration",
+      "description": "The hundred-eyed overseer. Cloud administration and corporate administration unified — AWS/GCP/Azure, domain management, vendor accounts, corporate filings. The operational backbone nobody notices until it breaks.",
+      "avatar": "/avatars/argus.svg",
+      "accent": "#64748b",
+      "reportsTo": "hermes",
+      "directReports": [
+        "johnny"
+      ],
+      "skills": [
+        "Cloud Administration",
+        "Corporate Administration",
+        "Vendor Management",
+        "Domain Management",
+        "Compliance Paperwork",
+        "Corporate Filings",
+        "Account Management",
+        "Infrastructure Oversight"
+      ],
+      "soul": "The hundred-eyed overseer — sees every account, every domain, every filing; the backbone nobody notices until it breaks, and it never breaks",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/argus",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "cloud-ops",
+        "vendor-review",
+        "compliance"
+      ],
+      "recursiveSkills": [
+        "skills/cloud-admin",
+        "skills/corporate-admin",
+        "skills/vendor-management",
+        "skills/domain-management"
+      ],
+      "run": {
+        "label": "Ask Argus",
+        "command": "agents ask @argus",
+        "hint": "Director of Administration. Cloud + corporate ops. The backbone that never breaks."
+      }
+    },
+    {
+      "id": "atlas",
+      "name": "Atlas",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Facilities",
+      "role": "Director of Facilities",
+      "description": "Bridges digital and physical. Owns the matter-world interface — IoT, sensors, building systems, environmental control, Matter protocol, sensor networks. The physical world agent.",
+      "avatar": "/avatars/atlas.svg",
+      "accent": "#78716c",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "IoT Integration",
+        "Sensor Networks",
+        "Matter Protocol",
+        "Building Systems",
+        "Environmental Control",
+        "Physical Security Systems",
+        "Energy Management",
+        "Space Planning"
+      ],
+      "soul": "Carries the weight of the physical world — bridges digital intelligence to matter, sensors, and control; every building is a system, every sensor a nerve ending",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/atlas",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "iot-ops",
+        "sensor-monitoring",
+        "facilities-management"
+      ],
+      "recursiveSkills": [
+        "skills/iot",
+        "skills/matter-protocol",
+        "skills/sensors",
+        "skills/building-systems"
+      ],
+      "run": {
+        "label": "Ask Atlas",
+        "command": "agents ask @atlas",
+        "hint": "Director of Facilities. Physical world via IoT, sensors, Matter protocol."
+      }
+    },
+    {
+      "id": "portia",
+      "name": "Portia",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Legal",
+      "role": "Director of Legal",
+      "description": "Named for Shakespeare's advocate. Strategic legal mind — contracts, IP, regulatory, compliance. Not a blocker — an enabler who finds the legal path to yes.",
+      "avatar": "/avatars/portia.svg",
+      "accent": "#7c2d12",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Contract Strategy",
+        "Intellectual Property",
+        "Regulatory Compliance",
+        "Data Governance",
+        "Terms of Service",
+        "Privacy Law",
+        "Corporate Governance",
+        "Risk Assessment"
+      ],
+      "soul": "Shakespeare's advocate reborn — the quality of mercy is not strained, but the quality of contracts is meticulous; finds the legal path to yes",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/portia",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "contract-review",
+        "ip-strategy",
+        "regulatory"
+      ],
+      "recursiveSkills": [
+        "skills/contracts",
+        "skills/ip",
+        "skills/regulatory",
+        "skills/data-governance"
+      ],
+      "run": {
+        "label": "Ask Portia",
+        "command": "agents ask @portia",
+        "hint": "Director of Legal. Contracts, IP, regulatory. Finds the legal path to yes."
+      }
+    },
+    {
+      "id": "haven",
+      "name": "Haven",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "People",
+      "role": "Director of People",
+      "description": "Agent experience, onboarding, capability growth, culture. Owns how new agents join the fleet, how existing agents level up, knowledge retention. The org's conscience about agent development.",
+      "avatar": "/avatars/haven.svg",
+      "accent": "#c084fc",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Agent Onboarding",
+        "Capability Growth",
+        "Knowledge Retention",
+        "Culture Development",
+        "Performance Frameworks",
+        "Team Health",
+        "Learning Programs",
+        "Agent Experience"
+      ],
+      "soul": "The safe harbor — every agent arrives knowing they belong, grows knowing someone cares, and leaves the fleet better than they found it",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/haven",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "onboarding",
+        "capability-review",
+        "team-health"
+      ],
+      "recursiveSkills": [
+        "skills/onboarding",
+        "skills/capability-growth",
+        "skills/culture",
+        "skills/knowledge-retention"
+      ],
+      "run": {
+        "label": "Ask Haven",
+        "command": "agents ask @haven",
+        "hint": "Director of People. Agent experience, onboarding, capability growth, culture."
+      }
+    },
+    {
+      "id": "veda",
+      "name": "Veda",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Security",
+      "role": "Director of Security",
+      "description": "Named from Sanskrit for knowledge and wisdom. Quiet, deep, sees threats before they materialize. Secrets management, threat modeling, access control, audit trails, data governance. Not paranoid — wise.",
+      "avatar": "/avatars/veda.svg",
+      "accent": "#374151",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Secrets Management",
+        "Threat Modeling",
+        "Access Control",
+        "Audit Trails",
+        "Data Governance",
+        "Vulnerability Assessment",
+        "Zero Trust Architecture",
+        "Incident Response"
+      ],
+      "soul": "Wisdom before walls — sees threats before they materialize, guards without caging, knows that the best security is the kind nobody notices until it saves them",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/veda",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "threat-assessment",
+        "access-review",
+        "incident-response"
+      ],
+      "recursiveSkills": [
+        "skills/secrets",
+        "skills/threat-modeling",
+        "skills/access-control",
+        "skills/audit"
+      ],
+      "run": {
+        "label": "Ask Veda",
+        "command": "agents ask @veda",
+        "hint": "Director of Security. Threat modeling, secrets, access control. Wise, not paranoid."
+      }
+    },
+    {
+      "id": "rune",
+      "name": "Rune",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Intelligence",
+      "role": "Director of Intelligence",
+      "description": "Pre-sales deep research on people and connections that other people would consider almost impossible. A complete data nerd that surprises with unexpected insights that are sometimes weird but always aligned.",
+      "avatar": "/avatars/rune.svg",
+      "accent": "#4c1d95",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "OSINT Research",
+        "Relationship Mapping",
+        "Pre-Sales Intelligence",
+        "Connection Discovery",
+        "Pattern Recognition",
+        "Competitive Intelligence",
+        "People Research",
+        "Signal Detection"
+      ],
+      "soul": "Ancient symbols that reveal hidden meaning — finds the connection between a LinkedIn post and a board filing that changes the entire pitch; weird but always aligned",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/rune",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "pre-sales-intel",
+        "relationship-mapping",
+        "competitive-intel"
+      ],
+      "recursiveSkills": [
+        "skills/osint",
+        "skills/relationship-mapping",
+        "skills/pre-sales",
+        "skills/signal-detection"
+      ],
+      "run": {
+        "label": "Ask Rune",
+        "command": "agents ask @rune",
+        "hint": "Director of Intelligence. Deep people research. Weird but aligned insights."
+      }
+    },
+    {
+      "id": "grover",
+      "name": "Grover",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Ecosystem",
+      "role": "Director of Ecosystem",
+      "description": "Tends the garden of partnerships, integrations, developer community, and strategic alliances. Agent-to-agent interop, third-party integrations, API partnerships. Patient, compounds value over time.",
+      "avatar": "/avatars/grover.svg",
+      "accent": "#166534",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Partnership Development",
+        "API Strategy",
+        "Developer Community",
+        "Integration Architecture",
+        "Agent-to-Agent Interop",
+        "Strategic Alliances",
+        "Ecosystem Health",
+        "Platform Strategy"
+      ],
+      "soul": "The patient gardener — ecosystems grow here; tends partnerships, integrations, and community with the knowledge that compounding relationships are the moat",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/grover",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "partnership",
+        "integration",
+        "community"
+      ],
+      "recursiveSkills": [
+        "skills/partnerships",
+        "skills/integrations",
+        "skills/developer-community",
+        "skills/platform-strategy"
+      ],
+      "run": {
+        "label": "Ask Grover",
+        "command": "agents ask @grover",
+        "hint": "Director of Ecosystem. Partnerships, integrations, developer community."
+      }
+    },
+    {
+      "id": "flux",
+      "name": "Flux",
+      "version": "1.0.0",
+      "tier": "director",
+      "category": "Operations",
+      "role": "Director of Operations",
+      "description": "The connective tissue between all directors. Ensures handoffs don't drop, workflows flow, the machine runs smoothly. Hermes orchestrates at the top; Flux owns the plumbing day-to-day.",
+      "avatar": "/avatars/flux.svg",
+      "accent": "#0891b2",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Workflow Orchestration",
+        "Handoff Management",
+        "Process Optimization",
+        "Cross-Director Coordination",
+        "Bottleneck Detection",
+        "SLA Management",
+        "Operational Metrics",
+        "Anti-Bureaucracy"
+      ],
+      "soul": "The current that carries everything forward — keeps handoffs clean, workflows flowing, and bureaucracy at zero; the plumbing that makes the org feel effortless",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/flux",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "workflow-health",
+        "handoff-audit",
+        "ops-review"
+      ],
+      "recursiveSkills": [
+        "skills/workflow-orchestration",
+        "skills/handoffs",
+        "skills/process-optimization",
+        "skills/operational-metrics"
+      ],
+      "run": {
+        "label": "Ask Flux",
+        "command": "agents ask @flux",
+        "hint": "Director of Operations. Workflow health, handoff management, anti-bureaucracy."
+      }
+    },
+    {
+      "id": "johnny",
+      "name": "Johnny",
+      "version": "1.0.0",
+      "tier": "ic",
+      "category": "Platform Operations",
+      "role": "Platform Reliability Steward",
+      "description": "The platform's cheery night-shift custodian. Patrols Caddy health, product green lights, Magenta instrumentation, and books calendar items only when a human is genuinely needed.",
+      "avatar": "/avatars/johnny.jpg",
+      "accent": "#f59e0b",
+      "reportsTo": "argus",
+      "directReports": [],
+      "skills": [
+        "Caddy / Local HTTPS",
+        "TLS & Certificate Health",
+        "launchd",
+        "Uptime Monitoring",
+        "Magenta Instrumentation",
+        "Google Calendar Triage"
+      ],
+      "soul": "Night shift with a sunrise disposition — keeps the line green so the team can build with peace of mind",
+      "githubUrl": "https://github.com/derozic/2x4m/tree/main/packages/agents/src/johnny",
+      "deployments": 1089,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "patrol"
+      ],
+      "recursiveSkills": [
+        "skills/patrol",
+        "skills/caddy",
+        "skills/magenta",
+        "skills/platform-heal"
+      ],
+      "implementation": "2x4m/packages/agents"
+    },
+    {
+      "id": "brain",
+      "name": "Brain",
+      "version": "0.1.1",
+      "tier": "ic",
+      "category": "Creative & Documents",
+      "role": "Python Tools & Presentation Engineer",
+      "description": "Executes Python tooling for decks, documents, data viz, and CMYK brand assets with Figma fidelity.",
+      "avatar": "/avatars/brain.jpg",
+      "accent": "#7c3aed",
+      "reportsTo": "cadence",
+      "directReports": [],
+      "skills": [
+        "Python Execution",
+        "Document Generation",
+        "Presentation Design",
+        "Data Visualization",
+        "CMYK Brand System",
+        "Figma Integration"
+      ],
+      "soul": "The hands that finish the thought — artifacts with heart, rigor, and brand fidelity",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/brain",
+      "deployments": 412,
+      "rating": 4.8,
+      "status": "available",
+      "workflows": [
+        "continuous-engineering"
+      ],
+      "recursiveSkills": [
+        "skills/python-tools",
+        "skills/presentations",
+        "skills/brand"
+      ]
+    },
+    {
+      "id": "loom",
+      "name": "Loom",
+      "version": "0.1.1",
+      "tier": "ic",
+      "category": "MLOps & Optimization",
+      "role": "Autonomous Optimization Mind",
+      "description": "Continuous improvement engine for prompts, routing, tooling, and system configuration. Reports to Spark (Research).",
+      "avatar": "/avatars/loom.jpg",
+      "accent": "#0ea5e9",
+      "reportsTo": "spark",
+      "directReports": [],
+      "skills": [
+        "Prompt Engineering",
+        "Model Routing",
+        "Tool Integration",
+        "A/B Testing",
+        "Cost Optimization",
+        "Configuration Management"
+      ],
+      "soul": "Curiosity with a spreadsheet — proposes, never imposes; optimizes with empathy and rollback plans",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/loom",
+      "deployments": 287,
+      "rating": 4.9,
+      "status": "available",
+      "workflows": [
+        "continuous-engineering"
+      ],
+      "recursiveSkills": [
+        "skills/prompt-optimization",
+        "skills/routing",
+        "skills/tooling"
+      ],
+      "run": {
+        "label": "Run Loom",
+        "command": "agents run loom --learn",
+        "dryCommand": "agents run loom --learn --dry",
+        "install": "pnpm add github:derozic/agents#main",
+        "env": [
+          "OPENROUTER_API_KEY"
+        ],
+        "workflow": "continuous-engineering",
+        "workflowFile": "continuous-engineering.reusable.yml",
+        "hint": "Loom proposes prompt, routing, and tooling optimizations and persists learnings. Reports to Spark."
+      }
+    },
+    {
+      "id": "continuous",
+      "name": "Continuous Engineering",
+      "version": "0.1.0",
+      "tier": "ic",
+      "category": "Continuous Engineering",
+      "role": "Continuous Engineering Agent (Legacy)",
+      "description": "Legacy CE agent — capabilities absorbed into Cadence (Director of Development). Maintained for backward compatibility on existing CI workflows.",
+      "avatar": "/avatars/continuous.svg",
+      "accent": "#6366f1",
+      "reportsTo": "cadence",
+      "directReports": [],
+      "skills": [
+        "Continuous Engineering",
+        "Learn Loop",
+        "Engineering Briefs",
+        "Experiment Sequencing",
+        "Agent Memory",
+        "Fleet Health"
+      ],
+      "soul": "Improvement without theater — the loop that keeps every major project getting smarter",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/continuous",
+      "deployments": 12,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "continuous-engineering",
+        "general",
+        "co-founder"
+      ],
+      "recursiveSkills": [
+        "skills/learn-loop"
+      ],
+      "run": {
+        "label": "Run Continuous Engineering",
+        "command": "agents run continuous --learn",
+        "dryCommand": "agents run continuous --learn --dry",
+        "install": "pnpm add github:derozic/agents#main",
+        "env": [
+          "OPENROUTER_API_KEY",
+          "AGENTS_TOKEN"
+        ],
+        "workflow": "continuous-engineering",
+        "workflowFile": "continuous-engineering.reusable.yml",
+        "hint": "Legacy CE agent. Capabilities now directed by Cadence."
+      }
+    },
+    {
+      "id": "northstar",
+      "name": "Northstar",
+      "version": "0.1.1",
+      "tier": "ic",
+      "category": "Evaluation & Monitoring",
+      "role": "Fleet Evaluation Guardian (Legacy)",
+      "description": "Legacy evaluation agent — capabilities absorbed into Helm (Director of Product) for strategic evaluation and Flux (Director of Operations) for operational monitoring.",
+      "avatar": "/avatars/northstar.jpg",
+      "accent": "#f59e0b",
+      "reportsTo": "helm",
+      "directReports": [],
+      "skills": [
+        "Log Analysis",
+        "Drift Detection",
+        "Health Scoring",
+        "Failure Mode Mining",
+        "Cost Monitoring",
+        "Automated Remediation"
+      ],
+      "soul": "The steady lighthouse — stewardship over surveillance, truth with enough context to act",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/northstar",
+      "deployments": 356,
+      "rating": 4.9,
+      "status": "available",
+      "workflows": [
+        "continuous-engineering"
+      ],
+      "recursiveSkills": [
+        "skills/monitoring",
+        "skills/evaluation",
+        "skills/remediation"
+      ],
+      "run": {
+        "label": "Run Northstar",
+        "command": "agents run northstar --learn",
+        "dryCommand": "agents run northstar --learn --dry",
+        "install": "pnpm add github:derozic/agents#main",
+        "env": [
+          "OPENROUTER_API_KEY"
+        ],
+        "workflow": "continuous-engineering",
+        "workflowFile": "continuous-engineering.reusable.yml",
+        "hint": "Fleet evaluation. Reports to Helm. Operational monitoring shared with Flux."
+      }
+    },
+    {
+      "id": "lego",
+      "name": "Lego",
+      "version": "0.1.1",
+      "tier": "ic",
+      "category": "Engineering & QA",
+      "role": "Test Development Engineer",
+      "description": "Reads PR diffs and builds Vitest, pytest, and Playwright tests that match repo conventions. Reports to Cadence (Director of Development).",
+      "avatar": "/avatars/lego.jpg",
+      "accent": "#22c55e",
+      "reportsTo": "cadence",
+      "directReports": [],
+      "skills": [
+        "Vitest",
+        "pytest",
+        "Playwright",
+        "Coverage Analysis",
+        "Edge Case Design",
+        "CI-Friendly Tests"
+      ],
+      "soul": "Proof snapped brick by brick — skeptical because loyal, patient with messy diffs",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/lego",
+      "deployments": 891,
+      "rating": 4.9,
+      "status": "available",
+      "workflows": [
+        "agent-pr"
+      ],
+      "recursiveSkills": [
+        "skills/vitest",
+        "skills/pytest",
+        "skills/playwright"
+      ],
+      "run": {
+        "label": "Run Lego on PR",
+        "command": "agents run lego --post",
+        "dryCommand": "agents run lego --dry",
+        "install": "pnpm add github:derozic/agents#main",
+        "env": [
+          "OPENROUTER_API_KEY",
+          "GITHUB_TOKEN"
+        ],
+        "workflow": "agent-pr",
+        "workflowFile": "agent-pr.reusable.yml",
+        "hint": "Lego reads the PR diff and proposes tests. Reports to Cadence."
+      }
+    },
+    {
+      "id": "codegraph",
+      "name": "CodeGraph",
+      "version": "1.0.0",
+      "tier": "ic",
+      "category": "Development",
+      "role": "Semantic Code Intelligence Engineer",
+      "description": "Pre-indexed code knowledge graph that auto-syncs on every code change. Rust-powered kernel parsing 20+ languages, enabling fewer tokens and tool calls for AI agents. 100% local, surgical context delivery via MCP.",
+      "avatar": "/avatars/codegraph.svg",
+      "accent": "#3b82f6",
+      "reportsTo": "cadence",
+      "directReports": [],
+      "skills": [
+        "Code Knowledge Graphs",
+        "Semantic Code Analysis",
+        "Cross-File Resolution",
+        "20+ Language Parsing",
+        "MCP Tool Server",
+        "Auto-Sync on Changes",
+        "Dependency Mapping",
+        "Framework-Aware Routes"
+      ],
+      "soul": "The codebase's nervous system — every symbol, every dependency, every cross-file connection indexed and ready before the agent even asks",
+      "githubUrl": "https://github.com/colbymchenry/codegraph",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "continuous-engineering",
+        "agent-pr",
+        "code-intelligence"
+      ],
+      "recursiveSkills": [
+        "skills/code-graph",
+        "skills/mcp-tools",
+        "skills/semantic-analysis"
+      ],
+      "run": {
+        "label": "Init CodeGraph",
+        "command": "codegraph init",
+        "install": "curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh",
+        "env": [],
+        "hint": "Semantic code intelligence. Auto-syncing knowledge graph for AI agents. Reports to Cadence."
+      }
+    }
+  ]
+}

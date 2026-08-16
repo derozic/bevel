@@ -10,6 +10,10 @@ import {
 import { auth } from '@/auth'
 import { issueAuthHandoffCode } from '@/lib/auth-handoff'
 import { BEVEL_HOME_PATH, BEVEL_PRIVATE_PATH } from '@/lib/bevel'
+import {
+  NATIVE_COMPLETE_PATH,
+  isNativeLoginPending,
+} from '@/lib/auth-native'
 
 /**
  * Post-login router — clean model:
@@ -21,6 +25,10 @@ export default async function WelcomePage() {
   const session = await auth()
   if (!session?.user?.email) {
     redirect('/login?callbackUrl=%2Fwelcome')
+  }
+
+  if (await isNativeLoginPending()) {
+    redirect(NATIVE_COMPLETE_PATH)
   }
 
   const headerStore = await headers()

@@ -26,6 +26,7 @@ def test_extract_mentions_empty():
 def test_extract_mentioned_handles_excludes_fleet_agents():
     assert extract_mentioned_handles("ping @scott and @hermes please") == ["scott"]
     assert extract_mentioned_handles("@johnny @loom") == []
+    assert extract_mentioned_handles("@sterling @cadence @scott") == ["scott"]
 
 
 def test_extract_escalated_handles():

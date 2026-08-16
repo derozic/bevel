@@ -13,6 +13,7 @@ export {
 } from './FleetProvider'
 export { AgentChip, type AgentChipProps } from './components/AgentChip'
 export { FleetChat, type FleetChatProps } from './components/FleetChat'
+export { MessageGestures } from './components/MessageGestures'
 export {
   formatFleetError,
   formatRoomErrorEvent,

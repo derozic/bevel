@@ -18,6 +18,10 @@ import { BevelCutMark } from '@/components/BevelCutMark'
 import { BevelMark } from '@/components/BevelMark'
 import { GitHubSignInButton, GoogleSignInButton } from './GoogleSignInButton'
 import { OtpSignIn } from './OtpSignIn'
+import {
+  NATIVE_COMPLETE_PATH,
+  isNativeLoginRequest,
+} from '@/lib/auth-native'
 
 const ERROR_COPY: Record<string, string> = {
   Configuration:
@@ -48,10 +52,16 @@ const ERROR_COPY: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; error?: string }>
+  searchParams: Promise<{
+    callbackUrl?: string
+    error?: string
+    native?: string
+    return?: string
+  }>
 }) {
   const session = await auth()
   const params = await searchParams
+  const nativeReturn = isNativeLoginRequest(params)
   const errorKey = params.error ?? ''
   const errorMessage = errorKey
     ? (ERROR_COPY[errorKey] ?? ERROR_COPY.Default)
@@ -78,13 +88,17 @@ export default async function LoginPage({
   const isPlatformTenant = isPlatformEntryTenantSlug(tenant.slug)
   const isPlatform = platformEntry || isPlatformTenant
 
-  // Never allow callbackUrl to point back at the auth funnel (redirect loops).
+  // Flutter sends native=1. Absolute callback URLs used to be discarded
+  // (must start with /), so Auth.js landed on /welcome and never returned
+  // to the desktop app.
   const rawCallback =
-    params.callbackUrl &&
-    params.callbackUrl.startsWith('/') &&
-    !params.callbackUrl.startsWith('//')
-      ? params.callbackUrl
-      : '/welcome'
+    nativeReturn
+      ? NATIVE_COMPLETE_PATH
+      : params.callbackUrl &&
+          params.callbackUrl.startsWith('/') &&
+          !params.callbackUrl.startsWith('//')
+        ? params.callbackUrl
+        : '/welcome'
   const callbackPathOnly = rawCallback.split('?')[0] || '/welcome'
   const unsafeCallbacks = new Set([
     '/login',
@@ -93,16 +107,14 @@ export default async function LoginPage({
     '/api/auth/signin',
     '/api/auth/callback',
   ])
-  const callbackUrl = unsafeCallbacks.has(callbackPathOnly)
-    ? '/workspaces'
-    : rawCallback
+  const callbackUrl =
+    nativeReturn || callbackPathOnly === NATIVE_COMPLETE_PATH
+      ? NATIVE_COMPLETE_PATH
+      : unsafeCallbacks.has(callbackPathOnly)
+        ? '/workspaces'
+        : rawCallback
 
-  // Honor callbackUrl only when the session is complete (email present).
-  // A partial session (user without email) used to bounce:
-  // login → /welcome → login (ERR_TOO_MANY_REDIRECTS).
   if (session?.user?.email) {
-    // Already signed in. Never bounce through this page again for the same
-    // callback — a missing user.id on /talk used to send us back here forever.
     redirect(callbackUrl)
   }
 
@@ -154,17 +166,17 @@ export default async function LoginPage({
     : `Sign in with an authorized account for ${workspaceLabel}. Open channels, agents, and workspace tools.`
 
   return (
-    <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm sm:p-10">
+    <div className="w-full rounded-2xl border border-border bg-surface p-8 shadow-sm sm:p-10">
       <div className="mb-6 flex flex-col items-center gap-3">
         {isPlatform ? (
           <>
-            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 text-gray-900">
-              <BevelCutMark className="h-7 w-7 text-gray-900" />
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-background text-foreground">
+              <BevelCutMark className="h-7 w-7 text-foreground" />
             </span>
-            <BevelMark size="lg" className="text-gray-900" />
+            <BevelMark size="lg" className="text-foreground" />
           </>
         ) : tenantLogo ? (
-          <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface">
             <Image
               src={tenantLogo}
               alt={workspaceLabel}
@@ -175,18 +187,24 @@ export default async function LoginPage({
             />
           </span>
         ) : (
-          <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 text-gray-900">
-            <BevelCutMark className="h-7 w-7 text-gray-900" />
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-background text-foreground">
+            <BevelCutMark className="h-7 w-7 text-foreground" />
           </span>
         )}
       </div>
 
-      <h1 className="text-center font-display text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">
+      <h1 className="text-center font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         {title}
       </h1>
-      <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-gray-600">
+      <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-muted">
         {subtitle}
       </p>
+      {nativeReturn ? (
+        <p className="mx-auto mt-4 max-w-md rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm leading-relaxed text-muted">
+          After Google, this browser will send you back to the BEVEL app.
+          Stay here until that handoff finishes.
+        </p>
+      ) : null}
 
       {errorMessage ? (
         <div
@@ -214,7 +232,7 @@ export default async function LoginPage({
             label="Continue with Google"
           />
         ) : (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted">
             Google sign-in is not configured on this server.
           </div>
         )}
@@ -223,10 +241,10 @@ export default async function LoginPage({
 
         {otpOk ? (
           <>
-            <div className="relative py-1 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-              <span className="relative z-10 bg-white px-2">or</span>
+            <div className="relative py-1 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+              <span className="relative z-10 bg-surface px-2">or</span>
               <span
-                className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gray-200"
+                className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border"
                 aria-hidden
               />
             </div>
@@ -236,36 +254,36 @@ export default async function LoginPage({
       </div>
 
       {isPlatform ? (
-        <div className="mt-8 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-gray-900">
+        <div className="mt-8 rounded-xl border border-dashed border-border bg-background p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-foreground">
             New organization?
           </p>
-          <p className="mt-2 text-xs leading-relaxed text-gray-600">
+          <p className="mt-2 text-xs leading-relaxed text-muted">
             Claim a BEVEL workspace for your company domain. No customer brands
             are shown here — you only see your workspace after sign-in.
           </p>
           <p className="mt-3">
             <Link
               href="/claim"
-              className="text-xs font-semibold text-gray-900 underline-offset-2 hover:underline"
+              className="text-xs font-semibold text-foreground underline-offset-2 hover:underline"
             >
               Claim workspace
             </Link>
             {' · '}
             <Link
               href="/workspaces"
-              className="text-xs font-semibold text-gray-900 underline-offset-2 hover:underline"
+              className="text-xs font-semibold text-foreground underline-offset-2 hover:underline"
             >
               Browse workspaces
             </Link>
           </p>
         </div>
       ) : domains.length > 0 || explicitEmails.length > 0 ? (
-        <div className="mt-8 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-gray-900">
+        <div className="mt-8 rounded-xl border border-dashed border-border bg-background p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-foreground">
             Authorized for this workspace
           </p>
-          <ul className="mt-2 space-y-1 text-xs text-gray-600">
+          <ul className="mt-2 space-y-1 text-xs text-muted">
             {domains.map(({ domain, label }) => (
               <li key={domain}>{label}</li>
             ))}
@@ -276,7 +294,7 @@ export default async function LoginPage({
         </div>
       ) : null}
 
-      <p className="mt-6 text-center text-xs text-gray-500">
+      <p className="mt-6 text-center text-xs text-muted">
         {isPlatform ? (
           <>
             <Link

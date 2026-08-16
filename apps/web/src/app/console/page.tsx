@@ -9,6 +9,7 @@ import {
   Command,
   GitBranch,
   Key,
+  Users,
   MessageSquare,
   Package,
   Settings,
@@ -52,6 +53,12 @@ const CARDS = [
     title: 'Workflows',
     body: 'Built-in fleet flows and n8n automation templates.',
     icon: GitBranch,
+  },
+  {
+    href: '/console/org',
+    title: 'Agent org',
+    body: 'Working hierarchy and diamond fan-out / fan-in across the Entity fleet.',
+    icon: Users,
   },
   {
     href: '/console/commands',

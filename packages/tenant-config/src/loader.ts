@@ -181,6 +181,8 @@ export function compileTenant(
     ['sms', 'sms'],
     ['otp_sms', 'otpSms'],
     ['presence_sms', 'presenceSms'],
+    ['imessage', 'imessage'],
+    ['imessage_inbox', 'imessageInbox'],
     ['sso_saml', 'ssoSaml'],
     ['audit_log', 'auditLog'],
     ['dedicated_support', 'dedicatedSupport'],
@@ -260,6 +262,8 @@ export function compileTenant(
         Object.keys(logoUrlsByDaypart).length > 0
           ? logoUrlsByDaypart
           : undefined,
+      cmykKitId: declarative.brand.cmyk?.kit_id,
+      cmykHost: declarative.brand.cmyk?.host,
     },
     realtime: {
       namespace: declarative.realtime.namespace,
