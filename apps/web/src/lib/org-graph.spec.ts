@@ -37,6 +37,19 @@ describe('org graph', () => {
     )
   })
 
+  it('loads soul, skills, and example workflows for a director profile', () => {
+    const mildred = getOrgNode('mildred')
+    expect(mildred?.soul.toLowerCase()).toContain('token')
+    expect(mildred?.skills.length).toBeGreaterThan(3)
+    expect(mildred?.skills).toEqual(
+      expect.arrayContaining(['OpenRouter Ledger', 'Bevel Charts']),
+    )
+    expect(mildred?.workflows).toEqual(
+      expect.arrayContaining(['cost-close', 'budget-review']),
+    )
+    expect(mildred?.runHint.toLowerCase()).toContain('finance')
+  })
+
   it('builds the founder → Hermes → directors tree', () => {
     const nodes = getOrgNodes()
     const founder = getOrgNode('scott')

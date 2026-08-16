@@ -25,6 +25,10 @@ export type OrgNode = {
   bio: string
   deployments: number
   rating: number
+  skills: string[]
+  workflows: string[]
+  runHint: string
+  runCommand: string
 }
 
 export type DiamondWorkflow = {
@@ -56,6 +60,9 @@ type RegistryShape = {
     avatar?: string
     deployments?: number
     rating?: number
+    skills?: string[]
+    workflows?: string[]
+    run?: { hint?: string; command?: string; label?: string }
   }>
 }
 
@@ -88,6 +95,10 @@ export function getFounderNode(): OrgNode {
     bio: 'Human founder. Agents report through Hermes.',
     deployments: 0,
     rating: 0,
+    skills: ['Product stewardship', 'Fleet direction'],
+    workflows: [],
+    runHint: 'Founder. Agents report through Hermes.',
+    runCommand: '',
   }
 }
 
@@ -115,6 +126,10 @@ export function getOrgNodes(): OrgNode[] {
       bio: raw.description || catalog?.bio || '',
       deployments: Number(raw.deployments) || 0,
       rating: Number(raw.rating) || 0,
+      skills: raw.skills ?? catalog?.skills ?? [],
+      workflows: raw.workflows ?? [],
+      runHint: raw.run?.hint || catalog?.tagline || '',
+      runCommand: raw.run?.command || '',
     })
   }
 
