@@ -62,11 +62,11 @@ WebSocket runtime stays isolated behind `services/realtime` so the app is not ma
 Each customer is a folder under `tenants/`:
 
 ```yaml
-# tenants/acme/bevel.yaml
-tenant: acme
-domain: bevel.acme.com
+# tenants/2x4m/bevel.yaml
+tenant: 2x4m
+domain: bevel.2x4m.cc
 hosts:
-  - bevel.acme.lvh.me          # preview / local alias
+  - bevel.2x4m.lvh.me          # preview / local alias
 
 brand:
   logo: ./logo.svg
@@ -80,30 +80,30 @@ features:
 auth:
   mode: magic-link
   allowed_domains:
-    - acme.com
+    - 2x4m.cc
 
 realtime:
-  namespace: acme
+  namespace: 2x4m
   presence: true
 ```
 
 Then validate the full surface:
 
 ```bash
-pnpm bevel doctor acme
+pnpm bevel doctor 2x4m
 ```
 
 ```
-✓ Tenant config valid — bevel.acme.com
-✓ Domain CNAME configured — bevel.acme.com → cname.bevel.com
-✓ SSL active — https://bevel.acme.lvh.me
+✓ Tenant config valid — bevel.2x4m.cc
+✓ Domain CNAME configured — bevel.2x4m.cc → cname.bevel.com
+✓ SSL active — https://bevel.2x4m.lvh.me
 ✓ Theme tokens valid — accent #22c55e
-✓ Realtime namespace provisioned — namespace "acme" · transport websocket
+✓ Realtime namespace provisioned — namespace "2x4m" · transport websocket
 ✓ Auth policy valid — mode: magic-link
-✓ Preview deployment healthy — https://bevel.acme.lvh.me
+✓ Preview deployment healthy — https://bevel.2x4m.lvh.me
 ```
 
-Offline (config + theme only): `pnpm bevel doctor acme --offline`
+Offline (config + theme only): `pnpm bevel doctor 2x4m --offline`
 
 ## Tenant resolution
 
@@ -161,7 +161,7 @@ bash scripts/iterm-tabs/03-admin.sh     # :43201 admin
 | Surface | Dev URL |
 |---------|---------|
 | Tenant (demo) | https://bevel.lvh.me |
-| Tenant (acme) | https://bevel.acme.lvh.me |
+| Tenant (2x4m) | https://bevel.2x4m.lvh.me |
 | Admin | https://admin.bevel.lvh.me |
 | Realtime | https://realtime.bevel.lvh.me |
 | **API** | https://api.bevel.lvh.me |

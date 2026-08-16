@@ -22,8 +22,8 @@ export default function DocsHome() {
 
       <h2>Declarative tenant</h2>
       <pre style={{ background: '#111', color: '#eee', padding: '1rem', borderRadius: 8 }}>
-{`tenant: acme
-domain: bevel.acme.com
+{`tenant: 2x4m
+domain: bevel.2x4m.cc
 brand:
   logo: ./logo.svg
   theme: ./theme.json
@@ -31,14 +31,14 @@ features:
   async_streams: true
   live_sessions: true
 realtime:
-  namespace: acme
+  namespace: 2x4m
   presence: true`}
       </pre>
 
       <h2>Control plane</h2>
       <pre style={{ background: '#111', color: '#eee', padding: '1rem', borderRadius: 8 }}>
-{`pnpm bevel doctor acme
-pnpm bevel validate acme
+{`pnpm bevel doctor 2x4m
+pnpm bevel validate 2x4m
 pnpm bevel list`}
       </pre>
 
