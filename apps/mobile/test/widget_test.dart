@@ -5,6 +5,7 @@ import 'package:bevel_app/config.dart';
 import 'package:bevel_app/main.dart';
 import 'package:bevel_app/native/deep_links.dart';
 import 'package:bevel_app/native/media_device_discovery.dart';
+import 'package:bevel_app/native/macos_plugin_gaps.dart';
 import 'package:bevel_app/ui/workspace_shell.dart';
 
 void main() {
@@ -95,6 +96,14 @@ void main() {
     expect(webViewSupportsBackgroundColor(TargetPlatform.windows), isFalse);
     expect(webViewSupportsBackgroundColor(TargetPlatform.iOS), isTrue);
     expect(webViewSupportsBackgroundColor(TargetPlatform.android), isTrue);
+  });
+
+  test('macOS WebKit opaque gap is recognized', () {
+    expect(
+      isMacosWebKitGap(UnimplementedError('opaque is not implemented on macOS')),
+      isTrue,
+    );
+    expect(isMacosWebKitGap(StateError('nope')), isFalse);
   });
 
   test('media device models parse inventory maps', () {

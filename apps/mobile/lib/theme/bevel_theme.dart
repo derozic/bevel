@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -85,9 +86,13 @@ ThemeData buildBevelTheme(BevelPalette p) {
       backgroundColor: p.cream.withValues(alpha: 0.92),
       foregroundColor: p.ink,
       surfaceTintColor: Colors.transparent,
-      systemOverlayStyle: p.isNight
-          ? SystemUiOverlayStyle.light
-          : SystemUiOverlayStyle.dark,
+      systemOverlayStyle:
+          defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.android
+          ? (p.isNight
+              ? SystemUiOverlayStyle.light
+              : SystemUiOverlayStyle.dark)
+          : null,
       titleTextStyle: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w600,

@@ -226,30 +226,6 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
         ),
       )
       ..loadRequest(start);
-    _syncWebViewBackground(const Color(0xFF101825));
-  }
-
-  Color? _webViewBackground;
-
-  void _syncWebViewBackground(Color color) {
-    if (!webViewSupportsBackgroundColor()) return;
-    if (_webViewBackground == color) return;
-    _webViewBackground = color;
-    unawaited(() async {
-      try {
-        await _controller.setBackgroundColor(color);
-      } on UnimplementedError {
-        // Desktop WebKit bindings do not implement `opaque`.
-      } catch (_) {
-        /* ignore plugin gaps */
-      }
-    }());
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _syncWebViewBackground(context.bevel.cream);
   }
 
   Future<void> _probeSessionAndChannels() async {

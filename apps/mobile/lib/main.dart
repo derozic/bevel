@@ -12,6 +12,7 @@ import 'native/health_service.dart';
 import 'native/hermes_bridge.dart';
 import 'native/hermes_handoff.dart';
 import 'native/hermes_return_reporter.dart';
+import 'native/macos_plugin_gaps.dart';
 import 'native/native_capabilities.dart';
 import 'native/notification_service.dart';
 import 'native/google_native_auth.dart';
@@ -33,6 +34,7 @@ import 'workspace/workspace_target.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installMacosPluginGuards();
   await bootstrapDesktopWindow();
   runApp(const BevelApp());
 }

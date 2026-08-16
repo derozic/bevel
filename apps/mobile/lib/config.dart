@@ -42,7 +42,7 @@ class BevelConfig {
   static const String loginPath = '/login';
 
   /// Semantic version shown in About / release notes (mirrors pubspec).
-  static const String versionLabel = '0.4.5';
+  static const String versionLabel = '0.4.6';
 
   /// Magenta Extensions + analytics API.
   static const String magentaApiBase = String.fromEnvironment(
