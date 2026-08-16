@@ -135,7 +135,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background text-text">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 glass border-b border-border">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/95 backdrop-blur-md">
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3 sm:gap-4">
             <button
@@ -199,7 +199,7 @@ export default function DashboardLayout({
               animate={{ x: 0 }}
               exit={{ x: -250 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed left-0 top-14 bottom-0 w-64 glass border-r border-border z-30 overflow-y-auto"
+              className="fixed left-0 top-14 bottom-0 z-40 w-64 overflow-y-auto border-r border-border bg-background/95 backdrop-blur-md"
             >
               <div className="p-4 pb-2">
                 <a
@@ -299,7 +299,9 @@ export default function DashboardLayout({
           )}
         </AnimatePresence>
 
-        <main className={`flex-1 transition-all ${sidebarOpen ? "ml-64" : "ml-0"}`}>
+        <main
+          className={`relative z-0 flex-1 transition-all ${sidebarOpen ? "ml-64" : "ml-0"}`}
+        >
           <div className="p-6">{children}</div>
         </main>
       </div>
