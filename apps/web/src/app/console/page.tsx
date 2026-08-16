@@ -55,8 +55,8 @@ const CARDS = [
     icon: GitBranch,
   },
   {
-    href: '/console/org',
-    title: 'Agent org',
+    href: '/console/fleet',
+    title: 'Agent fleet',
     body: 'Working hierarchy and diamond fan-out / fan-in across the Entity fleet.',
     icon: Users,
   },

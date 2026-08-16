@@ -1,13 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import {
   ChartBarIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline'
 import {
-  agentTalkHref,
   getChildren,
   getDiamondWorkflows,
   getOrgNode,
@@ -16,13 +14,7 @@ import {
   type DiamondWorkflow,
   type OrgNode,
 } from '@/lib/org-graph'
-
-const TIER_LABEL: Record<OrgNode['tier'], string> = {
-  founder: 'Founder',
-  'co-founder': 'Co-founder',
-  director: 'Director',
-  ic: 'IC',
-}
+import { AgentProfile } from './AgentProfile'
 
 function StatusDot({ status }: { status: OrgNode['status'] }) {
   const color =
@@ -361,11 +353,11 @@ export function AgentOrgChart() {
         <div>
           <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
             <UsersIcon className="h-8 w-8 text-accent" />
-            Agent org
+            Agent fleet
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Working Entity fleet: hierarchy is who reports to whom. Diamond
-            is how work actually moves — fan-out to parallel agents, then join.
+            The working Entity fleet. Hierarchy is who reports to whom.
+            Diamond is how work moves — fan-out to parallel agents, then join.
           </p>
         </div>
         <div className="flex items-end gap-6">
@@ -442,7 +434,7 @@ export function AgentOrgChart() {
         </div>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_240px]">
+      <div className="grid gap-4 xl:grid-cols-[200px_minmax(0,1fr)_300px]">
         <aside className="space-y-3 rounded-2xl border border-border bg-surface p-4">
           <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
             <ChartBarIcon className="h-3.5 w-3.5" />
@@ -477,6 +469,25 @@ export function AgentOrgChart() {
               />
             </div>
           </div>
+          <div className="border-t border-border pt-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+              Staffed pods
+            </p>
+            <ul className="mt-2 space-y-1">
+              {dynamics.pods.map((pod) => (
+                <li key={pod.directorId}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(pod.directorId)}
+                    className="flex w-full items-center justify-between text-left text-xs hover:text-foreground"
+                  >
+                    <span className="truncate text-muted">{pod.directorName}</span>
+                    <span className="tabular-nums">{pod.size}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </aside>
 
         <div className="overflow-x-auto rounded-2xl border border-border bg-surface p-6">
@@ -495,81 +506,7 @@ export function AgentOrgChart() {
           ) : null}
         </div>
 
-        <aside className="space-y-4 rounded-2xl border border-border bg-surface p-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Team dynamics
-            </p>
-            <ul className="mt-2 space-y-2">
-              {dynamics.pods.length === 0 ? (
-                <li className="text-xs text-muted">No IC pods staffed yet.</li>
-              ) : (
-                dynamics.pods.map((pod) => (
-                  <li key={pod.directorId}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(pod.directorId)}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-0.5 text-left text-sm hover:bg-background"
-                    >
-                      <span className="truncate font-medium">{pod.directorName}</span>
-                      <span className="tabular-nums text-xs text-muted">
-                        {pod.size} IC{pod.size === 1 ? '' : 's'}
-                      </span>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Functions
-            </p>
-            <ul className="mt-2 space-y-1.5">
-              {dynamics.topCategories.map((cat) => (
-                <li
-                  key={cat.name}
-                  className="flex items-center justify-between text-xs"
-                >
-                  <span className="truncate text-muted">{cat.name}</span>
-                  <span className="tabular-nums font-medium">{cat.count}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          {selected ? (
-            <div className="border-t border-border pt-4">
-              <div className="flex items-start gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={selected.avatarUrl}
-                  alt=""
-                  className="h-10 w-10 rounded-xl object-cover"
-                />
-                <div>
-                  <h2 className="text-sm font-semibold">{selected.name}</h2>
-                  <p className="text-xs text-muted">{selected.role}</p>
-                  <p className="mt-0.5 text-[10px] uppercase tracking-wide text-muted">
-                    {TIER_LABEL[selected.tier]} · {selected.status}
-                  </p>
-                </div>
-              </div>
-              {selected.bio ? (
-                <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-muted">
-                  {selected.bio}
-                </p>
-              ) : null}
-              {selected.id !== 'scott' ? (
-                <Link
-                  href={agentTalkHref(selected.id)}
-                  className="mt-3 inline-flex rounded-full bg-cta px-3 py-1.5 text-xs font-semibold text-cta-fg"
-                >
-                  Talk to {selected.name}
-                </Link>
-              ) : null}
-            </div>
-          ) : null}
-        </aside>
+        {selected ? <AgentProfile node={selected} /> : <div />}
       </div>
     </div>
   )

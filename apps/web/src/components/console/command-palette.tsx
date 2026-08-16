@@ -309,12 +309,12 @@ function CommandPalette() {
         run: () => go("/console/workflows"),
       },
       {
-        id: "org",
-        label: "Agent org",
+        id: "fleet",
+        label: "Agent fleet",
         group: "Workspace",
         icon: Users,
         keywords: "org chart hierarchy diamond fleet agents",
-        run: () => go("/console/org"),
+        run: () => go("/console/fleet"),
       },
       {
         id: "status",
