@@ -93,7 +93,8 @@
         "directReports": [
           "lego",
           "brain",
-          "codegraph"
+          "codegraph",
+          "continuous"
         ]
       },
       "tegan": {
@@ -102,11 +103,15 @@
       },
       "spark": {
         "reportsTo": "hermes",
-        "directReports": []
+        "directReports": [
+          "loom"
+        ]
       },
       "helm": {
         "reportsTo": "hermes",
-        "directReports": []
+        "directReports": [
+          "northstar"
+        ]
       },
       "sable": {
         "reportsTo": "hermes",
@@ -160,6 +165,18 @@
       },
       "johnny": {
         "reportsTo": "argus",
+        "directReports": []
+      },
+      "loom": {
+        "reportsTo": "spark",
+        "directReports": []
+      },
+      "continuous": {
+        "reportsTo": "cadence",
+        "directReports": []
+      },
+      "northstar": {
+        "reportsTo": "helm",
         "directReports": []
       }
     }

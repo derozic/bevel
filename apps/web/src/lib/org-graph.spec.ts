@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  emptyIcFacets,
+  filterIcs,
   getChildren,
   getDiamondWorkflows,
+  getIcs,
   getOrgNode,
   getOrgNodes,
+  icFacetOptions,
   orgDynamics,
   orgStats,
 } from './org-graph'
@@ -66,8 +70,48 @@ describe('org graph', () => {
     expect(getOrgNode('brain')?.parentId).toBe('cadence')
     expect(getOrgNode('johnny')?.parentId).toBe('argus')
     expect(getChildren('cadence').map((n) => n.id)).toEqual(
-      expect.arrayContaining(['lego', 'brain', 'codegraph']),
+      expect.arrayContaining(['lego', 'brain', 'codegraph', 'continuous']),
     )
+  })
+
+  it('lists every IC with pod, category, and legacy facets', () => {
+    const ics = getIcs()
+    expect(ics.map((ic) => ic.node.id).sort()).toEqual([
+      'brain',
+      'codegraph',
+      'continuous',
+      'johnny',
+      'lego',
+      'loom',
+      'northstar',
+    ])
+    expect(ics.every((ic) => ic.node.tier === 'ic')).toBe(true)
+    expect(ics.find((ic) => ic.node.id === 'lego')?.manager?.id).toBe('cadence')
+    expect(ics.find((ic) => ic.node.id === 'loom')?.manager?.id).toBe('spark')
+    expect(ics.find((ic) => ic.node.id === 'northstar')?.manager?.id).toBe('helm')
+    expect(ics.find((ic) => ic.node.id === 'johnny')?.manager?.id).toBe('argus')
+    expect(ics.find((ic) => ic.node.id === 'continuous')?.legacy).toBe(true)
+    expect(ics.find((ic) => ic.node.id === 'northstar')?.legacy).toBe(true)
+    expect(ics.find((ic) => ic.node.id === 'lego')?.legacy).toBe(false)
+
+    const facets = icFacetOptions(ics)
+    expect(facets.pods.find((p) => p.id === 'cadence')?.count).toBe(4)
+    expect(facets.pods.map((p) => p.id)).toEqual(
+      expect.arrayContaining(['cadence', 'argus', 'spark', 'helm']),
+    )
+    expect(facets.categories.length).toBeGreaterThanOrEqual(4)
+    expect(facets.kinds.find((k) => k.id === 'legacy')?.count).toBe(2)
+
+    const cadence = filterIcs(ics, { ...emptyIcFacets, pod: 'cadence' })
+    expect(cadence.map((ic) => ic.node.id).sort()).toEqual([
+      'brain',
+      'codegraph',
+      'continuous',
+      'lego',
+    ])
+    const active = filterIcs(ics, { ...emptyIcFacets, kind: 'active' })
+    expect(active).toHaveLength(5)
+    expect(active.some((ic) => ic.node.id === 'northstar')).toBe(false)
   })
 
   it('reports fleet size and director coverage', () => {

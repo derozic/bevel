@@ -251,6 +251,97 @@ export function orgDynamics(nodes = getOrgNodes()) {
   }
 }
 
+export type IcRecord = {
+  node: OrgNode
+  manager: OrgNode | undefined
+  legacy: boolean
+}
+
+export type IcFacets = {
+  pod: string
+  category: string
+  status: 'all' | OrgNode['status']
+  kind: 'all' | 'active' | 'legacy'
+}
+
+export const emptyIcFacets: IcFacets = {
+  pod: 'all',
+  category: 'all',
+  status: 'all',
+  kind: 'all',
+}
+
+export function isLegacyIc(node: OrgNode): boolean {
+  return /\blegacy\b/i.test(`${node.role} ${node.bio} ${node.runHint}`)
+}
+
+export function getIcs(nodes = getOrgNodes()): IcRecord[] {
+  return nodes
+    .filter((n) => n.tier === 'ic')
+    .map((node) => ({
+      node,
+      manager: node.parentId
+        ? nodes.find((n) => n.id === node.parentId)
+        : undefined,
+      legacy: isLegacyIc(node),
+    }))
+    .sort((a, b) => a.node.name.localeCompare(b.node.name))
+}
+
+export function icFacetOptions(ics = getIcs()) {
+  const pods = new Map<string, { id: string; name: string; count: number }>()
+  const categories = new Map<string, number>()
+  const statuses: Record<OrgNode['status'], number> = {
+    available: 0,
+    busy: 0,
+    offline: 0,
+  }
+  let legacy = 0
+  for (const ic of ics) {
+    if (ic.manager) {
+      const current = pods.get(ic.manager.id)
+      if (current) current.count += 1
+      else {
+        pods.set(ic.manager.id, {
+          id: ic.manager.id,
+          name: ic.manager.name,
+          count: 1,
+        })
+      }
+    }
+    const category = ic.node.category || 'Fleet'
+    categories.set(category, (categories.get(category) ?? 0) + 1)
+    statuses[ic.node.status] += 1
+    if (ic.legacy) legacy += 1
+  }
+  return {
+    pods: [...pods.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+    categories: [...categories.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+    statuses: (['available', 'busy', 'offline'] as const)
+      .map((id) => ({ id, count: statuses[id] }))
+      .filter((s) => s.count > 0),
+    kinds: [
+      { id: 'active' as const, count: ics.length - legacy },
+      { id: 'legacy' as const, count: legacy },
+    ].filter((k) => k.count > 0),
+  }
+}
+
+export function filterIcs(ics: IcRecord[], facets: IcFacets): IcRecord[] {
+  return ics.filter((ic) => {
+    if (facets.pod !== 'all' && ic.manager?.id !== facets.pod) return false
+    if (facets.category !== 'all' && ic.node.category !== facets.category) {
+      return false
+    }
+    if (facets.status !== 'all' && ic.node.status !== facets.status) return false
+    if (facets.kind === 'legacy' && !ic.legacy) return false
+    if (facets.kind === 'active' && ic.legacy) return false
+    return true
+  })
+}
+
 export function agentTalkHref(id: string): string {
   if (id === 'scott') return '/bevel/talk/hermes'
   return `/bevel/talk/${id}`

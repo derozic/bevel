@@ -6,72 +6,21 @@ import {
   UsersIcon,
 } from '@heroicons/react/24/outline'
 import {
+  emptyIcFacets,
+  filterIcs,
   getChildren,
   getDiamondWorkflows,
+  getIcs,
   getOrgNode,
   getOrgNodes,
   orgDynamics,
   type DiamondWorkflow,
+  type IcFacets,
   type OrgNode,
 } from '@/lib/org-graph'
+import { AgentAvatar, StatusDot } from './AgentAvatar'
 import { AgentProfile } from './AgentProfile'
-
-function StatusDot({ status }: { status: OrgNode['status'] }) {
-  const color =
-    status === 'available'
-      ? 'bg-success'
-      : status === 'busy'
-        ? 'bg-warning'
-        : 'bg-muted'
-  return (
-    <span
-      className={`inline-block h-2 w-2 rounded-full ${color}`}
-      title={status}
-    />
-  )
-}
-
-function AgentAvatar({
-  node,
-  size = 32,
-}: {
-  node: OrgNode
-  size?: number
-}) {
-  const [failed, setFailed] = useState(false)
-  const initial = (node.name.trim()[0] || '?').toUpperCase()
-  if (failed) {
-    return (
-      <span
-        className="inline-flex shrink-0 items-center justify-center rounded-lg font-bold text-white"
-        style={{
-          width: size,
-          height: size,
-          background: node.accent,
-          fontSize: size * 0.42,
-        }}
-      >
-        {initial}
-      </span>
-    )
-  }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={node.avatarUrl}
-      alt=""
-      width={size}
-      height={size}
-      className="shrink-0 rounded-lg object-cover"
-      style={{
-        width: size,
-        height: size,
-        boxShadow: `inset 0 0 0 2px ${node.accent}`,
-      }}
-      onError={() => setFailed(true)}
-    />
-  )
-}
+import { IcFacetView } from './IcFacetView'
 
 function AgentChip({
   node,
@@ -165,11 +114,9 @@ function DiamondRails({
 function HierarchyView({
   selectedId,
   onSelect,
-  showIcs,
 }: {
   selectedId: string
   onSelect: (id: string) => void
-  showIcs: boolean
 }) {
   const nodes = getOrgNodes()
   const founder = nodes.find((n) => n.tier === 'founder') ?? getOrgNode('scott')
@@ -204,41 +151,6 @@ function HierarchyView({
           />
         ))}
       </div>
-      {showIcs &&
-      directors.some((d) => getChildren(d.id, nodes).some((c) => c.tier === 'ic')) ? (
-        <>
-          <div className="mt-6 h-4 w-px bg-border" />
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Pods
-          </p>
-          <div className="flex w-full flex-wrap justify-center gap-6">
-            {directors
-              .map((director) => ({
-                director,
-                ics: getChildren(director.id, nodes).filter((c) => c.tier === 'ic'),
-              }))
-              .filter((col) => col.ics.length > 0)
-              .map(({ director, ics }) => (
-                <div
-                  key={director.id}
-                  className="flex max-w-[180px] flex-col items-center gap-1.5"
-                >
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                    {director.name}
-                  </p>
-                  {ics.map((ic) => (
-                    <AgentChip
-                      key={ic.id}
-                      node={ic}
-                      selected={selectedId === ic.id}
-                      onSelect={onSelect}
-                    />
-                  ))}
-                </div>
-              ))}
-          </div>
-        </>
-      ) : null}
     </div>
   )
 }
@@ -334,9 +246,10 @@ export function AgentOrgChart() {
   const nodes = useMemo(() => getOrgNodes(), [])
   const diamonds = useMemo(() => getDiamondWorkflows(nodes), [nodes])
   const dynamics = useMemo(() => orgDynamics(nodes), [nodes])
+  const ics = useMemo(() => getIcs(nodes), [nodes])
   const { stats } = dynamics
-  const [mode, setMode] = useState<'hierarchy' | 'diamond'>('hierarchy')
-  const [showIcs, setShowIcs] = useState(false)
+  const [mode, setMode] = useState<'hierarchy' | 'diamond' | 'ics'>('hierarchy')
+  const [icFacets, setIcFacets] = useState<IcFacets>(emptyIcFacets)
   const [selectedId, setSelectedId] = useState('hermes')
   const [diamondId, setDiamondId] = useState(diamonds[0]?.id ?? '')
   const selected = getOrgNode(selectedId) ?? getOrgNode('hermes')
@@ -346,6 +259,26 @@ export function AgentOrgChart() {
   const availablePct = stats.fleet
     ? Math.round((stats.available / stats.fleet) * 100)
     : 0
+
+  function openIcs(podId?: string) {
+    const next: IcFacets = {
+      ...emptyIcFacets,
+      pod: podId ?? 'all',
+    }
+    setIcFacets(next)
+    setMode('ics')
+    const visible = filterIcs(ics, next)
+    const current = getOrgNode(selectedId)
+    if (current?.tier !== 'ic' && visible[0]) {
+      setSelectedId(visible[0].node.id)
+    } else if (
+      current?.tier === 'ic' &&
+      !visible.some((ic) => ic.node.id === current.id) &&
+      visible[0]
+    ) {
+      setSelectedId(visible[0].node.id)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -357,7 +290,8 @@ export function AgentOrgChart() {
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
             The working Entity fleet. Hierarchy is who reports to whom.
-            Diamond is how work moves — fan-out to parallel agents, then join.
+            ICs are the working bench — filter by pod and practice.
+            Diamond is how work moves — fan-out, then join.
           </p>
         </div>
         <div className="flex items-end gap-6">
@@ -400,15 +334,16 @@ export function AgentOrgChart() {
         </button>
         <button
           type="button"
-          aria-pressed={showIcs}
-          onClick={() => setShowIcs((v) => !v)}
+          onClick={() => {
+            if (mode !== 'ics') openIcs()
+          }}
           className={`rounded-full border px-3 py-1 text-sm font-medium ${
-            showIcs
+            mode === 'ics'
               ? 'border-accent bg-accent/10 text-foreground'
               : 'border-border text-muted'
           }`}
         >
-          {showIcs ? 'Hide ICs' : 'Show ICs'}
+          ICs
         </button>
       </div>
 
@@ -451,11 +386,13 @@ export function AgentOrgChart() {
             value={stats.byTier.director}
             hint={`${dynamics.staffed} staffed · ${dynamics.uncovered} solo`}
           />
-          <Kpi
-            label="ICs"
-            value={stats.byTier.ic}
-            hint={`Avg span ${dynamics.span.toFixed(1)}`}
-          />
+          <button type="button" onClick={() => openIcs()} className="text-left">
+            <Kpi
+              label="ICs"
+              value={stats.byTier.ic}
+              hint="Open the IC facet view"
+            />
+          </button>
           <Kpi label="Diamonds" value={stats.diamonds} hint="Parallel fan-out joins" />
           <div>
             <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
@@ -478,7 +415,7 @@ export function AgentOrgChart() {
                 <li key={pod.directorId}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(pod.directorId)}
+                    onClick={() => openIcs(pod.directorId)}
                     className="flex w-full items-center justify-between text-left text-xs hover:text-foreground"
                   >
                     <span className="truncate text-muted">{pod.directorName}</span>
@@ -495,7 +432,14 @@ export function AgentOrgChart() {
             <HierarchyView
               selectedId={selectedId}
               onSelect={setSelectedId}
-              showIcs={showIcs}
+            />
+          ) : mode === 'ics' ? (
+            <IcFacetView
+              ics={ics}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              facets={icFacets}
+              onFacets={setIcFacets}
             />
           ) : activeDiamond ? (
             <DiamondView
