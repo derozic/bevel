@@ -11,7 +11,7 @@ import { Button, cn } from '@bevel/ui'
 
 const TENANTS = [
   { slug: 'demo', name: 'BEVEL Demo', apexExample: 'derozic.com' },
-  { slug: 'acme', name: 'Acme Corp', apexExample: 'acme.com' },
+  { slug: '2x4m', name: '2x4m', apexExample: '2x4m.cc' },
 ]
 
 function CopyField({ label, value }: { label: string; value: string }) {

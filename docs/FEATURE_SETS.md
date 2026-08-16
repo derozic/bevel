@@ -54,7 +54,7 @@ This is **orthogonal to plan**. Examples:
 ## Declare on a tenant
 
 ```yaml
-# tenants/acme/bevel.yaml
+# tenants/2x4m/bevel.yaml
 plan: pro
 feature_access: beta          # stable | beta | upcoming
 trial_ends_at: "2026-08-01T00:00:00.000Z"   # if plan: trial
