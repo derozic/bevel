@@ -133,9 +133,9 @@ export default function DashboardLayout({
   }, [softGo, goToChat]);
 
   return (
-    <div className="min-h-screen bg-background text-text">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/95 backdrop-blur-md">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background text-text">
+      {/* In-flow header: content scrolls in <main>, never under this bar. */}
+      <header className="relative z-20 shrink-0 border-b border-border bg-background">
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3 sm:gap-4">
             <button
@@ -191,16 +191,17 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      <div className="flex pt-14">
-        <AnimatePresence>
+      <div className="flex min-h-0 flex-1">
+        <AnimatePresence initial={false}>
           {sidebarOpen && (
             <motion.aside
-              initial={{ x: -250 }}
-              animate={{ x: 0 }}
-              exit={{ x: -250 }}
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 256, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed left-0 top-14 bottom-0 z-40 w-64 overflow-y-auto border-r border-border bg-background/95 backdrop-blur-md"
+              className="relative z-10 shrink-0 overflow-x-hidden overflow-y-auto border-r border-border bg-background"
             >
+              <div className="w-64">
               <div className="p-4 pb-2">
                 <a
                   href={chatHref}
@@ -295,13 +296,12 @@ export default function DashboardLayout({
                   </div>
                 </div>
               </div>
+              </div>
             </motion.aside>
           )}
         </AnimatePresence>
 
-        <main
-          className={`relative z-0 flex-1 transition-all ${sidebarOpen ? "ml-64" : "ml-0"}`}
-        >
+        <main className="min-h-0 flex-1 overflow-y-auto">
           <div className="p-6">{children}</div>
         </main>
       </div>

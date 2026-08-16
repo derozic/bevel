@@ -266,7 +266,7 @@ function DiamondView({
         style={{ clipPath: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)' }}
         aria-hidden
       />
-      <div className="relative z-10 flex flex-col items-center">
+      <div className="relative flex flex-col items-center">
         <p className="mb-5 max-w-lg text-center text-sm text-muted">
           {workflow.description}
         </p>
