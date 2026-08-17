@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isNativeLoginRequest, NATIVE_COMPLETE_PATH } from './auth-native'
+import {
+  isNativeLoginRequest,
+  NATIVE_COMPLETE_PATH,
+  shouldInterceptNativeBrowserPath,
+} from './auth-native-shared'
 
 describe('isNativeLoginRequest', () => {
   it('treats native=1 as a desktop/mobile return', () => {
@@ -17,6 +21,16 @@ describe('isNativeLoginRequest', () => {
     expect(
       isNativeLoginRequest({ return: 'bevel://auth/complete' }),
     ).toBe(true)
+  })
+
+  it('only intercepts post-OAuth landing pages for the native bounce', () => {
+    expect(shouldInterceptNativeBrowserPath('/welcome')).toBe(true)
+    expect(shouldInterceptNativeBrowserPath('/~general')).toBe(true)
+    expect(shouldInterceptNativeBrowserPath('/login')).toBe(false)
+    expect(shouldInterceptNativeBrowserPath('/console/fleet')).toBe(false)
+    expect(shouldInterceptNativeBrowserPath('/api/auth/callback/google')).toBe(
+      false,
+    )
   })
 
   it('leaves ordinary web login alone', () => {

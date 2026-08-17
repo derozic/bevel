@@ -105,6 +105,8 @@ class _BevelHomePageState extends State<BevelHomePage> {
   String? _lastDeepLink;
   var _didAutoOpenWorkspace = false;
   var _workspaceOpen = false;
+  String? _lastAuthCompleteCode;
+  DateTime? _lastAuthCompleteAt;
 
   @override
   void initState() {
@@ -200,6 +202,16 @@ class _BevelHomePageState extends State<BevelHomePage> {
 
     switch (action.kind) {
       case 'auth_complete':
+        final code = action.handoffCode ?? '';
+        final now = DateTime.now();
+        if (code.isNotEmpty &&
+            code == _lastAuthCompleteCode &&
+            _lastAuthCompleteAt != null &&
+            now.difference(_lastAuthCompleteAt!) < const Duration(seconds: 20)) {
+          return;
+        }
+        _lastAuthCompleteCode = code;
+        _lastAuthCompleteAt = now;
         // System-browser OAuth finished → redeem handoff code in WebView jar.
         unawaited(
           _onAuthComplete(

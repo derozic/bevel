@@ -1,22 +1,20 @@
 import { cookies } from 'next/headers'
+import type { NextResponse } from 'next/server'
 
-export const NATIVE_COMPLETE_PATH = '/api/auth/native-complete'
-const COOKIE = 'bevel_native'
+export {
+  isNativeLoginRequest,
+  NATIVE_COMPLETE_PATH,
+  NATIVE_LOGIN_COOKIE,
+  NATIVE_RETURNED_COOKIE,
+  shouldInterceptNativeBrowserPath,
+} from './auth-native-shared'
 
-export function isNativeLoginRequest(params: {
-  native?: string
-  callbackUrl?: string
-  return?: string
-}): boolean {
-  if (params.native === '1' || params.native === 'true') return true
-  const cb = params.callbackUrl ?? ''
-  const ret = params.return ?? ''
-  return (
-    cb.includes('native-complete') ||
-    ret.includes('native-complete') ||
-    ret.startsWith('bevel://')
-  )
-}
+import {
+  NATIVE_LOGIN_COOKIE,
+  NATIVE_RETURNED_COOKIE,
+} from './auth-native-shared'
+
+const COOKIE = NATIVE_LOGIN_COOKIE
 
 export async function isNativeLoginPending(): Promise<boolean> {
   const jar = await cookies()
@@ -27,3 +25,23 @@ export async function clearNativeLogin(): Promise<void> {
   const jar = await cookies()
   jar.delete(COOKIE)
 }
+
+/** After a successful native return, stop yanking every page back to the app. */
+export function markNativeReturned(response: NextResponse): void {
+  response.cookies.set(NATIVE_RETURNED_COOKIE, '1', {
+    path: '/',
+    maxAge: 2 * 60,
+    sameSite: 'lax',
+    httpOnly: true,
+    secure: true,
+  })
+  response.cookies.set(NATIVE_LOGIN_COOKIE, '', {
+    path: '/',
+    maxAge: 0,
+    sameSite: 'lax',
+    httpOnly: true,
+    secure: true,
+  })
+}
+
+

@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { issueAuthHandoffCode } from '@/lib/auth-handoff'
-import { clearNativeLogin, NATIVE_COMPLETE_PATH } from '@/lib/auth-native'
+import {
+  markNativeReturned,
+  NATIVE_COMPLETE_PATH,
+  NATIVE_RETURNED_COOKIE,
+} from '@/lib/auth-native'
 
 /**
  * After system-browser Google OAuth, native clients land here and bounce into
@@ -50,7 +54,14 @@ export async function GET(request: Request) {
     process.env.BEVEL_NATIVE_WORKSPACE_URL ||
     'https://bevel.2x4m.cc/~general'
 
+  const alreadyReturned =
+    request.headers.get('cookie')?.includes(`${NATIVE_RETURNED_COOKIE}=1`) ===
+    true
+
   if (!session?.user?.email) {
+    if (alreadyReturned) {
+      return NextResponse.redirect(new URL('/login?native=1', origin))
+    }
     return NextResponse.redirect(
       new URL(
         `/login?native=1&callbackUrl=${encodeURIComponent(NATIVE_COMPLETE_PATH)}`,
@@ -104,10 +115,9 @@ export async function GET(request: Request) {
     /* ignore */
   }
 
-  await clearNativeLogin()
-
   const deep = `bevel://auth/complete?${params.toString()}`
   const safeDeep = deep.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+  const hasCode = Boolean(issued?.code)
   const html = `<!DOCTYPE html><html><head>
 <meta charset="utf-8"/>
 <title>Returning to BEVEL</title>
@@ -121,25 +131,32 @@ export async function GET(request: Request) {
 </style>
 </head><body>
 <div class="card">
-  <h1>Open the BEVEL app</h1>
-  <p>Sign-in finished. Return to the desktop app to plant this session.</p>
+  <h1>${hasCode ? 'Open the BEVEL app' : 'Almost there'}</h1>
+  <p>${
+    hasCode
+      ? 'Sign-in finished. Return to the desktop app to plant this session.'
+      : 'Signed in, but the workspace handoff code could not be minted. Click Open BEVEL anyway, then sign in once more from the app if chat is still locked.'
+  }</p>
   <a class="btn" id="open" href="${safeDeep}">Open BEVEL</a>
-  <p class="quiet">If the app does not come forward, click the button. Stay here — do not continue in the browser.</p>
+  <p class="quiet">Stay on this page. Do not continue in the browser.</p>
 </div>
 <script>
   const dest = ${JSON.stringify(deep)};
-  const go = () => { window.location.href = dest; };
-  go();
-  setTimeout(go, 400);
-  setTimeout(go, 1200);
+  const key = 'bevel_native_fired';
+  if (!sessionStorage.getItem(key)) {
+    sessionStorage.setItem(key, '1');
+    window.location.replace(dest);
+  }
 </script>
 </body></html>`
 
-  return new NextResponse(html, {
+  const res = new NextResponse(html, {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
     },
   })
+  markNativeReturned(res)
+  return res
 }

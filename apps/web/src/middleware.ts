@@ -1,6 +1,12 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { withTenantResolution } from '@bevel/tenant-config/middleware'
+import {
+  NATIVE_COMPLETE_PATH,
+  NATIVE_LOGIN_COOKIE,
+  NATIVE_RETURNED_COOKIE,
+  shouldInterceptNativeBrowserPath,
+} from '@/lib/auth-native-shared'
 
 const PUBLIC_PATHS = [
   '/api/health',
@@ -235,9 +241,6 @@ const BEVEL_RESERVED_SEGMENTS = new Set([
  * - Keep /talk and /session as path routes (next.config rewrites)
  * - Stamp tenant host
  */
-const NATIVE_LOGIN_COOKIE = 'bevel_native'
-const NATIVE_COMPLETE_PATH = '/api/auth/native-complete'
-
 /** Flutter/system-browser login must not dump the operator into /talk in Chrome. */
 function isNativeLoginQuery(request: NextRequest): boolean {
   const q = request.nextUrl.searchParams
@@ -264,12 +267,13 @@ function stampNativeLoginCookie(response: NextResponse): void {
 }
 
 function shouldReturnToNativeApp(request: NextRequest): boolean {
+  if (request.cookies.get(NATIVE_RETURNED_COOKIE)?.value === '1') return false
   if (request.cookies.get(NATIVE_LOGIN_COOKIE)?.value !== '1') return false
   const p = request.nextUrl.pathname
   if (p === NATIVE_COMPLETE_PATH || p.startsWith('/api/')) return false
   if (p === '/login' || p.startsWith('/login/')) return false
   if (p.startsWith('/_next')) return false
-  return true
+  return shouldInterceptNativeBrowserPath(p)
 }
 
 export function middleware(request: NextRequest) {

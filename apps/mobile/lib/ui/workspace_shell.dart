@@ -88,6 +88,8 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   var _sessionChecked = false;
   var _sessionHealthy = false;
   var _authRetryUsed = false;
+  var _needsWorkspaceSignIn = false;
+  var _browserLoginInFlight = false;
   List<(String, String)> _channels = const [
     ('general', 'General'),
     ('ops', 'Ops'),
@@ -200,6 +202,18 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             if (path.contains('/api/auth/handoff')) {
               return NavigationDecision.navigate;
             }
+            // Do not load the web login wall in the shell — that restarts
+            // Google in the system browser and loops.
+            if (path == '/login' || path.startsWith('/login/')) {
+              if (mounted) {
+                setState(() {
+                  _needsWorkspaceSignIn = true;
+                  _sessionHealthy = false;
+                  _loading = false;
+                });
+              }
+              return NavigationDecision.prevent;
+            }
             // Operator console / integrations stay in system browser.
             if (SessionBridge.isOperatorPath(path) ||
                 path.contains('/console')) {
@@ -255,12 +269,8 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       if (!healthy && !_authRetryUsed) {
         _authRetryUsed = true;
         if (mounted) {
-          BevelSnack.show(
-            context,
-            'Workspace session missing — signing in with Google…',
-          );
+          setState(() => _needsWorkspaceSignIn = true);
         }
-        await _nativeGoogleThenReload();
         return;
       }
 
@@ -301,6 +311,8 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
 
   /// In-app Google Sign-In → handoff redeem on this host (no Safari).
   Future<void> _nativeGoogleThenReload() async {
+    if (_browserLoginInFlight) return;
+    _browserLoginInFlight = true;
     try {
       final host = widget.workspaceHost?.trim().isNotEmpty == true
           ? widget.workspaceHost!.trim()
@@ -325,12 +337,17 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       );
       await _controller.loadRequest(redeem);
       _sessionChecked = false;
+      _needsWorkspaceSignIn = false;
     } catch (e) {
       if (mounted) {
-        BevelSnack.show(context, 'Google sign-in failed: $e');
+        BevelSnack.show(
+          context,
+          'Opening Google in the browser — come back here after it finishes.',
+        );
       }
-      // Last resort: system browser
       await _oauth.openSystemLogin();
+    } finally {
+      _browserLoginInFlight = false;
     }
   }
 
@@ -485,6 +502,30 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       if (!_sessionHealthy) 'Sign in to continue',
     ].join(' · ');
 
+    final signInBanner = _needsWorkspaceSignIn && !_sessionHealthy
+        ? Material(
+            color: p.surface,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Workspace session is not in this window yet. Sign in once, then stay in the app.',
+                      style: TextStyle(color: p.muted, fontSize: 13, height: 1.35),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton(
+                    onPressed: _nativeGoogleThenReload,
+                    child: const Text('Sign in'),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : null;
+
     final webBody = Stack(
       fit: StackFit.expand,
       children: [
@@ -619,33 +660,40 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           ),
         ],
       ),
-      body: showRail
-          ? Row(
-              children: [
-                SizedBox(
-                  width: layout.isFoldInner ? 260 : 300,
-                  child: Material(
-                    color: p.railWash,
-                    child: WorkspaceRail(
-                      activePath: path,
-                      channels: _channels,
-                      onNavigate: _navigatePath,
-                      onOpenTimeline: () => _navigatePath('/timeline'),
-                      onOpenNativeHub:
-                          widget.consumerMode ? null : widget.onOpenNativeHub,
-                      onOpenNotifications: widget.onOpenNotifications,
-                    ),
-                  ),
-                ),
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: p.border,
-                ),
-                Expanded(child: webBody),
-              ],
-            )
-          : webBody,
+      body: Column(
+        children: [
+          if (signInBanner != null) signInBanner,
+          Expanded(
+            child: showRail
+                ? Row(
+                    children: [
+                      SizedBox(
+                        width: layout.isFoldInner ? 260 : 300,
+                        child: Material(
+                          color: p.railWash,
+                          child: WorkspaceRail(
+                            activePath: path,
+                            channels: _channels,
+                            onNavigate: _navigatePath,
+                            onOpenTimeline: () => _navigatePath('/timeline'),
+                            onOpenNativeHub:
+                                widget.consumerMode ? null : widget.onOpenNativeHub,
+                            onOpenNotifications: widget.onOpenNotifications,
+                          ),
+                        ),
+                      ),
+                      VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        color: p.border,
+                      ),
+                      Expanded(child: webBody),
+                    ],
+                  )
+                : webBody,
+          ),
+        ],
+      ),
     );
   }
 }

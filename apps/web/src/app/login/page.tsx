@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import {
   getTenantFromRequest,
   isPlatformEntryHost,
@@ -20,6 +20,7 @@ import { GitHubSignInButton, GoogleSignInButton } from './GoogleSignInButton'
 import { OtpSignIn } from './OtpSignIn'
 import {
   NATIVE_COMPLETE_PATH,
+  NATIVE_RETURNED_COOKIE,
   isNativeLoginRequest,
 } from '@/lib/auth-native'
 
@@ -114,8 +115,13 @@ export default async function LoginPage({
         ? '/workspaces'
         : rawCallback
 
+  const nativeAlreadyReturned =
+    (await cookies()).get(NATIVE_RETURNED_COOKIE)?.value === '1'
   if (session?.user?.email) {
-    redirect(callbackUrl)
+    // Already bounced into the Mac app — do not send the browser around again.
+    if (!(nativeReturn && nativeAlreadyReturned)) {
+      redirect(callbackUrl)
+    }
   }
 
   const googleOk =
@@ -209,8 +215,9 @@ export default async function LoginPage({
       </p>
       {nativeReturn ? (
         <p className="mx-auto mt-4 max-w-md rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm leading-relaxed text-muted">
-          After Google, this browser will send you back to the BEVEL app.
-          Stay here until that handoff finishes.
+          {nativeAlreadyReturned
+            ? 'You can close this tab. Finish in the BEVEL app.'
+            : 'After Google, this browser will send you back to the BEVEL app. Stay here until that handoff finishes.'}
         </p>
       ) : null}
 
@@ -234,7 +241,11 @@ export default async function LoginPage({
       ) : null}
 
       <div className="mt-8 space-y-4">
-        {googleOk ? (
+        {nativeAlreadyReturned ? (
+          <p className="text-center text-sm text-muted">
+            Return to the desktop window. Signing in again here will loop.
+          </p>
+        ) : googleOk ? (
           <GoogleSignInButton
             callbackUrl={callbackUrl}
             label="Continue with Google"
@@ -245,9 +256,11 @@ export default async function LoginPage({
           </div>
         )}
 
-        {githubOk ? <GitHubSignInButton callbackUrl={callbackUrl} /> : null}
+        {githubOk && !nativeAlreadyReturned ? (
+          <GitHubSignInButton callbackUrl={callbackUrl} />
+        ) : null}
 
-        {otpOk ? (
+        {otpOk && !nativeAlreadyReturned ? (
           <>
             <div className="relative py-1 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
               <span className="relative z-10 bg-surface px-2">or</span>
