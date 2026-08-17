@@ -14,6 +14,7 @@ import 'native/hermes_handoff.dart';
 import 'native/hermes_return_reporter.dart';
 import 'native/macos_plugin_gaps.dart';
 import 'native/native_capabilities.dart';
+import 'native/native_login_gate.dart';
 import 'native/notification_service.dart';
 import 'native/google_native_auth.dart';
 import 'native/oauth_browser.dart';
@@ -153,9 +154,11 @@ class _BevelHomePageState extends State<BevelHomePage> {
         _hermesStatus = hermesStatus;
       });
 
-      // Signed-in: open last selected space, or the chooser (Private + orgs).
+      // Only auto-open chat when the WebView already has a session.
+      // A leftover completedGoogleSignIn flag without cookies reopened
+      // login and stacked more Google hops.
       if (!_didAutoOpenWorkspace &&
-          (onboarding.completedGoogleSignIn || onboarding.sessionHealthy) &&
+          onboarding.sessionHealthy &&
           !onboarding.needsOnboarding) {
         _didAutoOpenWorkspace = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -202,16 +205,14 @@ class _BevelHomePageState extends State<BevelHomePage> {
 
     switch (action.kind) {
       case 'auth_complete':
-        final code = action.handoffCode ?? '';
         final now = DateTime.now();
-        if (code.isNotEmpty &&
-            code == _lastAuthCompleteCode &&
-            _lastAuthCompleteAt != null &&
-            now.difference(_lastAuthCompleteAt!) < const Duration(seconds: 20)) {
+        if (_lastAuthCompleteAt != null &&
+            now.difference(_lastAuthCompleteAt!) < const Duration(seconds: 30)) {
           return;
         }
-        _lastAuthCompleteCode = code;
+        _lastAuthCompleteCode = action.handoffCode;
         _lastAuthCompleteAt = now;
+        NativeLoginGate.markComplete();
         // System-browser OAuth finished → redeem handoff code in WebView jar.
         unawaited(
           _onAuthComplete(

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
+import 'native_login_gate.dart';
 
 /// Legacy OAuth via system browser — **fallback only**.
 ///
@@ -13,6 +14,7 @@ class OAuthBrowser {
   const OAuthBrowser();
 
   Future<bool> openSystemLogin() {
+    if (!NativeLoginGate.tryBegin()) return Future.value(false);
     return open(BevelConfig.systemBrowserLoginUri());
   }
 

@@ -42,7 +42,7 @@ class BevelConfig {
   static const String loginPath = '/login';
 
   /// Semantic version shown in About / release notes (mirrors pubspec).
-  static const String versionLabel = '0.4.6';
+  static const String versionLabel = '0.4.7';
 
   /// Magenta Extensions + analytics API.
   static const String magentaApiBase = String.fromEnvironment(
@@ -151,18 +151,9 @@ class BevelConfig {
       return true;
     }
 
-    // Handoff redeem must stay in the WebView (plants host-local cookies).
-    if (path.contains('/api/auth/handoff')) {
-      return false;
-    }
-
-    // Auth.js provider start + callback — complete outside WKWebView
-    if (path.contains('/api/auth/signin') ||
-        path.contains('/api/auth/callback') ||
-        path.contains('/api/auth/signout') ||
-        path.contains('/api/auth/native-complete')) {
-      return true;
-    }
+    // Handoff redeem and Auth.js callbacks must stay in the WebView.
+    // Opening /api/auth/signin or /native-complete in the system browser
+    // starts another Google hop and loops 4–5 times.
     return false;
   }
 

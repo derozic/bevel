@@ -226,9 +226,15 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               }
               return NavigationDecision.prevent;
             }
-            // Google/GitHub/Auth.js IdP hops leave the WebView.
+            // Google/GitHub inside the WebView: block only. Never spawn a
+            // second system-browser hop — that is the 4–5x login loop.
             if (BevelConfig.isOAuthNavigation(uri)) {
-              _oauth.open(uri);
+              if (mounted) {
+                setState(() {
+                  _needsWorkspaceSignIn = true;
+                  _loading = false;
+                });
+              }
               return NavigationDecision.prevent;
             }
             if (BevelConfig.isAllowedInAppUri(uri)) {
