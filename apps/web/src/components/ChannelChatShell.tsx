@@ -6,6 +6,7 @@ import { FleetChat, FleetProvider, type FleetWorkRepo } from '@bevel/realtime-cl
 import { agents } from '@/lib/agent-catalog'
 import { BEVEL_ARCHIVE_PATH, BEVEL_COPY, bevelTalkPath } from '@/lib/bevel'
 import { UserMenu } from '@/components/UserMenu'
+import { ChatHeaderTools } from '@/components/ChatHeaderTools'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 import {
   ensureNotificationPermission,
@@ -222,7 +223,12 @@ export function ChannelChatShell({
         focusMessageId={focusMessageId}
         highlightQuery={highlightQuery}
         onChannelToggle={onChannelToggle}
-        userMenu={<UserMenu size="sm" align="end" />}
+        userMenu={
+          <>
+            <ChatHeaderTools />
+            <UserMenu size="sm" align="end" />
+          </>
+        }
         agentMessageHref={(agentId) => bevelTalkPath(agentId)}
         peopleLookupPath="/api/users/lookup"
         channelEscalated={channelEscalated}

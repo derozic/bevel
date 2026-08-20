@@ -28,6 +28,8 @@ describe('isNativeLoginRequest', () => {
     expect(shouldInterceptNativeBrowserPath('/~general')).toBe(true)
     expect(shouldInterceptNativeBrowserPath('/login')).toBe(false)
     expect(shouldInterceptNativeBrowserPath('/console/fleet')).toBe(false)
+    expect(shouldInterceptNativeBrowserPath('/talk/hermes')).toBe(false)
+    expect(shouldInterceptNativeBrowserPath('/bevel/talk/hermes')).toBe(true)
     expect(shouldInterceptNativeBrowserPath('/api/auth/callback/google')).toBe(
       false,
     )

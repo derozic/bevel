@@ -4,7 +4,6 @@ domain: bevel.2ndbra.in
 hosts:
   - bevel.2ndbra.in
   - bevel.2ndbrain.lvh.me
-  - 2ndbrain.lvh.me
   - 2ndbrain.bevel.lvh.me
 
 plan: pro
@@ -13,6 +12,7 @@ feature_access: beta
 brand:
   theme: ./theme.json
   product_name: 2ndBrain
+  logo: ./logo.svg
   cmyk:
     kit_id: 2ndbrain
 

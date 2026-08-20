@@ -90,6 +90,8 @@
 }
 
 .fleet-chat-header {
+  position: relative;
+  z-index: 50;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -175,6 +177,8 @@
 }
 
 .fleet-chat-agents {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -241,6 +245,7 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  gap: 0.35rem;
   margin-left: 0.35rem;
   pointer-events: auto;
 }

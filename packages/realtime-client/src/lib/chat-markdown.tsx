@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { extractChatImages } from './chat-images'
 
 const FENCE_RE = /^```/
 const LIST_RE = /^[-•*]\s+/
@@ -64,10 +65,35 @@ function inlineFormat(text: string, keyPrefix: string): ReactNode[] {
     })
 }
 
-/** Lightweight chat markdown — lists, bold, code, @mentions, ^escalations. */
+function ChatImageStrip({
+  images,
+}: {
+  images: Array<{ alt: string; src: string }>
+}) {
+  if (images.length === 0) return null
+  return (
+    <div className="fleet-chat-msg-images">
+      {images.map((img) => (
+        <a
+          key={img.src}
+          href={img.src}
+          target="_blank"
+          rel="noreferrer"
+          className="fleet-chat-msg-image-link"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={img.src} alt={img.alt} className="fleet-chat-msg-image" />
+        </a>
+      ))}
+    </div>
+  )
+}
+
+/** Lightweight chat markdown — lists, bold, code, @mentions, ^escalations, images. */
 export function ChatMessageBody({ text }: { text: string }) {
   const safe = typeof text === 'string' ? text : text == null ? '' : String(text)
-  const lines = safe.replace(/\r\n/g, '\n').split('\n')
+  const { body, images } = extractChatImages(safe)
+  const lines = body.replace(/\r\n/g, '\n').split('\n')
   const nodes: ReactNode[] = []
   let listItems: ReactNode[] = []
   let block = 0
@@ -114,9 +140,14 @@ export function ChatMessageBody({ text }: { text: string }) {
 
   flushList()
 
-  if (nodes.length === 0) {
+  if (nodes.length === 0 && images.length === 0) {
     return <p className="fleet-chat-paragraph">{text}</p>
   }
 
-  return <div className="fleet-chat-formatted">{nodes}</div>
+  return (
+    <div className="fleet-chat-formatted">
+      <ChatImageStrip images={images} />
+      {nodes}
+    </div>
+  )
 }

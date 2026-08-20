@@ -25,6 +25,7 @@ import { UserAvatar } from "@/components/console/user-avatar";
 import { useCommandPalette } from "@/components/console/command-palette";
 import { DayNightBadge } from "@/components/console/day-night-badge";
 import { bevelUrls } from "@/components/console/bevel-urls";
+import { useSoftWorkspaceLinks } from "@/lib/workspace-nav";
 
 interface NavigationItem {
   name: string;
@@ -56,6 +57,7 @@ export default function DashboardLayout({
   const { setOpen: setPaletteOpen } = useCommandPalette();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const chatHref = useMemo(() => bevelUrls.workspaceChat(), []);
+  useSoftWorkspaceLinks();
 
   const user = session?.user?.email
     ? {

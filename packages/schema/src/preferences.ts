@@ -171,6 +171,20 @@ export const bevelUserPreferencesSchema = z.object({
      * Ctrl/Cmd+click or channel properties toggles membership.
      */
     escalatedChannels: z.array(z.string()).default([]),
+    /**
+     * Frequent conversations shown as the rail pin grid.
+     * Undefined = not customized yet (workspace tracks are the default pins).
+     * Empty array = member unpinned everything.
+     */
+    pinnedConversations: z
+      .array(
+        z.object({
+          kind: z.enum(['channel', 'talk', 'session']),
+          id: z.string().min(1).max(128),
+        }),
+      )
+      .max(24)
+      .optional(),
   }),
   appearance: z.object({
     themeId: themeIdSchema,

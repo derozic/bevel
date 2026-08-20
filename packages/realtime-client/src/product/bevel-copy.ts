@@ -8,6 +8,10 @@ export const BEVEL_COPY = {
 
   channelHint: 'Toggle agents · post · @mention to focus',
   channelsLabel: 'Tracks',
+  pinnedLabel: 'Pinned',
+  pinnedEmpty: 'Pin conversations you use often.',
+  feedLabel: 'feed',
+  feedEmpty: 'Mentions and ^escalations land here',
   conversationsLabel: 'Direct',
   loadingChannels: 'Loading tracks…',
   loadingConversations: 'Loading conversations…',

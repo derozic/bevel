@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  agentTalkHref,
   emptyIcFacets,
   filterIcs,
   getChildren,
@@ -139,5 +140,11 @@ describe('org graph', () => {
       expect.arrayContaining(['lego', 'brain', 'codegraph']),
     )
     expect(orgStats().diamonds).toBe(diamonds.length)
+  })
+
+  it('opens agent talk on the public /talk path, not /bevel/talk', () => {
+    expect(agentTalkHref('hermes')).toBe('/talk/hermes')
+    expect(agentTalkHref('johnny')).toBe('/talk/johnny')
+    expect(agentTalkHref('scott')).toBe('/talk/hermes')
   })
 })

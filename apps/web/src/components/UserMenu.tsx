@@ -132,7 +132,12 @@ export function UserMenu({
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align={align} className="z-[200] w-60" sideOffset={8}>
+      <DropdownMenuContent
+        align={align}
+        className="z-[400] w-60"
+        sideOffset={8}
+        style={{ zIndex: 400 }}
+      >
         <div className="border-b border-border px-2.5 py-2.5 mb-1">
           <p className="truncate text-sm font-semibold text-foreground">{name}</p>
           {email ? (

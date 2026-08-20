@@ -7,6 +7,7 @@
  */
 import fleetRegistry from './fleet-registry.json'
 import { getAgentById, type Agent } from './agent-catalog'
+import { bevelTalkPath } from './bevel'
 
 export type OrgTier = 'founder' | 'co-founder' | 'director' | 'ic'
 
@@ -343,8 +344,9 @@ export function filterIcs(ics: IcRecord[], facets: IcFacets): IcRecord[] {
 }
 
 export function agentTalkHref(id: string): string {
-  if (id === 'scott') return '/bevel/talk/hermes'
-  return `/bevel/talk/${id}`
+  // Public /talk/:agent — middleware 308s /bevel/talk/* which full-reloads the shell.
+  if (id === 'scott') return bevelTalkPath('hermes')
+  return bevelTalkPath(id)
 }
 
 export type { Agent }

@@ -3,7 +3,12 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Client, getStateCallbacks, type Room } from '@colyseus/sdk'
-import { Bars3Icon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
+import {
+  Bars3Icon,
+  PaperAirplaneIcon,
+  PhotoIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline'
 import { useFleet } from '../FleetProvider'
 import { accentStripeColor } from '../lib/accent'
 import {
@@ -18,6 +23,13 @@ import {
   type SchemaMessage,
 } from '../lib/colyseus-messages'
 import { ChatMessageBody } from '../lib/chat-markdown'
+import {
+  MAX_CHAT_IMAGES,
+  chatImageMarkdown,
+  collectImageFiles,
+  hasChatImageMarkdown,
+  isAllowedChatImageFile,
+} from '../lib/chat-images'
 import {
   applyMention,
   filterMixedMentionCandidates,
@@ -57,6 +69,29 @@ import type { GestureKind } from '@bevel/schema'
 
 const SEAT_RETRY_MAX = 2
 const SEAT_RETRY_DELAY_MS = 700
+
+type PendingChatImage = {
+  id: string
+  file: File
+  previewUrl: string
+}
+
+async function uploadChatImage(file: File): Promise<{ url: string; name: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch('/api/chat/images', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  const data = (await res.json().catch(() => null)) as
+    | { url?: string; name?: string; error?: string }
+    | null
+  if (!res.ok || !data?.url) {
+    throw new Error(data?.error || `Could not upload image (${res.status})`)
+  }
+  return { url: data.url, name: data.name || file.name || 'image' }
+}
 
 /** Known leftover portraits still served even if they left the registry. */
 const LEGACY_AGENT_AVATARS: Record<string, string> = {
@@ -540,7 +575,11 @@ export function FleetChat({
   const [input, setInput] = useState('')
   const [caret, setCaret] = useState(0)
   const [mentionHighlight, setMentionHighlight] = useState(0)
+  const [pendingImages, setPendingImages] = useState<PendingChatImage[]>([])
+  const [attachBusy, setAttachBusy] = useState(false)
+  const [dropping, setDropping] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [agentIds, setAgentIds] = useState<string[]>(() =>
     bootSnapshot?.agentIds?.length ? bootSnapshot.agentIds : initialAgents
   )
@@ -1123,9 +1162,51 @@ export function FleetChat({
     })
   }
 
+  function addImageFiles(files: File[]) {
+    if (files.length === 0) return
+    setPendingImages((prev) => {
+      const room = Math.max(0, MAX_CHAT_IMAGES - prev.length)
+      const next = files.filter(isAllowedChatImageFile).slice(0, room)
+      if (next.length === 0) return prev
+      return [
+        ...prev,
+        ...next.map((file) => ({
+          id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          file,
+          previewUrl: URL.createObjectURL(file),
+        })),
+      ]
+    })
+  }
+
+  function removePendingImage(id: string) {
+    setPendingImages((prev) => {
+      const hit = prev.find((p) => p.id === id)
+      if (hit) URL.revokeObjectURL(hit.previewUrl)
+      return prev.filter((p) => p.id !== id)
+    })
+  }
+
+  function handleClipboardPaste(event: React.ClipboardEvent) {
+    const files = collectImageFiles(event.clipboardData)
+    if (files.length === 0) return
+    event.preventDefault()
+    addImageFiles(files)
+  }
+
+  useEffect(() => {
+    return () => {
+      pendingImages.forEach((p) => URL.revokeObjectURL(p.previewUrl))
+    }
+    // revoke leftovers on unmount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function send() {
     const text = input.trim()
-    if (!text || !roomRef.current || ticketBusy) return
+    if ((!text && pendingImages.length === 0) || !roomRef.current || ticketBusy) {
+      return
+    }
 
     let message = text
     const work = workMode && fleet.canPutOnWork && Boolean(activeWorkRepo)
@@ -1159,6 +1240,32 @@ export function FleetChat({
         setTicketBusy(false)
       }
     }
+
+    const queued = pendingImages
+    if (queued.length > 0) {
+      setAttachBusy(true)
+      try {
+        const uploaded = await Promise.all(
+          queued.map((item) => uploadChatImage(item.file)),
+        )
+        const imageMd = uploaded
+          .map((item) => chatImageMarkdown(item.name, item.url))
+          .join('\n')
+        message = [message, imageMd].filter(Boolean).join('\n\n')
+      } catch (err) {
+        setIssue({
+          title: 'Could not attach image',
+          hint: err instanceof Error ? err.message : undefined,
+        })
+        setAttachBusy(false)
+        return
+      }
+      queued.forEach((item) => URL.revokeObjectURL(item.previewUrl))
+      setPendingImages([])
+      setAttachBusy(false)
+    }
+
+    if (!message.trim()) return
 
     const directTarget =
       !isChannel && agentIds.length === 1 ? agentIds[0] : undefined
