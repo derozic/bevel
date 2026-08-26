@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import Link from 'next/link'
+import { serverRealtimeUrl } from '@/lib/realtime-server'
+import { formatUptime } from './live-graph'
 import { StatusDashboard, type StatusProbe } from './StatusDashboard'
 
 export const metadata: Metadata = {
@@ -15,10 +17,11 @@ async function probe(
   name: string,
   url: string,
   okWhen: (status: number, body: string) => boolean,
+  fetchUrl = url,
 ): Promise<StatusProbe> {
   const started = Date.now()
   try {
-    const res = await fetch(url, {
+    const res = await fetch(fetchUrl, {
       cache: 'no-store',
       signal: AbortSignal.timeout(8000),
       headers: { Accept: 'application/json, text/html' },
@@ -35,6 +38,9 @@ async function probe(
         database?: { status?: string }
         realtime?: string
         degraded?: boolean
+        uptimeSec?: number
+        searchIndex?: { documents?: number }
+        rooms?: { count?: number; clients?: number }
       }
       if (j.version) detail = `v${j.version}`
       if (j.database?.status) {
@@ -42,6 +48,18 @@ async function probe(
       }
       if (typeof j.realtime === 'string') {
         detail = [detail, `rt:${j.realtime}`].filter(Boolean).join(' · ')
+      }
+      if (typeof j.uptimeSec === 'number') {
+        detail = [detail, `up ${formatUptime(j.uptimeSec)}`].filter(Boolean).join(' · ')
+      }
+      if (typeof j.rooms?.count === 'number') {
+        detail = [detail, `${j.rooms.count} rooms`].filter(Boolean).join(' · ')
+      }
+      if (typeof j.rooms?.clients === 'number') {
+        detail = [detail, `${j.rooms.clients} clients`].filter(Boolean).join(' · ')
+      }
+      if (typeof j.searchIndex?.documents === 'number') {
+        detail = [detail, `${j.searchIndex.documents} docs`].filter(Boolean).join(' · ')
       }
       if (j.degraded) detail = [detail, 'degraded'].filter(Boolean).join(' · ')
     } catch {
@@ -121,11 +139,13 @@ export default async function StatusPage() {
       'Realtime',
       `${realtimeBase}/health`,
       (s, b) => s === 200 && b.includes('ok'),
+      `${serverRealtimeUrl()}/health`,
     ),
     probe(
       'This host',
       `${origin}/api/health`,
       (s, b) => s === 200 && b.includes('bevel'),
+      `http://127.0.0.1:${process.env.WEB_PORT || process.env.PORT || '43200'}/api/health`,
     ),
   ])
 

@@ -126,6 +126,12 @@ class ConversationSearchIndex {
     return this.docs.size
   }
 
+  get sessionCount(): number {
+    const ids = new Set<string>()
+    for (const doc of this.docs.values()) ids.add(doc.sessionId)
+    return ids.size
+  }
+
   isReady(): boolean {
     return this.ready
   }

@@ -6,6 +6,7 @@ export default defineConfig({
     include: [
       'apps/web/src/**/*.spec.ts',
       'packages/*/src/**/*.spec.ts',
+      'services/realtime/src/**/*.spec.ts',
     ],
     exclude: ['**/node_modules/**', '**/.next/**', '**/dist/**'],
     environment: 'node',
