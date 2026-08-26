@@ -1,5 +1,10 @@
 import { auth } from '@/auth'
-import { bevelApiFetch } from '@/lib/bevel-api.server'
+import {
+  bevelApiFetch,
+  hostTenantSlug,
+  stampTenant,
+  withTenantQuery,
+} from '@/lib/bevel-api.server'
 import { DEFAULT_CHANNELS, type FleetChannelSummary } from '@/lib/fleet-channels'
 
 function normalizeSlug(raw: string): string {
@@ -31,10 +36,11 @@ export async function GET() {
   }
 
   try {
-    const res = await bevelApiFetch('/api/v1/fleet/channels', {
-      method: 'GET',
-      cache: 'no-store',
-    })
+    const tenant = await hostTenantSlug()
+    const res = await bevelApiFetch(
+      withTenantQuery('/api/v1/fleet/channels', tenant),
+      { method: 'GET', cache: 'no-store' },
+    )
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as {
         detail?: string
@@ -102,14 +108,20 @@ export async function POST(request: Request) {
       : ['hermes', 'johnny']
 
   try {
+    const tenant = await hostTenantSlug()
     const res = await bevelApiFetch('/api/v1/fleet/channels', {
       method: 'POST',
-      body: JSON.stringify({
-        slug,
-        name: payload.name?.trim() || slug,
-        tags,
-        defaultAgentIds,
-      }),
+      body: JSON.stringify(
+        stampTenant(
+          {
+            slug,
+            name: payload.name?.trim() || slug,
+            tags,
+            defaultAgentIds,
+          },
+          tenant,
+        ),
+      ),
     })
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
     if (!res.ok) {

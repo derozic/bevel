@@ -44,6 +44,8 @@ export {
   resolveHomeTenantForEmail,
   emailIsMemberOfWorkspace,
   publicTenantUrl,
+  tenantPublicHost,
+  isPreviewHost,
   registrableDomain,
   needsAuthHandoff,
   isPlatformHost,

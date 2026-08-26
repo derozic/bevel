@@ -135,6 +135,8 @@ export const TenantSchema = z.object({
   slug: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1),
   host: z.string().min(1),
+  /** Production domain plus preview aliases (e.g. *.lvh.me). */
+  hosts: z.array(z.string()).default([]),
   status: z.enum(['active', 'pending', 'suspended']).default('active'),
   /** free | trial | pro | team | enterprise */
   plan: TenantPlanSchema.default('free'),

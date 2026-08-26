@@ -1,14 +1,22 @@
 import { NextResponse } from 'next/server'
-import { bevelApiFetch } from '@/lib/bevel-api.server'
+import {
+  bevelApiFetch,
+  hostTenantSlug,
+  withTenantQuery,
+} from '@/lib/bevel-api.server'
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params
+  const tenant = await hostTenantSlug()
   try {
     const res = await bevelApiFetch(
-      `/api/v1/webhooks/${encodeURIComponent(id)}/deliveries`,
+      withTenantQuery(
+        `/api/v1/webhooks/${encodeURIComponent(id)}/deliveries`,
+        tenant,
+      ),
     )
     const data = await res.json().catch(() => ({}))
     return NextResponse.json(data, { status: res.status })

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { bevelTagPath } from '@/lib/bevel'
+import { hostTenantSlug, withHostTenant } from '@/lib/host-tenant'
 import type { FolkEntityKind } from '@bevel/schema'
 
 export function FolksonomyChips({
@@ -27,7 +28,9 @@ export function FolksonomyChips({
     if (!id) return
     try {
       const res = await fetch(
-        `/api/tags?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}`,
+        withHostTenant(
+          `/api/tags?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}`,
+        ),
         { credentials: 'include', cache: 'no-store' },
       )
       const data = (await res.json().catch(() => ({}))) as { tags?: string[] }
@@ -51,7 +54,7 @@ export function FolksonomyChips({
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, kind, id }),
+        body: JSON.stringify({ slug, kind, id, tenant: hostTenantSlug() }),
       })
       const data = (await res.json().catch(() => ({}))) as { tags?: string[] }
       if (Array.isArray(data.tags)) setTags(data.tags)
@@ -68,7 +71,7 @@ export function FolksonomyChips({
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, kind, id }),
+        body: JSON.stringify({ slug, kind, id, tenant: hostTenantSlug() }),
       })
       const data = (await res.json().catch(() => ({}))) as { tags?: string[] }
       if (Array.isArray(data.tags)) setTags(data.tags)

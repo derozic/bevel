@@ -90,6 +90,18 @@ export function loadThemeTokens(
   return ThemeTokensSchema.parse(raw)
 }
 
+function uniqueHostnames(...raw: Array<string | undefined>): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const value of raw) {
+    const host = (value || '').toLowerCase().split(':')[0]?.trim()
+    if (!host || seen.has(host)) continue
+    seen.add(host)
+    out.push(host)
+  }
+  return out
+}
+
 function authModeToProviders(
   mode: DeclarativeTenant['auth']['mode'],
 ): Tenant['auth']['providers'] {
@@ -125,6 +137,18 @@ export function compileTenant(
   }
 
   const host = declarative.domain.toLowerCase().split(':')[0]
+  let previewHost: string | undefined
+  try {
+    const preview = declarative.deployment?.preview_url
+    if (preview) previewHost = new URL(preview).hostname
+  } catch {
+    previewHost = undefined
+  }
+  const hosts = uniqueHostnames(
+    host,
+    previewHost,
+    ...(declarative.hosts ?? []),
+  )
   const slug = declarative.tenant
   const dir = tenantDir(slug, root)
   const logoPath = declarative.brand.logo
@@ -208,6 +232,7 @@ export function compileTenant(
     slug,
     name: declarative.name ?? slug,
     host,
+    hosts,
     status: 'active',
     plan,
     featureAccess,

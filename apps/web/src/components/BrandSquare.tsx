@@ -3,6 +3,7 @@
 import type { CSSProperties, MouseEvent, ReactNode } from 'react'
 import Link from 'next/link'
 import { processColorForKey } from '@/lib/cmyk-process'
+import { rewriteLocalWorkspaceHref } from '@/lib/local-workspace-href'
 
 export function BrandSquare({
   href,
@@ -35,19 +36,30 @@ export function BrandSquare({
   const style = { '--tile-process': wash } as CSSProperties
   const mark = logoUrl?.trim()
   const initial = (label.replace(/^[~^#]/, '').trim()[0] || '?').toUpperCase()
+  const crossHost = /^https?:\/\//i.test(href)
+  function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+    const next = rewriteLocalWorkspaceHref(href)
+    if (next !== href) {
+      event.preventDefault()
+      window.location.assign(next)
+      return
+    }
+    onClick?.(event)
+  }
+  const tileProps = {
+    href,
+    onClick: handleClick,
+    onContextMenu,
+    'data-active': active ? 'true' : 'false',
+    'data-escalated': escalated ? 'true' : 'false',
+    'aria-busy': busy || undefined,
+    title: title || caption || label,
+    className: 'bevel-brand-square',
+    style,
+  } as const
 
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      onContextMenu={onContextMenu}
-      data-active={active ? 'true' : 'false'}
-      data-escalated={escalated ? 'true' : 'false'}
-      aria-busy={busy || undefined}
-      title={title || caption || label}
-      className="bevel-brand-square"
-      style={style}
-    >
+  const body = (
+    <>
       <span className="bevel-brand-square-face" aria-hidden>
         {mark ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -60,8 +72,14 @@ export function BrandSquare({
       {caption && caption !== label ? (
         <span className="bevel-brand-square-caption">{caption}</span>
       ) : null}
-    </Link>
+    </>
   )
+
+  if (crossHost) {
+    return <a {...tileProps}>{body}</a>
+  }
+
+  return <Link {...tileProps}>{body}</Link>
 }
 
 export function BrandSquareGrid({

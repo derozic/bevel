@@ -1,8 +1,22 @@
 import type { NextConfig } from 'next'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const appDir = path.dirname(fileURLToPath(import.meta.url))
+const repoRoot = path.join(appDir, '../..')
+// Next only auto-loads apps/web/.env*. Pull repo-root .env so Google Workspace
+// (AUTH_GOOGLE_ID/SECRET/HD) and AUTH_SECRET apply when `pnpm dev` is started
+// from this package. Require (not import) so production typecheck does not
+// need a direct @next/env dependency.
+try {
+  const { loadEnvConfig } = createRequire(import.meta.url)('@next/env') as {
+    loadEnvConfig: (dir: string) => void
+  }
+  loadEnvConfig(repoRoot)
+} catch {
+  // typecheck / environments without @next/env
+}
 
 const nextConfig: NextConfig = {
   // Monorepo: pin tracing root so parent lockfiles do not hijack app discovery.
@@ -26,6 +40,9 @@ const nextConfig: NextConfig = {
     'bevel.agents.2x4m.lvh.me', // legacy redirect target still hits Next briefly
     'bevel.2ndbrain.lvh.me',
     'bevel.preso.lvh.me',
+    'bevel.pres0.lvh.me',
+    'bevel.olimbic.lvh.me',
+    'bevel.decli.lvh.me',
   ],
   transpilePackages: [
     '@bevel/auth',

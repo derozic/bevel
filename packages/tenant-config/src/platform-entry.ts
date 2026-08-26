@@ -15,6 +15,7 @@ export const PLATFORM_ENTRY_TENANT: Tenant = {
   slug: 'platform',
   name: 'BEVEL',
   host: 'bevel.is',
+  hosts: ['bevel.is', 'www.bevel.is', 'app.bevel.is', 'bevel.lvh.me'],
   status: 'active',
   plan: 'pro',
   featureAccess: 'beta',
@@ -64,7 +65,11 @@ export const PLATFORM_ENTRY_TENANT: Tenant = {
 /** Host-scoped copy of the platform-entry synthetic tenant. */
 export function platformEntryTenant(host: string): Tenant {
   const h = host.toLowerCase().split(':')[0] || 'bevel.is'
-  return { ...PLATFORM_ENTRY_TENANT, host: h }
+  return {
+    ...PLATFORM_ENTRY_TENANT,
+    host: h,
+    hosts: Array.from(new Set([h, ...PLATFORM_ENTRY_TENANT.hosts])),
+  }
 }
 
 export function isPlatformEntryTenantSlug(slug: string | undefined | null): boolean {

@@ -13,8 +13,10 @@ import {
   publicTenantUrl,
   resolveHomeTenantForEmail,
   resolveWorkspacesForEmail,
+  tenantPublicHost,
   workspaceHasRoster,
 } from '@bevel/tenant-config'
+import { googleOidcFetch } from './google-oidc-fetch'
 import { mintRealtimeToken, resolveAuthSecret } from './tokens'
 import {
   isPhoneSyntheticEmail,
@@ -384,14 +386,14 @@ export function createTenantAuthConfig(
       access_type: 'online',
       response_type: 'code',
     }
-    // Platform: don't force a single Workspace hd — any org domain may sign in.
-    // Org host: hint that tenant's domain when unique.
-    if (!platformEntry) {
-      const hd = process.env.AUTH_GOOGLE_HD
-      if (hd) googleParams.hd = hd
-      else if (tenant.auth.allowedEmailDomains?.length === 1) {
-        googleParams.hd = tenant.auth.allowedEmailDomains[0]!
-      }
+    // Prefer AUTH_GOOGLE_HD (Workspace) on every host, including bevel.lvh.me /
+    // bevel.is. Skipping it on platform left the Google picker on consumer
+    // accounts and Internal-consent clients failed the login.
+    const hd = process.env.AUTH_GOOGLE_HD?.trim()
+    if (hd) {
+      googleParams.hd = hd
+    } else if (!platformEntry && tenant.auth.allowedEmailDomains?.length === 1) {
+      googleParams.hd = tenant.auth.allowedEmailDomains[0]!
     }
 
     providers.push(
@@ -403,36 +405,11 @@ export function createTenantAuthConfig(
         /**
          * Google's OIDC discovery sets
          * `authorization_response_iss_parameter_supported: true`, so oauth4webapi
-         * requires `iss` on the /callback query string. Google often omits it,
-         * which surfaces as CallbackRouteError: response parameter "iss" missing
-         * after a successful Google consent. Strip the flag from discovery JSON.
+         * requires `iss` on the /callback query string. Google often omits it.
+         * googleOidcFetch strips that flag, caches discovery, and falls back to
+         * static endpoints when accounts.google.com fetch hangs (IPv6).
          */
-        [customFetch]: async (...args: Parameters<typeof fetch>) => {
-          const input = args[0]
-          const url =
-            typeof input === 'string'
-              ? input
-              : input instanceof URL
-                ? input.href
-                : input.url
-          const res = await fetch(...args)
-          if (!url.includes('.well-known/openid-configuration')) {
-            return res
-          }
-          try {
-            const json = (await res.clone().json()) as Record<string, unknown>
-            json.authorization_response_iss_parameter_supported = false
-            return new Response(JSON.stringify(json), {
-              status: res.status,
-              statusText: res.statusText,
-              headers: {
-                'content-type': 'application/json',
-              },
-            })
-          } catch {
-            return res
-          }
-        },
+        [customFetch]: googleOidcFetch,
       }),
     )
   }
@@ -603,6 +580,22 @@ export function createTenantAuthConfig(
           }
         }
 
+        // Picker tap onto an org host (bevel.2ndbrain.lvh.me) must rebind the
+        // shared .lvh.me session. Otherwise JWT stays on platform/2x4m and
+        // chat/history load the wrong workspace.
+        if (
+          email &&
+          !platformEntry &&
+          tenant.slug !== 'platform' &&
+          emailAllowedOnTenant(email, tenant)
+        ) {
+          token.tenantId = tenant.id
+          token.tenantSlug = tenant.slug
+          token.tenantHost = tenantPublicHost(tenant, host)
+          token.realtimeNamespace = tenant.realtime.namespace
+          token.needsWorkspacePick = false
+        }
+
         // Explicit workspace switch from picker
         if (trigger === 'update' && token.workspaceSwitchSlug) {
           const next = lookupTenantBySlug(String(token.workspaceSwitchSlug))
@@ -723,7 +716,7 @@ export function createTenantAuthConfig(
 export function homePathForTenant(tenant: Tenant, platformHost?: string): string {
   const entry = platformHost && isPlatformEntryHost(platformHost)
   if (entry && tenant.host !== platformHost?.toLowerCase().split(':')[0]) {
-    return publicTenantUrl(tenant, '/~general')
+    return publicTenantUrl(tenant, '/~general', platformHost)
   }
   return '/~general'
 }

@@ -213,11 +213,25 @@
 .fleet-chat-notice {
   height: 100%;
   overflow: hidden;
-  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
   border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
   font-size: 0.8125rem;
-  line-height: 1.45;
+  line-height: 1.3;
   box-sizing: border-box;
+}
+
+/* Title + hint on one row so they fit the 2.75rem slot (stacked copy overflowed). */
+.fleet-chat-notice-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .fleet-chat-replay-slot {
@@ -274,13 +288,21 @@
 
 .fleet-chat-notice-title {
   font-weight: 600;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fleet-chat-notice-hint {
-  margin-top: 0.2rem;
+  margin: 0;
   font-size: 0.75rem;
   font-weight: 500;
   color: var(--sticker-muted);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fleet-chat-notice[data-tone='warn'] .fleet-chat-notice-hint {

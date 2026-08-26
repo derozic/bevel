@@ -57,6 +57,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html
       lang="en"
+      data-tenant-slug={tenant?.slug || undefined}
       data-tenant-theme={themeAttr}
       data-tenant-product={productName || undefined}
       data-tenant-logo={logoUrl || undefined}

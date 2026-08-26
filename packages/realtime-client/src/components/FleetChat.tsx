@@ -154,8 +154,12 @@ function ConnectionNotice({
       data-tone={tone}
       role={tone === 'warn' ? 'alert' : 'status'}
     >
-      <p className="fleet-chat-notice-title">{safe.title}</p>
-      {safe.hint ? <p className="fleet-chat-notice-hint">{safe.hint}</p> : null}
+      <p className="fleet-chat-notice-line">
+        <span className="fleet-chat-notice-title">{safe.title}</span>
+        {safe.hint ? (
+          <span className="fleet-chat-notice-hint">{safe.hint}</span>
+        ) : null}
+      </p>
     </div>
   )
 }
@@ -544,8 +548,9 @@ export function FleetChat({
   const channelSlug = fleet.channelSlug ?? 'general'
   const resumeSessionId = fleet.sessionId
   const newSessionTitle = fleet.sessionTitle
+  const tenantSlug = fleet.tenantSlug || 'platform'
   const roomKey = isChannel
-    ? `channel:${channelSlug}`
+    ? `channel:${tenantSlug}:${channelSlug}`
     : `session:${resumeSessionId ?? 'new'}`
   const bootSnapshot = readRoomSnapshot(roomKey)
   const bootHasThread = Boolean(
@@ -729,6 +734,9 @@ export function FleetChat({
 
   useEffect(() => {
     if (!tokenReady) return
+    // Wait for the workspace slug so we do not matchmake as "platform" and
+    // immediately tear the seat down when session/html hydrates to 2x4m.
+    if (isChannel && !fleet.tenantSlug) return
 
     const gen = ++connectGenRef.current
     let cancelled = false
@@ -774,6 +782,18 @@ export function FleetChat({
           ...init,
           credentials: 'omit',
         }),
+      urlBuilder: (url) => {
+        // Seat reservations sometimes advertise 127.0.0.1:43208. Keep the
+        // WebSocket on the same Caddy host used for matchmake.
+        try {
+          const base = new URL(realtimeUrl)
+          url.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
+          url.host = base.host
+        } catch {
+          /* keep advertised URL */
+        }
+        return url.toString()
+      },
     })
     client.auth.token = authToken
 
@@ -792,6 +812,7 @@ export function FleetChat({
     const joinOptions = isChannel
       ? {
           channelSlug,
+          tenantSlug,
           agentIds: joinRoster,
           displayName: joinDisplayName,
           authToken,
@@ -816,9 +837,13 @@ export function FleetChat({
       }
     }, 15_000)
 
-    client
-      .joinOrCreate(roomName, joinOptions)
-      .then((room) => {
+    // React Strict Mode mounts, unmounts, remounts. Delay matchmake so the
+    // first pass never reserves a seat that the cleanup immediately drops.
+    const joinDelay = window.setTimeout(() => {
+      if (cancelled || connectGenRef.current !== gen) return
+      client
+        .joinOrCreate(roomName, joinOptions)
+        .then((room) => {
         window.clearTimeout(connectTimeout)
         if (cancelled || connectGenRef.current !== gen) {
           room.leave()
@@ -1020,16 +1045,18 @@ export function FleetChat({
         }
         setIssue(resolveBevelConnectionIssue(msg, { isChannel, realtimeUrl }))
       })
+    }, 80)
 
     return () => {
       cancelled = true
+      window.clearTimeout(joinDelay)
       window.clearTimeout(connectTimeout)
       if (connectGenRef.current === gen) {
         roomRef.current?.leave()
         roomRef.current = null
       }
     }
-  }, [roomKey, connectionAttempt, fleet.realtimeUrl, isChannel, tokenReady])
+  }, [roomKey, connectionAttempt, fleet.realtimeUrl, isChannel, tokenReady, tenantSlug, fleet.tenantSlug])
 
   useEffect(() => {
     writeRoomSnapshot(roomKey, {
@@ -1484,7 +1511,9 @@ export function FleetChat({
             />
           ) : showConnectingNotice ? (
             <div className="fleet-chat-notice" data-tone="info">
-              <p className="fleet-chat-notice-title">{connectingLabel}</p>
+              <p className="fleet-chat-notice-line">
+                <span className="fleet-chat-notice-title">{connectingLabel}</span>
+              </p>
             </div>
           ) : (
             <span className="fleet-chat-notice-placeholder" aria-hidden />

@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import { bevelApiFetch } from '@/lib/bevel-api.server'
+import {
+  bevelApiFetch,
+  hostTenantSlug,
+  stampTenant,
+  withTenantQuery,
+} from '@/lib/bevel-api.server'
 
-export async function GET(request: Request) {
-  const tenant = new URL(request.url).searchParams.get('tenant')
-  const qs = tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''
+export async function GET() {
+  const tenant = await hostTenantSlug()
   try {
-    const res = await bevelApiFetch(`/api/v1/webhooks${qs}`)
+    const res = await bevelApiFetch(withTenantQuery('/api/v1/webhooks', tenant))
     const data = await res.json().catch(() => ({}))
     return NextResponse.json(data, { status: res.status })
   } catch (err) {
@@ -17,11 +21,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({}))
+  const tenant = await hostTenantSlug()
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
   try {
     const res = await bevelApiFetch('/api/v1/webhooks', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify(stampTenant(body, tenant)),
     })
     const data = await res.json().catch(() => ({}))
     return NextResponse.json(data, { status: res.status })

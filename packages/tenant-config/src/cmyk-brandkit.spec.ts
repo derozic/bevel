@@ -17,6 +17,7 @@ function stubTenant(): Tenant {
     slug: '2x4m',
     name: '2x4m',
     host: 'bevel.2x4m.lvh.me',
+    hosts: ['bevel.2x4m.lvh.me'],
     status: 'active',
     plan: 'pro',
     featureAccess: 'beta',
@@ -31,7 +32,7 @@ function stubTenant(): Tenant {
     },
     realtime: { namespace: '2x4m' },
     workRepos: [],
-  } as Tenant
+  } as unknown as Tenant
 }
 
 describe('CMYK brand kit mapping', () => {

@@ -173,33 +173,97 @@ function isLoopbackHost(hostname: string): boolean {
   )
 }
 
+export function isPreviewHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().split(':')[0] || ''
+  return h === 'lvh.me' || h.endsWith('.lvh.me')
+}
+
+function previewAliasFor(tenant: Tenant): string | undefined {
+  const aliases = tenantHostnames(tenant)
+  const preferred = tenant.slug ? `bevel.${tenant.slug}.lvh.me` : undefined
+  if (preferred && aliases.includes(preferred)) return preferred
+  return aliases.find((h) => isPreviewHost(h)) || preferred
+}
+
+function tenantHostnames(tenant: Tenant): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of [tenant.host, ...(tenant.hosts ?? [])]) {
+    const host = (raw || '').toLowerCase().split(':')[0]
+    if (!host || seen.has(host)) continue
+    seen.add(host)
+    out.push(host)
+  }
+  return out
+}
+
+/**
+ * Host to open for this workspace from the current request.
+ * Local `.lvh.me` sessions stay on a preview alias so the picker never
+ * hops to production (bevel.2ndbra.in) and dies on localhost:41009.
+ */
+function normalizeRequestHost(raw?: string): string {
+  return (raw || '').split(',')[0]?.trim().toLowerCase().split(':')[0] || ''
+}
+
+function localDevPrefersPreview(): boolean {
+  if (process.env.NODE_ENV !== 'production') return true
+  const urls = [
+    process.env.AUTH_URL,
+    process.env.NEXTAUTH_URL,
+    process.env.BEVEL_PUBLIC_URL,
+  ]
+  return urls.some((u) => (u || '').includes('.lvh.me'))
+}
+
+export function tenantPublicHost(tenant: Tenant, fromHost?: string): string {
+  const from = normalizeRequestHost(fromHost)
+  const aliases = tenantHostnames(tenant)
+  const canonical = (tenant.host || aliases[0] || '').toLowerCase().split(':')[0]
+
+  if (from && aliases.includes(from)) return from
+
+  const wantPreview =
+    localDevPrefersPreview() ||
+    isPreviewHost(from) ||
+    isLoopbackHost(from)
+  if (wantPreview) {
+    const preview = previewAliasFor(tenant)
+    if (preview) return preview
+  }
+
+  if (canonical && !isLoopbackHost(canonical)) return canonical
+
+  const fromEnv =
+    process.env.BEVEL_PUBLIC_URL ||
+    process.env.AUTH_URL ||
+    process.env.NEXTAUTH_URL
+  if (fromEnv) {
+    try {
+      const u = new URL(fromEnv)
+      if (!isLoopbackHost(u.hostname)) return u.hostname
+    } catch {
+      /* keep looking */
+    }
+  }
+  return canonical || 'bevel.is'
+}
+
 /**
  * Absolute URL for an org workspace host.
- * Always uses `tenant.host` (never BEVEL_PUBLIC_URL / AUTH_URL) so platform entry
- * does not rewrite org hops to bevel.is when the tenant lives on bevel.2x4m.cc.
- * Env fallback only when tenant.host is missing or loopback.
+ * Prefer a preview alias when `fromHost` is local; otherwise `tenant.host`
+ * so platform entry does not rewrite org hops onto bevel.is.
  */
-export function publicTenantUrl(tenant: Tenant, path = '/bevel'): string {
+export function publicTenantUrl(
+  tenant: Tenant,
+  path = '/bevel',
+  fromHost?: string,
+): string {
   const proto =
     process.env.BEVEL_PUBLIC_PROTOCOL ??
     (process.env.NODE_ENV === 'production' ? 'https' : 'https')
 
-  let host = (tenant.host || '').toLowerCase().split(':')[0] || ''
-  if (!host || isLoopbackHost(host)) {
-    const fromEnv =
-      process.env.BEVEL_PUBLIC_URL ||
-      process.env.AUTH_URL ||
-      process.env.NEXTAUTH_URL
-    if (fromEnv) {
-      try {
-        const u = new URL(fromEnv)
-        if (!isLoopbackHost(u.hostname)) host = u.hostname
-      } catch {
-        /* keep host */
-      }
-    }
-  }
-  if (!host) host = 'bevel.is'
+  const host = tenantPublicHost(tenant, fromHost)
   const base = `${proto}://${host}`
   if (!path.startsWith('/')) return `${base}/${path}`
   return `${base}${path}`

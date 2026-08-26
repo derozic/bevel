@@ -51,6 +51,7 @@ export async function mintRealtimeToken(payload: {
     role: payload.role,
     type: 'realtime',
     tenantId: payload.tenantId,
+    tenantSlug: payload.namespace,
     namespace: payload.namespace,
   }
   if (payload.name) claims.name = payload.name

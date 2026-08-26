@@ -17,6 +17,7 @@ import {
   tokenizeRosterQuery,
 } from '@/lib/roster-search'
 import { WORKSPACE_PEOPLE, type WorkspacePerson } from '@/lib/workspace-directory'
+import { withHostTenant } from '@/lib/host-tenant'
 import { cn } from '@/lib/utils'
 
 /**
@@ -72,10 +73,13 @@ export function ConversationRoster({
       const taggedPeople: WorkspacePerson[] = []
 
       const tagFetches = tokens.map(async (token) => {
-        const res = await fetch(`/api/tags/${encodeURIComponent(token)}`, {
-          credentials: 'include',
-          cache: 'no-store',
-        })
+        const res = await fetch(
+          withHostTenant(`/api/tags/${encodeURIComponent(token)}`),
+          {
+            credentials: 'include',
+            cache: 'no-store',
+          },
+        )
         if (!res.ok) return
         const data = (await res.json().catch(() => ({}))) as {
           agents?: Array<{ id: string }>

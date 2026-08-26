@@ -4,10 +4,12 @@ import { headers } from 'next/headers'
 import type { Tenant } from '@bevel/schema'
 import {
   isPlatformEntryHost,
+  isPreviewHost,
   lookupTenantBySlug,
   needsAuthHandoff,
   publicTenantUrl,
   resolveWorkspacesForEmail,
+  tenantPublicHost,
 } from '@bevel/tenant-config'
 import { Button } from '@bevel/ui'
 import { BevelNavMark } from '@/components/BevelNavMark'
@@ -47,8 +49,10 @@ export default async function WorkspacesPage() {
     headerStore.get('host') ??
     ''
   )
+    .split(',')[0]
+    ?.trim()
     .toLowerCase()
-    .split(':')[0]
+    .split(':')[0] || ''
 
   const onPlatform = isPlatformEntryHost(host)
   const { tenants, domain } = resolveWorkspacesForEmail(session.user.email)
@@ -66,7 +70,7 @@ export default async function WorkspacesPage() {
     !onPlatform &&
     process.env.BEVEL_PLATFORM_AUTO_HANDOFF !== '0'
   ) {
-    redirect(publicTenantUrl(workspaces[0]!, BEVEL_HOME_PATH))
+    redirect(publicTenantUrl(workspaces[0]!, BEVEL_HOME_PATH, host))
   }
 
   return (
@@ -144,11 +148,17 @@ async function WorkspaceOpenLink({
   image?: string | null
   fromHost: string
 }) {
-  const orgHost = ws.host.toLowerCase().split(':')[0] || ws.host
+  const orgHost = tenantPublicHost(ws, fromHost)
   const callbackPath = BEVEL_HOME_PATH
-  let href = publicTenantUrl(ws, callbackPath)
+  let href = publicTenantUrl(ws, callbackPath, fromHost)
 
-  if (fromHost && needsAuthHandoff(fromHost, orgHost)) {
+  // Local .lvh.me cookies are shared — never hand off to production DNS
+  // (bevel.olimbic.games NXDOMAIN, bevel.2ndbra.in → localhost:41009).
+  const stayOnPreview =
+    process.env.NODE_ENV !== 'production' ||
+    isPreviewHost(fromHost) ||
+    isPreviewHost(orgHost)
+  if (fromHost && !stayOnPreview && needsAuthHandoff(fromHost, orgHost)) {
     const issued = await issueAuthHandoffCode({
       email,
       name,
@@ -168,11 +178,11 @@ async function WorkspaceOpenLink({
     <BrandSquare
       href={href}
       label={ws.theme.productName || ws.name}
-      caption={ws.host}
+      caption={orgHost}
       logoUrl={ws.theme.brandIconUrl || ws.theme.logoUrl || ws.theme.markUrl}
       processKey={ws.slug}
       process={ws.theme.accent}
-      title={`${ws.name} · ${ws.host}`}
+      title={`${ws.name} · ${orgHost}`}
     />
   )
 }

@@ -189,8 +189,8 @@ cmd_status() {
 }
 
 cmd_start() {
-  local targets=("${@:-}")
-  if [[ ${#targets[@]} -eq 0 || "${targets[0]}" == "all" ]]; then
+  local targets=("$@")
+  if [[ $# -eq 0 || "${1:-}" == "all" ]]; then
     targets=("${START_ORDER[@]}")
   fi
   echo "Starting BEVEL: ${targets[*]}"
@@ -201,8 +201,8 @@ cmd_start() {
 }
 
 cmd_stop() {
-  local targets=("${@:-}")
-  if [[ ${#targets[@]} -eq 0 || "${targets[0]}" == "all" ]]; then
+  local targets=("$@")
+  if [[ $# -eq 0 || "${1:-}" == "all" ]]; then
     targets=("${STOP_ORDER[@]}")
   fi
   echo "Stopping BEVEL: ${targets[*]}"

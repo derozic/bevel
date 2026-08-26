@@ -19,7 +19,12 @@ export async function fetchFleetChannels(
   if (!apiToken) return DEFAULT_CHANNELS
 
   try {
-    const res = await fetch(`${API_BASE}/api/v1/fleet/channels`, {
+    const tenant =
+      typeof sessionOrToken === 'string'
+        ? undefined
+        : sessionOrToken?.tenantSlug
+    const qs = tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''
+    const res = await fetch(`${API_BASE}/api/v1/fleet/channels${qs}`, {
       headers: { Authorization: `Bearer ${apiToken}` },
       cache: 'no-store',
     })

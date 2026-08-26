@@ -42,6 +42,7 @@ export type FetchMessagesOpts = {
   limit?: number
   before?: string | null
   beforeId?: string | null
+  tenant?: string | null
 }
 
 const PERSIST_TIMEOUT_MS = 8_000
@@ -67,14 +68,26 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms))
 }
 
-export async function fetchChannel(slug: string): Promise<FleetChannelRecord | null> {
+function withTenant(path: string, tenant?: string | null): string {
+  if (!tenant) return path
+  const join = path.includes('?') ? '&' : '?'
+  return `${path}${join}tenant=${encodeURIComponent(tenant)}`
+}
+
+export async function fetchChannel(
+  slug: string,
+  tenant?: string | null,
+): Promise<FleetChannelRecord | null> {
   const base = apiBase()
   if (!base) return null
   try {
-    const res = await fetch(`${base}/api/v1/fleet/channels/${encodeURIComponent(slug)}`, {
+    const res = await fetch(
+      `${base}${withTenant(`/api/v1/fleet/channels/${encodeURIComponent(slug)}`, tenant)}`,
+      {
       headers: internalHeaders(),
       signal: AbortSignal.timeout(PERSIST_TIMEOUT_MS),
-    })
+    },
+    )
     if (!res.ok) return null
     const data = (await res.json()) as FleetChannelRecord & { default_agent_ids?: string[] }
     return {
@@ -108,6 +121,7 @@ export async function fetchChannelMessagesPage(
     const params = new URLSearchParams({ limit: String(limit) })
     if (opts.before) params.set('before', opts.before)
     if (opts.beforeId) params.set('before_id', opts.beforeId)
+    if (opts.tenant) params.set('tenant', opts.tenant)
     const res = await fetch(
       `${base}/api/v1/fleet/channels/${encodeURIComponent(slug)}/messages?${params}`,
       {
@@ -156,6 +170,7 @@ export async function fetchChannelMessages(
 export async function appendChannelMessage(
   slug: string,
   msg: Omit<FleetChannelMessageRecord, 'createdAt'> & { createdAt?: string },
+  tenant?: string | null,
 ): Promise<boolean> {
   const base = apiBase()
   if (!base) {
@@ -166,7 +181,7 @@ export async function appendChannelMessage(
     return false
   }
 
-  const url = `${base}/api/v1/fleet/channels/${encodeURIComponent(slug)}/messages`
+  const url = `${base}${withTenant(`/api/v1/fleet/channels/${encodeURIComponent(slug)}/messages`, tenant)}`
   let lastErr = 'unknown'
   for (let attempt = 1; attempt <= PERSIST_RETRIES; attempt++) {
     try {
@@ -198,6 +213,57 @@ export async function appendChannelMessage(
     slug,
     id: msg.id,
     status: msg.status,
+    error: lastErr,
+  })
+  return false
+}
+
+/**
+ * Persist a gesture through the gesture endpoint so subscribers get
+ * `gesture.created` (not a duplicate `message.created` from a full upsert).
+ */
+export async function persistChannelGesture(
+  slug: string,
+  messageId: string,
+  gesture: { kind: string; userId: string; userName?: string },
+  tenant?: string | null,
+): Promise<boolean> {
+  const base = apiBase()
+  if (!base) return false
+  const url = `${base}${withTenant(`/api/v1/fleet/channels/${encodeURIComponent(slug)}/messages/${encodeURIComponent(messageId)}/gestures`, tenant)}`
+  let lastErr = 'unknown'
+  for (let attempt = 1; attempt <= PERSIST_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: internalHeaders(),
+        body: JSON.stringify({
+          kind: gesture.kind,
+          userId: gesture.userId,
+          userName: gesture.userName ?? '',
+        }),
+        signal: AbortSignal.timeout(PERSIST_TIMEOUT_MS),
+      })
+      if (res.ok) return true
+      lastErr = `HTTP ${res.status}`
+      if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+        console.error('[fleet-channel-api] gesture persist rejected', {
+          slug,
+          messageId,
+          status: res.status,
+        })
+        return false
+      }
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+    if (attempt < PERSIST_RETRIES) {
+      await sleep(150 * attempt * attempt)
+    }
+  }
+  console.error('[fleet-channel-api] gesture persist failed after retries', {
+    slug,
+    messageId,
     error: lastErr,
   })
   return false

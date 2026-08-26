@@ -37,6 +37,11 @@ function displayNameFromSession(
   return 'operator'
 }
 
+function hostTenantSlug(): string | undefined {
+  if (typeof document === 'undefined') return undefined
+  return document.documentElement.getAttribute('data-tenant-slug') || undefined
+}
+
 export function ChannelChatShell({
   roomMode = 'channel',
   channelSlug = 'general',
@@ -164,6 +169,13 @@ export function ChannelChatShell({
     []
   )
 
+  const [pageTenant, setPageTenant] = useState<string | undefined>(() =>
+    hostTenantSlug(),
+  )
+  useEffect(() => {
+    setPageTenant(hostTenantSlug())
+  }, [])
+
   const resolvedCanPutOnWork = canPutOnWork || session?.canPutOnWork === true
 
   function handleWorkRepoChange(fullName: string) {
@@ -192,6 +204,7 @@ export function ChannelChatShell({
       authReady={status === 'authenticated' || status === 'unauthenticated'}
       roomMode={roomMode}
       channelSlug={channelSlug}
+      tenantSlug={session?.tenantSlug || pageTenant}
       sessionId={sessionId}
       sessionTitle={sessionTitle}
       showPoweredBy={false}

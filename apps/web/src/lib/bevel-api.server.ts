@@ -2,7 +2,31 @@
  * Server-side helpers to call the BEVEL FastAPI control plane.
  */
 
+import { getTenantFromRequest } from '@bevel/tenant-config'
 import { auth } from '@/auth'
+
+/** Tenant slug for the current Host. Never trust a client-supplied tenant. */
+export async function hostTenantSlug(): Promise<string | null> {
+  const tenant = await getTenantFromRequest()
+  return tenant?.slug ?? null
+}
+
+export function withTenantQuery(
+  path: string,
+  tenant: string | null | undefined,
+): string {
+  if (!tenant) return path
+  const join = path.includes('?') ? '&' : '?'
+  return `${path}${join}tenant=${encodeURIComponent(tenant)}`
+}
+
+export function stampTenant<T extends Record<string, unknown>>(
+  body: T,
+  tenant: string | null,
+): T & { tenant?: string } {
+  if (!tenant) return body
+  return { ...body, tenant }
+}
 
 export function bevelApiBase(): string {
   return (

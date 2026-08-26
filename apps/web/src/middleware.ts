@@ -279,10 +279,11 @@ function shouldReturnToNativeApp(request: NextRequest): boolean {
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
 
+  // Never expire PKCE/state on /api/auth/* — Next.js copies those Set-Cookie
+  // deletes onto the same request, so the Google callback cannot read the
+  // verifier and Auth.js fails with InvalidCheck (error=Configuration).
   if (pathname.startsWith('/api/auth')) {
-    const res = NextResponse.next()
-    expireStaleDomainOAuthCookies(res, request)
-    return res
+    return NextResponse.next()
   }
 
   if (shouldReturnToNativeApp(request)) {
@@ -294,11 +295,17 @@ export function middleware(request: NextRequest) {
 
   // Escape hatch: clear corrupt session JWTs (Invalid Compact JWE) that cause
   // ERR_TOO_MANY_REDIRECTS when Auth.js partially decrypts old cookies.
+  // Only on explicit ?clear=1 — wiping cookies on every ?error= hid the error
+  // and bounced /login → /welcome → /login.
   const clearSession =
     searchParams.get('clear') === '1' || searchParams.get('clear') === 'session'
-  if (pathname === '/login' && (clearSession || Boolean(searchParams.get('error')))) {
-    const res = NextResponse.next()
+  if (pathname === '/login' && clearSession) {
+    const res = withTenantResolution(request, {
+      publicPaths: PUBLIC_PATHS,
+      unknownTenantUrl: process.env.BEVEL_UNKNOWN_TENANT_URL,
+    })
     expireSessionCookies(res, request)
+    expireStaleDomainOAuthCookies(res, request)
     if (isNativeLoginQuery(request)) stampNativeLoginCookie(res)
     return res
   }
@@ -375,8 +382,9 @@ export function middleware(request: NextRequest) {
     publicPaths: PUBLIC_PATHS,
     unknownTenantUrl: process.env.BEVEL_UNKNOWN_TENANT_URL,
   })
-  if (pathname === '/login' && isNativeLoginQuery(request)) {
-    stampNativeLoginCookie(res)
+  if (pathname === '/login') {
+    expireStaleDomainOAuthCookies(res, request)
+    if (isNativeLoginQuery(request)) stampNativeLoginCookie(res)
   }
   return res
 }

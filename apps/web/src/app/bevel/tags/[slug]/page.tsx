@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { bevelApiFetch } from '@/lib/bevel-api.server'
+import {
+  bevelApiFetch,
+  hostTenantSlug,
+  withTenantQuery,
+} from '@/lib/bevel-api.server'
 import { BEVEL_TAGS_PATH } from '@/lib/bevel'
 
 type Tagged = {
@@ -23,7 +27,10 @@ export default async function TagPage({
   let tracks: Tagged[] = []
   let resolved = slug
   try {
-    const res = await bevelApiFetch(`/api/v1/tags/${encodeURIComponent(slug)}`)
+    const tenant = await hostTenantSlug()
+    const res = await bevelApiFetch(
+      withTenantQuery(`/api/v1/tags/${encodeURIComponent(slug)}`, tenant),
+    )
     if (res.status === 404) notFound()
     const data = (await res.json().catch(() => ({}))) as {
       slug?: string

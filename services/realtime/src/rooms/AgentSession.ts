@@ -4,6 +4,7 @@ import { dispatchAgentChat } from '../agent-dispatch.js'
 import {
   appendChannelMessage,
   fetchChannelMessagesPage,
+  persistChannelGesture,
   type FleetChannelMessageRecord,
 } from '../fleet-channel-api.js'
 import { enqueuePersist, flushPersistQueue } from '../persist-queue.js'
@@ -452,18 +453,13 @@ export class AgentSession extends Room {
       userName: profile.name,
     })
     msg.reactionsJson = JSON.stringify(next)
-    void this.persistMessage({
-      id: msg.id,
-      speakerId: msg.speakerId || msg.agentId || 'unknown',
-      speakerName: msg.speaker,
-      speakerAvatar: msg.speakerAvatar,
-      speakerType: msg.speakerType,
-      agentId: msg.agentId,
-      body: msg.body,
-      status: msg.status || 'final',
-      reactions: next,
-      votePrompt: msg.votePrompt || undefined,
-    })
+    void enqueuePersist(`gesture:${msg.id}`, () =>
+      persistChannelGesture(this.persistSlug, msg.id, {
+        kind,
+        userId: profile.userId,
+        userName: profile.name,
+      }),
+    )
     recordEvent({
       ts: Date.now(),
       sessionId: this.state.sessionId,

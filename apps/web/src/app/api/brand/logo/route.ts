@@ -3,6 +3,7 @@ import { join, extname } from 'node:path'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import type { DaypartId } from '@bevel/schema'
+import { hostTenantSlug } from '@/lib/bevel-api.server'
 import { DAYPART_LOGO_SLOTS } from '@/lib/workspace-logo'
 
 export const runtime = 'nodejs'
@@ -32,7 +33,10 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const slug = session.tenantSlug || '2x4m'
+  const slug = (await hostTenantSlug()) || session.tenantSlug
+  if (!slug) {
+    return NextResponse.json({ error: 'tenant required' }, { status: 400 })
+  }
   const dir = brandDir(slug)
   const logos: Partial<Record<DaypartId, string>> = {}
   let fallback: string | undefined
@@ -74,7 +78,10 @@ export async function POST(request: Request) {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const slug = session.tenantSlug || '2x4m'
+  const slug = (await hostTenantSlug()) || session.tenantSlug
+  if (!slug) {
+    return NextResponse.json({ error: 'tenant required' }, { status: 400 })
+  }
 
   let form: FormData
   try {

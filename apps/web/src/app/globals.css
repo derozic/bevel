@@ -28,8 +28,8 @@
   --color-primary-500: var(--bevel-accent);
   --color-primary-600: color-mix(in oklch, var(--bevel-accent) 82%, black);
   /*
-   * Solid CTAs: ink fill + cream label flip with daypart (always high contrast).
-   * Prefer bg-cta text-cta-fg over bg-primary-500 text-background.
+   * Console solid CTAs: ink fill + cream label (high contrast on dense tools).
+   * Auth/marketing primaries use @bevel/ui Button (`bg-accent`) — not this pair.
    */
   --color-cta: var(--ink, var(--bevel-text));
   --color-cta-fg: var(--cream, var(--bevel-bg));
@@ -78,6 +78,23 @@ body {
   background: var(--bevel-bg);
   color: var(--bevel-text);
   font-family: var(--bevel-font-sans);
+}
+
+/*
+ * Login / claim Google CTA — same fill as HomePage Button.
+ * Pin to --bevel-accent (daypart + tenant) so it never picks up ink `--color-cta`.
+ */
+.bevel-auth-primary {
+  background-color: var(--bevel-accent, #7c5cff);
+  border-color: color-mix(in srgb, var(--bevel-accent, #7c5cff) 40%, transparent);
+  color: #fff;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--bevel-accent, #7c5cff) 40%, transparent),
+    0 12px 40px -12px var(--bevel-accent, #7c5cff);
+}
+
+.bevel-auth-primary:hover {
+  opacity: 0.9;
 }
 
 /* ── Marketing home atmosphere ─────────────────────────────

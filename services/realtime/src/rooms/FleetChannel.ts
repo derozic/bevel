@@ -6,6 +6,7 @@ import {
   appendChannelMessage,
   fetchChannel,
   fetchChannelMessagesPage,
+  persistChannelGesture,
   type FleetChannelMessageRecord,
 } from '../fleet-channel-api.js'
 import { enqueuePersist, flushPersistQueue } from '../persist-queue.js'
@@ -43,6 +44,7 @@ import {
 
 type JoinOptions = {
   channelSlug?: string
+  tenantSlug?: string
   agentIds?: string[]
   displayName?: string
   authToken?: string
@@ -120,6 +122,7 @@ export class FleetChannel extends Room {
   maxClients = 32
   declare state: FleetChannelState
   private channelSlug = 'general'
+  private tenantSlug = ''
   private speakerNames = new Map<string, string>()
   private speakerProfiles = new Map<string, SpeakerProfile>()
   /** True when Postgres has messages older than the shared room state window. */
@@ -135,26 +138,19 @@ export class FleetChannel extends Room {
     return claims
   }
 
-  async onCreate(options: JoinOptions) {
+  onCreate(options: JoinOptions) {
     this.setState(new FleetChannelState())
     this.channelSlug = (options.channelSlug ?? 'general').toLowerCase()
+    this.tenantSlug = (options.tenantSlug ?? '').toLowerCase()
     this.state.channelSlug = this.channelSlug
     this.state.createdAt = Date.now()
     this.state.status = 'active'
     this.state.poweredByLabel = BEVEL_POWERED_BY_LABEL
+    this.state.title = `~${this.channelSlug}`
 
-    const channel = await fetchChannel(this.channelSlug)
-    const agentIds = (
-      options.agentIds?.length
-        ? options.agentIds
-        : channel?.defaultAgentIds ?? ['hermes', 'johnny']
-    ).map((id) => id.toLowerCase())
-
-    this.state.title = channel?.name ?? `~${this.channelSlug}`
-    for (const tag of channel?.tags ?? []) {
-      this.state.tags.push(tag)
-    }
-
+    const agentIds = (options.agentIds?.length ? options.agentIds : ['hermes', 'johnny']).map(
+      (id) => id.toLowerCase(),
+    )
     const catalog = loadMergedRegistry()
     for (const id of agentIds) {
       this.state.agentIds.push(id)
@@ -167,17 +163,42 @@ export class FleetChannel extends Room {
       this.state.agents.push(row)
     }
 
+    // Do not await Postgres here. Colyseus holds the seat reservation until
+    // onCreate finishes; a slow API call expires the join (close 4002).
+    this.onMessage('chat', (client, payload: ChatPayload) => {
+      void this.handleChat(client, payload)
+    })
+    this.onMessage('load_history', (client, payload: LoadHistoryPayload) => {
+      void this.handleLoadHistory(client, payload)
+    })
+    this.onMessage('gesture', (client, payload: GesturePayload) => {
+      void this.handleGesture(client, payload)
+    })
+    void this.hydrateFromApi(options)
+  }
+
+  private async hydrateFromApi(options: JoinOptions) {
+    const channel = await fetchChannel(this.channelSlug, this.tenantSlug || null)
+    if (channel?.name) this.state.title = channel.name
+    if (channel?.tags?.length && this.state.tags.length === 0) {
+      for (const tag of channel.tags) this.state.tags.push(tag)
+    }
+    if (!options.agentIds?.length && channel?.defaultAgentIds?.length) {
+      // Roster already seeded from join options; skip mutating live presence.
+    }
+
     const page = await fetchChannelMessagesPage(this.channelSlug, {
       limit: ROOM_HISTORY_LIMIT,
+      tenant: this.tenantSlug || null,
     })
     this.historyHasMore = page.hasMore
     this.historyNextBefore = page.nextBefore
     this.historyNextBeforeId = page.nextBeforeId
 
     for (const row of page.messages) {
+      if (this.findMessage(row.id)) continue
       const msg = recordToChatMessage(row, this.channelSlug)
       this.pushMessage(msg)
-      // Seed search index only (do not re-append history into JSONL)
       if (row.speakerType !== 'system' && row.body?.trim()) {
         conversationSearchIndex.indexDocument({
           key: `${this.channelSlug}::${row.id}`,
@@ -194,20 +215,6 @@ export class FleetChannel extends Room {
         conversationSearchIndex.markReady()
       }
     }
-
-    // Channel copy lives in the client empty state — avoid welcome/join/leave chat noise.
-
-    this.onMessage('chat', (client, payload: ChatPayload) => {
-      void this.handleChat(client, payload)
-    })
-
-    this.onMessage('load_history', (client, payload: LoadHistoryPayload) => {
-      void this.handleLoadHistory(client, payload)
-    })
-
-    this.onMessage('gesture', (client, payload: GesturePayload) => {
-      void this.handleGesture(client, payload)
-    })
   }
 
   async onDispose() {
@@ -318,7 +325,9 @@ export class FleetChannel extends Room {
     },
   ): Promise<boolean> {
     return enqueuePersist(msg.id, () =>
-      appendChannelMessage(this.channelSlug, {
+      appendChannelMessage(
+        this.channelSlug,
+        {
         id: msg.id,
         speakerId: msg.speakerId,
         speakerName: msg.speakerName,
@@ -331,7 +340,9 @@ export class FleetChannel extends Room {
         createdAt: msg.createdAt,
         reactions: msg.reactions,
         votePrompt: msg.votePrompt,
-      }),
+        },
+        this.tenantSlug || null,
+      ),
     )
   }
 
@@ -371,18 +382,18 @@ export class FleetChannel extends Room {
       meta: { messageId, kind, agentId: msg.agentId },
     })
 
-    void this.persistMessage({
-      id: msg.id,
-      speakerId: msg.speakerId || msg.agentId || 'unknown',
-      speakerName: msg.speaker,
-      speakerAvatar: msg.speakerAvatar,
-      speakerType: msg.speakerType,
-      agentId: msg.agentId,
-      body: msg.body,
-      status: msg.status || 'final',
-      reactions: next,
-      votePrompt: msg.votePrompt || undefined,
-    })
+    void enqueuePersist(`gesture:${msg.id}`, () =>
+      persistChannelGesture(
+        this.channelSlug,
+        msg.id,
+        {
+        kind,
+        userId: profile.userId,
+        userName: profile.name,
+        },
+        this.tenantSlug || null,
+      ),
+    )
 
     // Thumbs-down on an agent turn is an immediate course-correct signal.
     if (kind === 'down' && msg.speakerType === 'agent' && msg.agentId) {
@@ -427,6 +438,7 @@ export class FleetChannel extends Room {
       limit,
       before,
       beforeId,
+      tenant: this.tenantSlug || null,
     })
 
     client.send('history', {

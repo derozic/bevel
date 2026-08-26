@@ -1,23 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getCsrfToken, signIn } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
+import { Button } from '@bevel/ui'
 
 /**
  * Google / GitHub sign-in.
  *
- * Primary path: native form POST to Auth.js (no Next server actions).
- * That avoids "Failed to fetch" / fetchServerAction failures when the
- * RSC action hash goes stale under HMR or host rewrites.
- *
- * Fallback: client signIn() if CSRF is unavailable.
+ * Native form POST to Auth.js (no Next server actions, no client signIn()).
  */
 export function GoogleSignInButton({
   callbackUrl = '/welcome',
   label = 'Continue with Google Workspace',
+  csrfToken,
 }: {
   callbackUrl?: string
   label?: string
+  csrfToken?: string | null
 }) {
   return (
     <OAuthSignInButton
@@ -25,6 +24,7 @@ export function GoogleSignInButton({
       callbackUrl={callbackUrl}
       label={label}
       variant="primary"
+      initialCsrf={csrfToken}
     />
   )
 }
@@ -32,9 +32,11 @@ export function GoogleSignInButton({
 export function GitHubSignInButton({
   callbackUrl = '/welcome',
   label = 'Continue with GitHub',
+  csrfToken,
 }: {
   callbackUrl?: string
   label?: string
+  csrfToken?: string | null
 }) {
   return (
     <OAuthSignInButton
@@ -42,8 +44,41 @@ export function GitHubSignInButton({
       callbackUrl={callbackUrl}
       label={label}
       variant="outline"
+      initialCsrf={csrfToken}
     />
   )
+}
+
+let cachedCsrf: string | null = null
+let csrfInflight: Promise<string | null> | null = null
+
+function loadCsrfToken(): Promise<string | null> {
+  if (cachedCsrf) return Promise.resolve(cachedCsrf)
+  if (!csrfInflight) {
+    csrfInflight = fetch('/api/auth/session', {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+      .catch(() => null)
+      .then(() =>
+        fetch('/api/auth/csrf', {
+          credentials: 'include',
+          cache: 'no-store',
+        }),
+      )
+      .then(async (res) => {
+        if (!res.ok) return null
+        const data = (await res.json()) as { csrfToken?: string }
+        const token = data.csrfToken ?? null
+        if (token) cachedCsrf = token
+        return token
+      })
+      .catch(() => null)
+      .finally(() => {
+        csrfInflight = null
+      })
+  }
+  return csrfInflight
 }
 
 function OAuthSignInButton({
@@ -51,116 +86,76 @@ function OAuthSignInButton({
   callbackUrl,
   label,
   variant,
+  initialCsrf,
 }: {
   provider: 'google' | 'github'
   callbackUrl: string
   label: string
   variant: 'primary' | 'outline'
+  initialCsrf?: string | null
 }) {
-  const [csrfToken, setCsrfToken] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
+  const { status } = useSession()
+  const [csrfToken, setCsrfToken] = useState<string | null>(() => {
+    if (initialCsrf) {
+      cachedCsrf = initialCsrf
+      return initialCsrf
+    }
+    return cachedCsrf
+  })
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // SessionProvider GET /api/auth/session also mints the CSRF cookie.
+    // Fetch csrf only after that settles, or the form token and cookie diverge
+    // (MissingCSRF / "Could not prepare sign-in").
+    if (status === 'loading' || csrfToken) return
     let cancelled = false
-    void getCsrfToken()
+    void loadCsrfToken()
       .then((token) => {
-        if (!cancelled) setCsrfToken(token ?? null)
+        if (cancelled) return
+        setCsrfToken(token)
+        if (!token) {
+          setError('Could not prepare sign-in. Reload and try again.')
+        }
       })
       .catch(() => {
-        if (!cancelled) setCsrfToken(null)
+        if (cancelled) return
+        setError('Could not prepare sign-in. Reload and try again.')
       })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [status, csrfToken])
 
-  // Full-width pill CTA (platform + workspace login)
-  const baseClass =
-    'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60'
-  const variantClass =
+  // Same primitive as HomePage: accent fill, never ink `--color-cta`.
+  const btnClass =
     variant === 'primary'
-      ? 'border-2 border-cta bg-cta text-cta-fg hover:opacity-90'
-      : 'border-2 border-border bg-surface text-foreground hover:border-foreground'
+      ? 'bevel-auth-primary h-12 w-full rounded-full'
+      : 'h-12 w-full rounded-full'
 
-  // Preferred: plain form POST (full navigation → Google). Refresh CSRF on submit
-  // so a long-open tab cannot post a stale token after a cookie rotate.
-  if (csrfToken) {
-    return (
-      <div className="space-y-2">
-        <form
-          method="POST"
-          action={`/api/auth/signin/${provider}`}
-          onSubmit={(event) => {
-            if (pending) {
-              event.preventDefault()
-              return
-            }
-            setPending(true)
-            setError(null)
-            // Re-fetch CSRF immediately before navigate when possible.
-            // If the form already has a valid token+cookie pair, submit proceeds.
-            const form = event.currentTarget
-            const input = form.elements.namedItem('csrfToken') as HTMLInputElement | null
-            event.preventDefault()
-            void getCsrfToken()
-              .then((token) => {
-                if (!token) {
-                  setPending(false)
-                  setError('Could not prepare sign-in. Reload and try again.')
-                  return
-                }
-                if (input) input.value = token
-                setCsrfToken(token)
-                form.submit()
-              })
-              .catch(() => {
-                setPending(false)
-                setError('Could not prepare sign-in. Reload and try again.')
-              })
-          }}
-        >
-          <input type="hidden" name="csrfToken" value={csrfToken} />
-          <input type="hidden" name="callbackUrl" value={callbackUrl} />
-          <button
-            type="submit"
-            disabled={pending}
-            className={`${baseClass} ${variantClass}`}
-          >
-            {provider === 'google' ? <GoogleGlyph /> : null}
-            {pending ? 'Redirecting…' : label}
-          </button>
-        </form>
-        {error ? (
-          <p className="text-xs text-danger" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
-    )
-  }
-
-  // CSRF still loading or failed — JS fallback
+  // Native form POST to Auth.js. Do not preventDefault + getCsrfToken() on
+  // submit — that second fetch is what surfaces "Could not prepare sign-in"
+  // when HMR/Caddy interrupts /api/auth/csrf, even though the hidden field
+  // already has a valid token.
   return (
     <div className="space-y-2">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => {
-          setPending(true)
-          setError(null)
-          void signIn(provider, { callbackUrl }).catch((e) => {
-            setPending(false)
-            setError(
-              e instanceof Error ? e.message : 'Could not start sign-in. Reload and try again.',
-            )
-          })
-        }}
-        className={`${baseClass} ${variantClass}`}
-      >
-        {provider === 'google' ? <GoogleGlyph /> : null}
-        {pending ? 'Redirecting…' : label}
-      </button>
+      <form method="POST" action={`/api/auth/signin/${provider}`} suppressHydrationWarning>
+        {csrfToken ? (
+          <input type="hidden" name="csrfToken" value={csrfToken} />
+        ) : null}
+        <input type="hidden" name="callbackUrl" value={callbackUrl} />
+        <Button
+          type="submit"
+          size="lg"
+          variant={variant === 'primary' ? 'default' : 'outline'}
+          disabled={!csrfToken}
+          className={btnClass}
+          suppressHydrationWarning
+        >
+          {provider === 'google' ? <GoogleGlyph /> : null}
+          {label}
+        </Button>
+      </form>
       {error ? (
         <p className="text-xs text-danger" role="alert">
           {error}

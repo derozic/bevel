@@ -23,10 +23,13 @@ import {
   NATIVE_RETURNED_COOKIE,
   isNativeLoginRequest,
 } from '@/lib/auth-native'
+import { csrfTokenFromCookies } from '@/lib/csrf-cookie'
 
 const ERROR_COPY: Record<string, string> = {
   Configuration:
-    'Sign-in hit a server configuration error. Confirm Google OAuth redirect URIs include this host’s /api/auth/callback/google, then hard-refresh.',
+    'Google sign-in did not finish. Clear session cookies below, then try Continue with Google Workspace again.',
+  InvalidCheck:
+    'Google sign-in could not be verified (the login cookie was missing). Clear session cookies below and try again.',
   AccessDenied:
     'Access denied. Use an email domain authorized for this workspace, or claim a new workspace for your organization.',
   OAuthAccountNotLinked:
@@ -103,21 +106,25 @@ export default async function LoginPage({
   const callbackPathOnly = rawCallback.split('?')[0] || '/welcome'
   const unsafeCallbacks = new Set([
     '/login',
-    '/welcome',
     '/api/auth',
     '/api/auth/signin',
     '/api/auth/callback',
   ])
+  // /welcome is the post-login router (chooser / org handoff). Honor it.
   const callbackUrl =
     nativeReturn || callbackPathOnly === NATIVE_COMPLETE_PATH
       ? NATIVE_COMPLETE_PATH
       : unsafeCallbacks.has(callbackPathOnly)
-        ? '/workspaces'
+        ? '/welcome'
         : rawCallback
 
+  const cookieJar = await cookies()
   const nativeAlreadyReturned =
-    (await cookies()).get(NATIVE_RETURNED_COOKIE)?.value === '1'
-  if (session?.user?.email) {
+    cookieJar.get(NATIVE_RETURNED_COOKIE)?.value === '1'
+  const csrfToken = csrfTokenFromCookies((name) => cookieJar.get(name)?.value)
+  // Do not redirect away when Auth.js returned an error — that hid the
+  // failure and looped /login?error= → /welcome → /login.
+  if (session?.user?.email && !errorKey) {
     // Already bounced into the Mac app — do not send the browser around again.
     if (!(nativeReturn && nativeAlreadyReturned)) {
       redirect(callbackUrl)
@@ -248,7 +255,8 @@ export default async function LoginPage({
         ) : googleOk ? (
           <GoogleSignInButton
             callbackUrl={callbackUrl}
-            label="Continue with Google"
+            label="Continue with Google Workspace"
+            csrfToken={csrfToken}
           />
         ) : (
           <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted">
@@ -257,7 +265,7 @@ export default async function LoginPage({
         )}
 
         {githubOk && !nativeAlreadyReturned ? (
-          <GitHubSignInButton callbackUrl={callbackUrl} />
+          <GitHubSignInButton callbackUrl={callbackUrl} csrfToken={csrfToken} />
         ) : null}
 
         {otpOk && !nativeAlreadyReturned ? (

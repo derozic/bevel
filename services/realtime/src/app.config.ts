@@ -36,7 +36,7 @@ export const server = defineServer({
   rooms: {
     fleet_lobby: defineRoom(FleetLobby),
     agent_session: defineRoom(AgentSession).filterBy(['sessionId']),
-    fleet_channel: defineRoom(FleetChannel).filterBy(['channelSlug']),
+    fleet_channel: defineRoom(FleetChannel).filterBy(['channelSlug', 'tenantSlug']),
   },
   express: (app) => {
     // Reflect Origin so credentialed Colyseus matchmake (credentials:include)
