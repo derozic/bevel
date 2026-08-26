@@ -449,12 +449,7 @@ export function BevelRail({
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {/* Right-half suite chip → apex bevel.is */}
-            <SuiteNav
-              size="sm"
-              showLabel={false}
-              productLabel={productName}
-            />
+            <SuiteNav size="sm" showLabel={false} />
             {!privateAgentsOnly ? (
               <button
                 type="button"

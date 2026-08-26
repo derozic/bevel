@@ -4,9 +4,7 @@ import { headers } from 'next/headers'
 import type { Tenant } from '@bevel/schema'
 import {
   isPlatformEntryHost,
-  isPreviewHost,
   lookupTenantBySlug,
-  needsAuthHandoff,
   publicTenantUrl,
   resolveWorkspacesForEmail,
   tenantPublicHost,
@@ -22,7 +20,7 @@ import {
 } from '@/lib/bevel'
 import { BrandSquare } from '@/components/BrandSquare'
 import { auth } from '@/auth'
-import { issueAuthHandoffCode } from '@/lib/auth-handoff'
+import { workspaceOpenHref } from '@/lib/workspace-spaces.server'
 import {
   NATIVE_COMPLETE_PATH,
   isNativeLoginPending,
@@ -149,30 +147,13 @@ async function WorkspaceOpenLink({
   fromHost: string
 }) {
   const orgHost = tenantPublicHost(ws, fromHost)
-  const callbackPath = BEVEL_HOME_PATH
-  let href = publicTenantUrl(ws, callbackPath, fromHost)
-
-  // Local .lvh.me cookies are shared — never hand off to production DNS
-  // (bevel.olimbic.games NXDOMAIN, bevel.2ndbra.in → localhost:41009).
-  const stayOnPreview =
-    process.env.NODE_ENV !== 'production' ||
-    isPreviewHost(fromHost) ||
-    isPreviewHost(orgHost)
-  if (fromHost && !stayOnPreview && needsAuthHandoff(fromHost, orgHost)) {
-    const issued = await issueAuthHandoffCode({
-      email,
-      name,
-      imageUrl: image,
-      tenantSlug: ws.slug,
-      callbackPath,
-    })
-    if (issued?.code) {
-      const dest = new URL(`https://${orgHost}/api/auth/handoff`)
-      dest.searchParams.set('code', issued.code)
-      dest.searchParams.set('callbackUrl', callbackPath)
-      href = dest.toString()
-    }
-  }
+  const href = await workspaceOpenHref({
+    tenant: ws,
+    fromHost,
+    email,
+    name,
+    image,
+  })
 
   return (
     <BrandSquare

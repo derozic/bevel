@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Cog6ToothIcon, ChevronDownIcon } from '@heroicons/react/24/outline'
+import { CheckIcon, Cog6ToothIcon, ChevronDownIcon } from '@heroicons/react/24/outline'
 import type { DaypartPreference } from '@bevel/schema'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@bevel/ui'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
@@ -18,13 +20,23 @@ import {
   DAYPART_ORDER,
   resolveDaypart,
 } from '@/lib/daypart'
+import { rewriteLocalWorkspaceHref } from '@/lib/local-workspace-href'
+
+type WorkspaceSpace = {
+  slug: string
+  label: string
+  href: string
+  current: boolean
+  kind: 'private' | 'workspace'
+}
 
 /**
- * Compact chrome left of the account avatar: settings, property, day part.
+ * Compact chrome left of the account avatar: settings, spaces, day part.
  */
 export function ChatHeaderTools() {
   const prefs = usePreferencesOptional()
   const [product, setProduct] = useState('Workspace')
+  const [spaces, setSpaces] = useState<WorkspaceSpace[]>([])
 
   useEffect(() => {
     const el = document.documentElement
@@ -47,9 +59,32 @@ export function ChatHeaderTools() {
     return () => mo.disconnect()
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    void fetch('/api/workspaces', { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) return
+        const data = (await res.json()) as { spaces?: WorkspaceSpace[] }
+        if (!cancelled && Array.isArray(data.spaces)) setSpaces(data.spaces)
+      })
+      .catch(() => {
+        /* keep fallback label */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const preference = prefs?.prefs.appearance.daypart ?? 'auto'
   const resolved = resolveDaypart(preference)
   const currentLabel = DAYPART_META[resolved].shortLabel
+  const currentSpace = spaces.find((s) => s.current)
+  const pillLabel = currentSpace?.label || product
+
+  function openSpace(href: string) {
+    const next = rewriteLocalWorkspaceHref(href)
+    window.location.assign(next)
+  }
 
   return (
     <div className="bevel-chat-tools" role="group" aria-label="Workspace">
@@ -63,13 +98,44 @@ export function ChatHeaderTools() {
         <Cog6ToothIcon className="h-4 w-4" aria-hidden />
       </button>
 
-      <Link
-        href="/workspaces"
-        className="bevel-chat-tools-property"
-        title={`Switch workspace · ${product}`}
-      >
-        {product}
-      </Link>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="bevel-chat-tools-property"
+            title={`Switch space · ${pillLabel}`}
+            aria-label="Switch Bevel space"
+            aria-haspopup="menu"
+          >
+            <span className="bevel-chat-tools-property-label">{pillLabel}</span>
+            <ChevronDownIcon className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="z-[400] min-w-[12.5rem]"
+          style={{ zIndex: 400 }}
+        >
+          <DropdownMenuLabel>Spaces</DropdownMenuLabel>
+          {spaces.map((space) => (
+            <DropdownMenuItem
+              key={space.slug}
+              onSelect={() => {
+                if (!space.current) openSpace(space.href)
+              }}
+            >
+              <span className="min-w-0 flex-1 truncate">{space.label}</span>
+              {space.current ? (
+                <CheckIcon className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
+              ) : null}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/workspaces">All spaces</Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>

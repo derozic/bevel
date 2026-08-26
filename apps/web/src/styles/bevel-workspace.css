@@ -849,14 +849,19 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
 }
 
 .bevel-chat-tools-property {
-  max-width: 6.5rem;
-  padding: 0 0.7rem;
+  max-width: 8.5rem;
+  gap: 0.2rem;
+  padding: 0 0.45rem 0 0.7rem;
   border-color: color-mix(in srgb, var(--bevel-accent, var(--ink)) 40%, transparent);
   background: color-mix(in srgb, var(--bevel-accent, var(--ink)) 10%, var(--surface));
   color: var(--bevel-accent, var(--ink));
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.01em;
+}
+
+.bevel-chat-tools-property-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
