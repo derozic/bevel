@@ -120,6 +120,7 @@ function recordToChatMessage(row: FleetChannelMessageRecord, channelSlug: string
 
 export class FleetChannel extends Room {
   maxClients = 32
+  seatReservationTimeout = 30
   declare state: FleetChannelState
   private channelSlug = 'general'
   private tenantSlug = ''

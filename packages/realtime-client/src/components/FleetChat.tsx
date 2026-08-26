@@ -45,6 +45,7 @@ import {
   formatRoomErrorEvent,
   sanitizeErrorText,
 } from '../lib/format-error'
+import { pinRealtimeEndpoint } from '../lib/realtime-client'
 import { cn } from '../lib/utils'
 import {
   BEVEL_COPY,
@@ -782,18 +783,7 @@ export function FleetChat({
           ...init,
           credentials: 'omit',
         }),
-      urlBuilder: (url) => {
-        // Seat reservations sometimes advertise 127.0.0.1:43208. Keep the
-        // WebSocket on the same Caddy host used for matchmake.
-        try {
-          const base = new URL(realtimeUrl)
-          url.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
-          url.host = base.host
-        } catch {
-          /* keep advertised URL */
-        }
-        return url.toString()
-      },
+      urlBuilder: (url) => pinRealtimeEndpoint(realtimeUrl, url),
     })
     client.auth.token = authToken
 
