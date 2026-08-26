@@ -32,7 +32,15 @@ console.log(
   `[search-index] ready — ${bootIndex.documents} messages across ${bootIndex.sessions} sessions`,
 )
 
+function publicAddress(): string | undefined {
+  const explicit = process.env.COLYSEUS_PUBLIC_ADDRESS?.trim()
+  if (explicit) return explicit.replace(/^https?:\/\//, '')
+  if (process.env.NODE_ENV === 'production') return 'realtime.bevel.is'
+  return undefined
+}
+
 export const server = defineServer({
+  publicAddress: publicAddress(),
   rooms: {
     fleet_lobby: defineRoom(FleetLobby),
     agent_session: defineRoom(AgentSession).filterBy(['sessionId']),
@@ -63,6 +71,7 @@ export const server = defineServer({
         status: 'ok',
         service: 'agents-realtime',
         colyseus: true,
+        publicAddress: publicAddress() ?? null,
         searchIndex: {
           ready: conversationSearchIndex.isReady(),
           documents: conversationSearchIndex.size,

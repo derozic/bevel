@@ -122,6 +122,7 @@ Realtime env (`/opt/bevel/services/realtime/.env`):
 
 ```ini
 REALTIME_PORT=43208
+COLYSEUS_PUBLIC_ADDRESS=realtime.bevel.is
 API_INTERNAL_URL=http://127.0.0.1:43203
 FLEET_INTERNAL_API_KEY=SECRET
 AUTH_SECRET=same-as-web
@@ -135,7 +136,16 @@ Caddy:
 
 ```caddy
 realtime.bevel.is {
-	reverse_proxy 127.0.0.1:43208
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+	reverse_proxy 127.0.0.1:43208 {
+		flush_interval -1
+	}
 }
 ```
 

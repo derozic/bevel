@@ -1,6 +1,11 @@
+import { Encoder } from '@colyseus/schema'
 import { server } from './app.config.js'
 import { config } from './config.js'
 import { installPersistShutdownHooks } from './persist-queue.js'
+
+// Channel hydrate (100 messages + presence) overflows the 8KB default and
+// disconnects browsers mid-join. Production ~general already hit this.
+Encoder.BUFFER_SIZE = 256 * 1024
 
 installPersistShutdownHooks()
 
