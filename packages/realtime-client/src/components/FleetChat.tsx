@@ -129,9 +129,7 @@ function safeIssue(issue: BevelConnectionIssue): BevelConnectionIssue {
   ) {
     return {
       title: BEVEL_COPY.errors.connectionFailed,
-      hint:
-        sanitizeErrorText(issue.hint) ||
-        'Reload the page. If it persists, restart realtime on port 43208.',
+      hint: sanitizeErrorText(issue.hint) || BEVEL_COPY.errors.connectionHint,
     }
   }
   return {
@@ -161,6 +159,13 @@ function ConnectionNotice({
           <span className="fleet-chat-notice-hint">{safe.hint}</span>
         ) : null}
       </p>
+      <button
+        type="button"
+        className="fleet-chat-notice-retry"
+        onClick={() => window.location.reload()}
+      >
+        Reload
+      </button>
     </div>
   )
 }
@@ -1497,7 +1502,7 @@ export function FleetChat({
           {issue ? (
             <ConnectionNotice
               issue={issue}
-              tone={issue.hint ? 'warn' : 'info'}
+              tone={/sign in/i.test(issue.title) ? 'warn' : 'info'}
             />
           ) : showConnectingNotice ? (
             <div className="fleet-chat-notice" data-tone="info">

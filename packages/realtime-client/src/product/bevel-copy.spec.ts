@@ -18,4 +18,23 @@ describe('chat copy', () => {
     expect(issue.hint).toBe(BEVEL_COPY.errors.seatReservationHint)
     expect(`${issue.title} ${issue.hint}`).not.toMatch(/\n/)
   })
+
+  it('does not leak hosts, ports, or "realtime tab" into reachability copy', () => {
+    const issue = resolveBevelConnectionIssue('Failed to fetch', {
+      isChannel: true,
+      realtimeUrl: 'https://realtime.bevel.is',
+    })
+    expect(issue.title).toBe(BEVEL_COPY.errors.connectionFailed)
+    expect(issue.hint).toBe(BEVEL_COPY.errors.connectionHint)
+    expect(`${issue.title} ${issue.hint}`).not.toMatch(/realtime\.bevel|43208|tab/i)
+  })
+
+  it('treats wss-on-http matchmake as a join failure, not a raw scheme error', () => {
+    const issue = resolveBevelConnectionIssue(
+      'URL scheme "wss" is not supported',
+      { isChannel: true, realtimeUrl: 'https://realtime.bevel.is' },
+    )
+    expect(issue.title).toBe(BEVEL_COPY.errors.connectionFailed)
+    expect(issue.hint).not.toMatch(/wss|realtime\.bevel/i)
+  })
 })

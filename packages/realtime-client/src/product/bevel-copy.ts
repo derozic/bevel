@@ -85,12 +85,13 @@ export const BEVEL_COPY = {
   },
 
   errors: {
-    connectionFailed: 'Could not connect to the channel.',
-    bindFailed: 'Connected but failed to load messages.',
+    connectionFailed: "Couldn't join this channel.",
+    connectionHint: 'Reload to try again.',
+    bindFailed: 'Connected, but messages did not load.',
     roomError: (detail: string) => detail || 'Connection dropped.',
     seatReservationRetry: 'Reconnecting…',
     seatReservationFailed: "Couldn't grab a seat in the channel.",
-    seatReservationHint: 'Reload the page — realtime may have restarted.',
+    seatReservationHint: 'Reload to try again.',
   },
 } as const
 
@@ -106,15 +107,19 @@ export function isSeatReservationExpired(raw: string): boolean {
   return SEAT_RESERVATION_RE.test(raw)
 }
 
-/** Map raw connection failures to operator-friendly copy (dev hints stay actionable). */
+const JOIN_FAILED: BevelConnectionIssue = {
+  title: BEVEL_COPY.errors.connectionFailed,
+  hint: BEVEL_COPY.errors.connectionHint,
+}
+
+/** Map raw connection failures to short, human copy. Never leak hosts or ports. */
 export function resolveBevelConnectionIssue(
   raw: string,
-  ctx: { isChannel: boolean; realtimeUrl: string }
+  _ctx: { isChannel: boolean; realtimeUrl: string },
 ): BevelConnectionIssue {
   const text = (raw ?? '').trim()
   const lower = text.toLowerCase()
 
-  // Colyseus / browser garbage: "error undefined", empty, bare "undefined"
   if (
     !text ||
     text === 'undefined' ||
@@ -122,12 +127,7 @@ export function resolveBevelConnectionIssue(
     /^error\s+undefined$/i.test(text) ||
     /^error\s*$/i.test(text)
   ) {
-    return {
-      title: BEVEL_COPY.errors.connectionFailed,
-      hint: ctx.isChannel
-        ? `Could not stay connected to the channel. Check realtime (${ctx.realtimeUrl}/health) and reload.`
-        : ctx.realtimeUrl,
-    }
+    return JOIN_FAILED
   }
 
   if (SEAT_RESERVATION_RE.test(lower)) {
@@ -135,53 +135,6 @@ export function resolveBevelConnectionIssue(
       title: BEVEL_COPY.errors.seatReservationFailed,
       hint: BEVEL_COPY.errors.seatReservationHint,
     }
-  }
-
-  // Room type not registered on this process (not every error that mentions fleet_channel)
-  if (
-    lower.includes('not defined') ||
-    (lower.includes('fleet_channel') &&
-      (lower.includes('not found') ||
-        lower.includes('does not exist') ||
-        lower.includes('not registered') ||
-        lower.includes('provided room name')))
-  ) {
-    return {
-      title: 'Channel mode is not available on realtime',
-      hint: 'Restart the BEVEL realtime service (port 43208), then reload.',
-    }
-  }
-
-  if (
-    lower.includes('failed to fetch') ||
-    lower.includes('network request failed') ||
-    lower.includes('load failed') ||
-    lower.includes('econnrefused') ||
-    lower.includes('networkerror')
-  ) {
-    return {
-      title: "Can't reach BEVEL realtime",
-      hint: `Start the realtime tab, then reload. (${ctx.realtimeUrl})`,
-    }
-  }
-
-  if (lower.includes('websocket') && lower.includes('error')) {
-    return {
-      title: "Can't reach BEVEL realtime",
-      hint: `WebSocket failed. Check ${ctx.realtimeUrl}/health`,
-    }
-  }
-
-  if (lower.includes('timed out') || lower.includes('timeout')) {
-    return ctx.isChannel
-      ? {
-          title: 'Timed out joining the channel',
-          hint: 'Check that realtime is running (https://realtime.bevel.lvh.me/health).',
-        }
-      : {
-          title: 'Connection timed out',
-          hint: ctx.realtimeUrl,
-        }
   }
 
   if (
@@ -192,18 +145,32 @@ export function resolveBevelConnectionIssue(
   ) {
     return {
       title: 'Sign in required',
-      hint: 'Refresh the page or sign out and sign in again.',
+      hint: 'Refresh, or sign out and sign in again.',
     }
   }
 
-  if (lower.includes('abnormal close') || lower.includes('1006')) {
-    return {
-      title: BEVEL_COPY.errors.connectionFailed,
-      hint: ctx.isChannel
-        ? 'The channel socket closed early. Reload — realtime may have restarted.'
-        : ctx.realtimeUrl,
-    }
+  if (
+    lower.includes('failed to fetch') ||
+    lower.includes('network request failed') ||
+    lower.includes('load failed') ||
+    lower.includes('econnrefused') ||
+    lower.includes('networkerror') ||
+    lower.includes('wss is not supported') ||
+    lower.includes('scheme wss') ||
+    (lower.includes('websocket') && lower.includes('error')) ||
+    lower.includes('timed out') ||
+    lower.includes('timeout') ||
+    lower.includes('abnormal close') ||
+    lower.includes('1006') ||
+    lower.includes('not defined') ||
+    (lower.includes('fleet_channel') &&
+      (lower.includes('not found') ||
+        lower.includes('does not exist') ||
+        lower.includes('not registered') ||
+        lower.includes('provided room name')))
+  ) {
+    return JOIN_FAILED
   }
 
-  return { title: text || BEVEL_COPY.errors.connectionFailed }
+  return JOIN_FAILED
 }
