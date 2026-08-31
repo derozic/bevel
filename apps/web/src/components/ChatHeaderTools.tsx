@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckIcon, Cog6ToothIcon, ChevronDownIcon } from '@heroicons/react/24/outline'
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  Cog6ToothIcon,
+  MoonIcon,
+  SparklesIcon,
+  SunIcon,
+} from '@heroicons/react/24/outline'
+import { SunIcon as SunSolidIcon } from '@heroicons/react/24/solid'
 import type { DaypartPreference } from '@bevel/schema'
 import {
   DropdownMenu,
@@ -19,6 +28,7 @@ import {
   DAYPART_META,
   DAYPART_ORDER,
   resolveDaypart,
+  type DaypartId,
 } from '@/lib/daypart'
 import { rewriteLocalWorkspaceHref } from '@/lib/local-workspace-href'
 
@@ -28,6 +38,30 @@ type WorkspaceSpace = {
   href: string
   current: boolean
   kind: 'private' | 'workspace'
+}
+
+const DAYPART_GLYPH_CLASS = 'h-4 w-4 shrink-0 opacity-80'
+
+function DaypartGlyph({
+  part,
+  className = DAYPART_GLYPH_CLASS,
+}: {
+  part: DaypartId | 'auto'
+  className?: string
+}) {
+  if (part === 'auto') {
+    return <ClockIcon className={className} aria-hidden />
+  }
+  if (part === 'morning') {
+    return <SunIcon className={className} aria-hidden />
+  }
+  if (part === 'midday') {
+    return <SunSolidIcon className={className} aria-hidden />
+  }
+  if (part === 'afternoon') {
+    return <SparklesIcon className={className} aria-hidden />
+  }
+  return <MoonIcon className={className} aria-hidden />
 }
 
 /**
@@ -113,8 +147,8 @@ export function ChatHeaderTools() {
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
-          className="z-[400] min-w-[12.5rem]"
-          style={{ zIndex: 400 }}
+          className="z-[5000] min-w-[12.5rem]"
+          style={{ zIndex: 5000 }}
         >
           <DropdownMenuLabel>Spaces</DropdownMenuLabel>
           {spaces.map((space) => (
@@ -149,14 +183,18 @@ export function ChatHeaderTools() {
             }
             aria-label="Day part"
           >
+            <DaypartGlyph
+              part={resolved}
+              className="h-3.5 w-3.5 shrink-0 opacity-80"
+            />
             <span>{currentLabel}</span>
             <ChevronDownIcon className="h-3 w-3 opacity-70" aria-hidden />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
-          className="z-[400] min-w-[11rem]"
-          style={{ zIndex: 400 }}
+          className="z-[5000] min-w-[11rem]"
+          style={{ zIndex: 5000 }}
         >
           <DropdownMenuLabel>Day part</DropdownMenuLabel>
           <DropdownMenuRadioGroup
@@ -168,11 +206,17 @@ export function ChatHeaderTools() {
             }
           >
             <DropdownMenuRadioItem value="auto">
+              <DaypartGlyph part="auto" />
               Auto
               <span className="ml-auto text-[10px] text-muted">{currentLabel}</span>
             </DropdownMenuRadioItem>
             {DAYPART_ORDER.map((id) => (
-              <DropdownMenuRadioItem key={id} value={id}>
+              <DropdownMenuRadioItem
+                key={id}
+                value={id}
+                title={DAYPART_META[id].hours}
+              >
+                <DaypartGlyph part={id} />
                 {DAYPART_META[id].label}
                 <span className="ml-auto text-[10px] text-muted">
                   {DAYPART_META[id].shortLabel}

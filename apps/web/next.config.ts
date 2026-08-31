@@ -34,6 +34,7 @@ const nextConfig: NextConfig = {
   // Allow Caddy hostnames in dev (HMR / assets).
   allowedDevOrigins: [
     'bevel.lvh.me',
+    'status.bevel.lvh.me',
     'demo.bevel.lvh.me',
     'demo.2x4m.lvh.me',
     'bevel.2x4m.lvh.me',

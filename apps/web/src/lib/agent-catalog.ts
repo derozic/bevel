@@ -2,6 +2,7 @@
  * Web fleet catalog — derived from the synced ~/dev/agents registry.
  * Refresh with `pnpm sync:agents`.
  */
+import { PLATFORM_AGENTS, resolvePlatformAgentId } from '@bevel/schema'
 import fleetRegistry from './fleet-registry.json'
 
 export type AgentAvatarIcon =
@@ -29,6 +30,8 @@ export interface Agent {
   summary?: string
   tier?: string
   reportsTo?: string
+  /** Extra @tokens that resolve to this agent (chatgpt → openai). */
+  aliases?: string[]
 }
 
 type RegistryAgent = {
@@ -124,7 +127,27 @@ const SEED_AGENTS: Agent[] = (fleetRegistry.agents as RegistryAgent[]).map(
   mapRegistryAgent,
 )
 
-export const agents = SEED_AGENTS
+const PLATFORM_CATALOG: Agent[] = PLATFORM_AGENTS.map((agent) => ({
+  id: agent.id,
+  name: agent.name,
+  avatar: 'cpu-chip' as const,
+  avatarUrl: agent.avatar,
+  accent: agent.accent,
+  industry: agent.category,
+  category: agent.category,
+  role: agent.role,
+  bio: agent.description,
+  skills: agent.skills,
+  directives: [],
+  soulMd: agent.description,
+  skillMd: '',
+  tagline: agent.tagline,
+  summary: agent.description,
+  tier: 'platform',
+  aliases: agent.aliases,
+}))
+
+export const agents = [...PLATFORM_CATALOG, ...SEED_AGENTS]
 
 export const fleetRegistryMeta = {
   version: (fleetRegistry as { version?: string }).version ?? '0',
@@ -133,7 +156,9 @@ export const fleetRegistryMeta = {
 }
 
 export function getAgentById(id: string): Agent | undefined {
-  return agents.find((a) => a.id.toLowerCase() === id.toLowerCase())
+  const raw = id.toLowerCase()
+  const canonical = resolvePlatformAgentId(raw) ?? raw
+  return agents.find((a) => a.id.toLowerCase() === canonical)
 }
 
 export function getAvailableAgents(): Agent[] {

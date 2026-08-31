@@ -40,6 +40,19 @@ describe('timeline teaser', () => {
     ).toBe('JOHNNY · caddy healed')
   })
 
+  it('does not use HTTP transport errors as the feed teaser', () => {
+    expect(
+      latestConversationPreview([
+        {
+          title: 'Fleet session',
+          preview: 'Request failed with status code 403',
+          updatedAt: 90,
+        },
+        { title: 'Hermes', preview: 'morning', updatedAt: 20 },
+      ]),
+    ).toBe('Hermes · morning')
+  })
+
   it('falls back to the most recent item when nothing is urgent', () => {
     const older = {
       id: 'a',

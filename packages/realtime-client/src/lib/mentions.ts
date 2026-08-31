@@ -1,3 +1,4 @@
+import { resolvePlatformAgentId } from '@bevel/schema'
 import type { FleetAgent } from '../types'
 
 export type MentionMatch = {
@@ -43,7 +44,8 @@ export function parseResolvedMentions(
   const found: MentionMatch[] = []
   for (const m of text.matchAll(/@([a-z0-9_-]+)\b/gi)) {
     const raw = m[1]!.toLowerCase()
-    const id = ids.has(raw) ? raw : names.get(raw)
+    const id =
+      ids.has(raw) ? raw : names.get(raw) || resolvePlatformAgentId(raw)
     if (!id || m.index == null) continue
     found.push({ id, start: m.index, end: m.index + m[0].length })
   }
@@ -120,12 +122,12 @@ export function filterMentionCandidates(
   const q = query.trim().toLowerCase()
   if (!q) return catalog.slice(0, 8)
   return catalog
-    .filter(
-      (a) =>
-        a.id.toLowerCase().includes(q) ||
-        a.name.toLowerCase().includes(q) ||
-        a.category?.toLowerCase().includes(q),
-    )
+    .filter((a) => {
+      const aliases = [a.id, a.name, a.category, ...(a.aliases ?? [])]
+        .filter(Boolean)
+        .map((s) => s!.toLowerCase())
+      return aliases.some((s) => s.includes(q))
+    })
     .slice(0, 8)
 }
 

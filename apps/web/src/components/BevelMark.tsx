@@ -16,15 +16,21 @@ export function BevelMark({
   showTm?: boolean
 }) {
   const sizeClass = {
-    sm: 'text-[10px] tracking-[0.22em]',
-    md: 'text-xs tracking-[0.28em]',
-    lg: 'text-sm tracking-[0.32em]',
+    sm: 'text-[10px]',
+    md: 'text-xs',
+    lg: 'text-sm',
+  }[size]
+
+  const wordClass = {
+    sm: 'tracking-[0.2em]',
+    md: 'tracking-[0.24em]',
+    lg: 'tracking-[0.28em]',
   }[size]
 
   const tmClass = {
-    sm: 'text-[8px]',
-    md: 'text-[9px]',
-    lg: 'text-[10px]',
+    sm: 'text-[7.5px] -ml-[0.14em]',
+    md: 'text-[8.5px] -ml-[0.16em]',
+    lg: 'text-[9.5px] -ml-[0.18em]',
   }[size]
 
   return (
@@ -36,11 +42,11 @@ export function BevelMark({
       )}
       aria-label={BEVEL_NAME}
     >
-      <span>{BEVEL_WORD}</span>
+      <span className={wordClass}>{BEVEL_WORD}</span>
       {showTm ? (
         <span
           className={cn(
-            'ml-0.5 normal-case tracking-normal font-semibold leading-none opacity-80',
+            'normal-case tracking-normal font-semibold leading-none opacity-80',
             tmClass,
           )}
           aria-hidden="true"

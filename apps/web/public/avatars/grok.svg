@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Grok">
+  <!-- xAI Grok twelve-point star on black -->
+  <rect width="120" height="120" rx="28" fill="#111111"/>
+  <g fill="#F4F4F5" transform="translate(60 60)">
+    <path d="M0-36 L4.2-6.4 L36 0 L4.2 6.4 L0 36 L-4.2 6.4 L-36 0 L-4.2-6.4 Z"/>
+    <path d="M0-36 L4.2-6.4 L36 0 L4.2 6.4 L0 36 L-4.2 6.4 L-36 0 L-4.2-6.4 Z" transform="rotate(30)"/>
+    <path d="M0-36 L4.2-6.4 L36 0 L4.2 6.4 L0 36 L-4.2 6.4 L-36 0 L-4.2-6.4 Z" transform="rotate(60)"/>
+  </g>
+</svg>

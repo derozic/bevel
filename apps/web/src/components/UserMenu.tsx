@@ -134,7 +134,8 @@ export function UserMenu({
 
       <DropdownMenuContent
         align={align}
-        className="z-[400] w-60"
+        className="z-[5000] w-60"
+        style={{ zIndex: 5000 }}
         sideOffset={8}
         style={{ zIndex: 400 }}
       >
