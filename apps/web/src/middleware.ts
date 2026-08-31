@@ -46,6 +46,7 @@ const PUBLIC_PATHS = [
   '/security',
   '/download',
   '/status',
+  '/api/status',
   '/console',
   '/_next',
   '/favicon.ico',
@@ -276,8 +277,30 @@ function shouldReturnToNativeApp(request: NextRequest): boolean {
   return shouldInterceptNativeBrowserPath(p)
 }
 
+function requestHost(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-host') ??
+    request.headers.get('host') ??
+    request.nextUrl.host
+  )
+    .split(',')[0]
+    ?.trim()
+    .toLowerCase()
+    .split(':')[0] || ''
+}
+
+function isStatusHost(host: string): boolean {
+  return host === 'status.bevel.is' || host === 'status.bevel.lvh.me'
+}
+
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
+
+  if (isStatusHost(requestHost(request)) && (pathname === '/' || pathname === '')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/status'
+    return NextResponse.rewrite(url)
+  }
 
   // Never expire PKCE/state on /api/auth/* — Next.js copies those Set-Cookie
   // deletes onto the same request, so the Google callback cannot read the
