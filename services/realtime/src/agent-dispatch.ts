@@ -2,6 +2,10 @@ import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { config } from './config.js'
 import { resolveWorkspaceForRepo } from './work-repos.js'
+import {
+  dispatchPlatformAgentChat,
+  isPlatformAgent,
+} from './platform-providers.js'
 
 const require = createRequire(import.meta.url)
 
@@ -20,6 +24,9 @@ export async function dispatchAgentChat(
   history: { role: string; content: string }[] = [],
   opts: DispatchChatOpts = {},
 ): Promise<{ output: string; model?: string; confidence?: number }> {
+  if (isPlatformAgent(agentId)) {
+    return dispatchPlatformAgentChat(agentId, message, history)
+  }
   const runnerPath = join(config.repoRoot, 'dist', 'runner.js')
   const { runAgentChat } = require(runnerPath) as {
     runAgentChat: (
@@ -51,6 +58,13 @@ export async function dispatchAgentWork(
   history: { role: string; content: string }[] = [],
   workRepo = config.workRepo
 ): Promise<{ output: string; model?: string; confidence?: number }> {
+  if (isPlatformAgent(agentId)) {
+    return dispatchPlatformAgentChat(
+      agentId,
+      `Work mode is on (${workRepo}), but ${agentId} cannot write the repo. Advise only.\n\n${message}`,
+      history,
+    )
+  }
   const runnerPath = join(config.repoRoot, 'dist', 'runner.js')
   const { runAgentWork } = require(runnerPath) as {
     runAgentWork: (

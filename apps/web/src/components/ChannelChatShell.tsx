@@ -165,6 +165,7 @@ export function ChannelChatShell({
         tagline: a.tagline,
         summary: a.bio || a.summary,
         capabilities: a.skills.slice(0, 4),
+        aliases: a.aliases,
       })),
     []
   )

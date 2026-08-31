@@ -27,8 +27,22 @@ const EXPECTED_DIRECTORS = [
 describe('agent catalog (synced from ~/dev/agents)', () => {
   it('loads the current Entity org from the registry', () => {
     expect(fleetRegistryMeta.version).toBe('2.0.0')
-    expect(getAvailableAgents().length).toBe(23)
-    expect(agents[0]?.id).toBe('hermes')
+    expect(getAvailableAgents().length).toBe(26)
+    expect(agents.slice(0, 3).map((a) => a.id)).toEqual([
+      'openai',
+      'claude',
+      'grok',
+    ])
+    expect(agents.map((a) => a.id)).toContain('hermes')
+  })
+
+  it('resolves ChatGPT / Anthropic / xAI aliases to platform seats', () => {
+    expect(getAgentById('chatgpt')?.id).toBe('openai')
+    expect(getAgentById('anthropic')?.id).toBe('claude')
+    expect(getAgentById('xai')?.id).toBe('grok')
+    expect(getAgentById('openai')?.avatarUrl).toBe('/avatars/openai.svg')
+    expect(getAgentById('claude')?.avatarUrl).toBe('/avatars/claude.svg')
+    expect(getAgentById('grok')?.avatarUrl).toBe('/avatars/grok.svg')
   })
 
   it('resolves Hermes and every director by id', () => {

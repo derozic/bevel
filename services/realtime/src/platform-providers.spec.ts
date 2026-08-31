@@ -1,0 +1,60 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  dispatchPlatformAgentChat,
+  isPlatformAgent,
+} from './platform-providers'
+
+const saved = {
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+  GROK_API_KEY: process.env.GROK_API_KEY,
+  XAI_API_KEY: process.env.XAI_API_KEY,
+}
+
+afterEach(() => {
+  process.env.OPENAI_API_KEY = saved.OPENAI_API_KEY
+  process.env.ANTHROPIC_API_KEY = saved.ANTHROPIC_API_KEY
+  process.env.GROK_API_KEY = saved.GROK_API_KEY
+  process.env.XAI_API_KEY = saved.XAI_API_KEY
+  vi.unstubAllGlobals()
+})
+
+describe('platform providers', () => {
+  it('treats ChatGPT / Anthropic / xAI aliases as platform seats', () => {
+    expect(isPlatformAgent('chatgpt')).toBe(true)
+    expect(isPlatformAgent('openai')).toBe(true)
+    expect(isPlatformAgent('anthropic')).toBe(true)
+    expect(isPlatformAgent('claude')).toBe(true)
+    expect(isPlatformAgent('xai')).toBe(true)
+    expect(isPlatformAgent('grok')).toBe(true)
+    expect(isPlatformAgent('hermes')).toBe(false)
+  })
+
+  it('returns a configured-host message when the key is missing', async () => {
+    delete process.env.OPENAI_API_KEY
+    const res = await dispatchPlatformAgentChat('chatgpt', 'hello')
+    expect(res.confidence).toBe(0)
+    expect(res.output).toMatch(/OPENAI_API_KEY/)
+    expect(res.output).toMatch(/ChatGPT/)
+  })
+
+  it('posts OpenAI-compatible chat completions for ChatGPT', async () => {
+    process.env.OPENAI_API_KEY = 'sk-test'
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'from openai' } }],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await dispatchPlatformAgentChat('openai', 'hi', [])
+    expect(res.output).toBe('from openai')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://api.openai.com/v1/chat/completions')
+    expect(init.headers).toMatchObject({
+      authorization: 'Bearer sk-test',
+    })
+  })
+})

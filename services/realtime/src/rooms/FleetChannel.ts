@@ -24,6 +24,11 @@ import { recordEvent } from '../recording.js'
 import { conversationSearchIndex } from '../search-index.js'
 import { loadMergedRegistry } from '../registry-merge.js'
 import {
+  ensureAgentsInRoster,
+  mentionedCanonicalIds,
+  resolveDispatchTargets,
+} from '../platform-roster.js'
+import {
   AgentPresence,
   ChatMessage,
   FleetChannelState,
@@ -69,6 +74,8 @@ type ChatPayload = {
   text: string
   speaker?: string
   targetAgent?: string
+  /** Client roster — newly added chips are seated on the next turn. */
+  agentIds?: string[]
   work?: boolean
   workRepo?: string
 }
@@ -520,6 +527,7 @@ export class FleetChannel extends Room {
       })
     }
 
+    this.seatIncomingAgents(text, payload)
     const targets = this.resolveTargetAgents(text, payload.targetAgent)
     if (targets.length === 0) {
       const names = this.state.agents.map((a) => a.name)
@@ -831,24 +839,24 @@ export class FleetChannel extends Room {
     }
   }
 
+  private seatIncomingAgents(text: string, payload: ChatPayload) {
+    const seated = [...this.state.agents].map((a) => ({
+      id: a.id,
+      name: a.name,
+    }))
+    ensureAgentsInRoster(this.state, [
+      ...(payload.agentIds ?? []),
+      ...(payload.targetAgent ? [payload.targetAgent] : []),
+      ...mentionedCanonicalIds(text, seated),
+    ])
+  }
+
   private resolveTargetAgents(text: string, explicit?: string): string[] {
-    const inSession = (id: string) => this.state.agentIds.includes(id)
-    if (explicit) {
-      const id = explicit.toLowerCase()
-      return inSession(id) ? [id] : []
-    }
-    const mention = text.match(/@([a-z0-9_-]+)\b/i)
-    if (mention) {
-      const id = mention[1].toLowerCase()
-      return inSession(id) ? [id] : []
-    }
-    if (this.state.agentIds.length === 1) return [this.state.agentIds[0]]
-    const lower = text.toLowerCase()
-    for (const agent of this.state.agents) {
-      if (lower.includes(`@${agent.id}`) || lower.includes(agent.name.toLowerCase())) {
-        return [agent.id]
-      }
-    }
-    return [...this.state.agentIds]
+    return resolveDispatchTargets({
+      text,
+      explicit,
+      agentIds: [...this.state.agentIds],
+      agents: [...this.state.agents].map((a) => ({ id: a.id, name: a.name })),
+    })
   }
 }

@@ -26,11 +26,11 @@ export async function AgentBevelSessionView({
   agentsParam?: string
   callbackPath: string
 }) {
-  const primaryId = agentId.trim().toLowerCase()
-  const primary = getAgentById(primaryId)
+  const primary = getAgentById(agentId)
   if (!primary) {
     notFound()
   }
+  const primaryId = primary.id
 
   const rosterParam = parseChatAgentsParam(agentsParam)
   const agentIds = rosterParam?.includes(primaryId)

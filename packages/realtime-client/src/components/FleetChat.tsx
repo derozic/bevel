@@ -1295,6 +1295,7 @@ export function FleetChat({
     roomRef.current.send('chat', {
       text: message,
       speaker: displayName,
+      agentIds,
       ...(directTarget ? { targetAgent: directTarget } : {}),
       work,
       workRepo: work ? activeWorkRepo : undefined,

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { PLATFORM_AGENTS } from '@bevel/schema/platform-agents'
 import { config } from './config.js'
 
 export type CatalogAgent = {
@@ -34,6 +35,16 @@ export function loadMergedRegistry(): CatalogAgent[] {
     if (!byId.has(agent.id)) {
       byId.set(agent.id, { ...agent, federated: true })
     }
+  }
+
+  for (const agent of PLATFORM_AGENTS) {
+    byId.set(agent.id, {
+      id: agent.id,
+      name: agent.name,
+      accent: agent.accent,
+      status: 'available',
+      federated: false,
+    })
   }
 
   return [...byId.values()]

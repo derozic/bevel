@@ -247,6 +247,24 @@ export const AGENT_CHIP_COPY: Record<string, AgentChipCopy> = {
       'Auto-sync',
     ],
   },
+  openai: {
+    tagline: 'OpenAI in the room',
+    summary:
+      'ChatGPT as a first-class Bevel agent — structured answers, coding, and tool-shaped output alongside Hermes.',
+    capabilities: ['ChatGPT', 'Structured output', 'Coding', 'Tool planning'],
+  },
+  claude: {
+    tagline: 'Anthropic in the room',
+    summary:
+      'Claude as a first-class Bevel agent — long-context reasoning and careful written work in mixed channels.',
+    capabilities: ['Claude', 'Long context', 'Reasoning', 'Writing'],
+  },
+  grok: {
+    tagline: 'xAI in the room',
+    summary:
+      'Grok as a first-class Bevel agent — direct, current answers in mixed channels with Hermes and Claude.',
+    capabilities: ['Grok', 'xAI', 'Realtime takes', 'Search-flavored answers'],
+  },
 }
 
 export function resolveAgentChipCopy(

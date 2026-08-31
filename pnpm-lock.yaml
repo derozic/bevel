@@ -502,6 +502,9 @@ importers:
 
   services/realtime:
     dependencies:
+      '@bevel/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
       '@colyseus/schema':
         specifier: ^4.0.7
         version: 4.0.27(typescript@5.9.3)
