@@ -5,6 +5,13 @@
 @import "../styles/bevel-workspace.css";
 @import "../styles/daypart.css";
 
+/* Radix puts z-index on Content, not the popper wrapper. z-index:auto
+   wrappers paint under later stacking contexts (agent chip row). */
+[data-radix-popper-content-wrapper] {
+  z-index: 5000 !important;
+  isolation: isolate;
+}
+
 /* Tailwind v4 theme — maps design tokens to utilities (bg-*, text-*, border-*, font-*) */
 @theme {
   --color-background: var(--bevel-bg);

@@ -21,7 +21,7 @@ export const DropdownMenuContent = forwardRef<
       sideOffset={sideOffset}
       align={align}
       className={cn(
-        'z-[400] min-w-[14rem] overflow-hidden rounded-xl border border-border',
+        'z-[5000] min-w-[14rem] overflow-hidden rounded-xl border border-border',
         'bg-surface/95 p-1.5 text-foreground shadow-2xl backdrop-blur-lg',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -92,7 +92,7 @@ export const DropdownMenuRadioItem = forwardRef<
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      'relative flex cursor-pointer select-none items-center rounded-lg py-2 pl-8 pr-2.5 text-sm outline-none',
+      'relative flex cursor-pointer select-none items-center gap-2 rounded-lg py-2 pl-8 pr-2.5 text-sm outline-none',
       'focus:bg-accent/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-40',
       className,
     )}
@@ -186,7 +186,7 @@ export const DropdownMenuSubContent = forwardRef<
     <DropdownMenuPrimitive.SubContent
       ref={ref}
       className={cn(
-        'z-[400] min-w-[10rem] overflow-hidden rounded-xl border border-border',
+        'z-[5000] min-w-[10rem] overflow-hidden rounded-xl border border-border',
         'bg-surface/95 p-1.5 text-foreground shadow-2xl backdrop-blur-lg',
         className,
       )}

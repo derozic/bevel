@@ -134,9 +134,9 @@ export function UserMenu({
 
       <DropdownMenuContent
         align={align}
-        className="z-[400] w-60"
+        className="z-[5000] w-60"
         sideOffset={8}
-        style={{ zIndex: 400 }}
+        style={{ zIndex: 5000 }}
       >
         <div className="border-b border-border px-2.5 py-2.5 mb-1">
           <p className="truncate text-sm font-semibold text-foreground">{name}</p>
