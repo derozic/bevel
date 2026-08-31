@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { headers } from 'next/headers'
 import {
   getTenantFromRequest,
@@ -43,10 +42,6 @@ export default async function LoginLayout({ children }: { children: ReactNode })
     (isPlatform ? 'BEVEL' : 'Workspace')
   ).replace(/\s+Agents$/i, '')
 
-  // Org hosts only — never use tenant logoUrl on platform entry
-  const tenantLogo =
-    !isPlatform && tenant?.theme.logoUrl ? tenant.theme.logoUrl : null
-
   const year = new Date().getFullYear()
 
   return (
@@ -66,22 +61,9 @@ export default async function LoginLayout({ children }: { children: ReactNode })
               </>
             ) : (
               <>
-                {tenantLogo ? (
-                  <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface">
-                    <Image
-                      src={tenantLogo}
-                      alt=""
-                      width={36}
-                      height={36}
-                      className="size-7 object-contain"
-                      priority
-                    />
-                  </span>
-                ) : (
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-foreground">
-                    <BevelCutMark className="text-foreground" />
-                  </span>
-                )}
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-foreground">
+                  <BevelCutMark className="text-foreground" />
+                </span>
                 <span className="font-display text-sm font-semibold tracking-tight text-foreground">
                   {productName}
                 </span>

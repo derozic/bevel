@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import {
@@ -173,11 +172,6 @@ export default async function LoginPage({
       ? tenant.auth.allowedEmails
       : []
 
-  // Platform: BEVEL cut-mark + wordmark (marketing brand). Never customer logos.
-  // Org host: that workspace mark only, fixed square box so SVG never skews.
-  const tenantLogo =
-    !isPlatform && tenant.theme.logoUrl ? tenant.theme.logoUrl : null
-
   const title = isPlatform
     ? 'Find your workspace'
     : `Sign in to ${workspaceLabel}`
@@ -196,17 +190,6 @@ export default async function LoginPage({
             </span>
             <BevelMark size="lg" className="text-foreground" />
           </>
-        ) : tenantLogo ? (
-          <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface">
-            <Image
-              src={tenantLogo}
-              alt={workspaceLabel}
-              width={56}
-              height={56}
-              className="size-10 object-contain"
-              priority
-            />
-          </span>
         ) : (
           <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-background text-foreground">
             <BevelCutMark className="h-7 w-7 text-foreground" />

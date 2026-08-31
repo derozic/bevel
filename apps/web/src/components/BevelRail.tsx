@@ -57,8 +57,6 @@ import {
   pickTimelineTeaser,
   type TimelineTeaserItem,
 } from '@/lib/timeline-teaser'
-import { BevelMark } from './BevelMark'
-import { SuiteNav } from './SuiteNav'
 import { WorkspaceBrand } from './WorkspaceBrand'
 import { FolksonomyChips } from './FolksonomyChips'
 import { ConversationRoster } from './ConversationRoster'
@@ -435,39 +433,38 @@ export function BevelRail({
   return (
     <div className="bevel-rail">
       <div className="bevel-rail-header">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <WorkspaceBrand productName={productName} />
-            {platformHomeHref ? (
-              <a
-                href={platformHomeHref}
-                className="bevel-rail-platform-back"
-                title={`Back to ${platformHomeLabel || productName || 'home'}`}
-              >
-                ← {platformHomeLabel || productName || 'home'}
-              </a>
-            ) : null}
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <SuiteNav size="sm" showLabel={false} />
-            {!privateAgentsOnly ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setCreatedSlug(null)
-                  setShowCreate(true)
-                }}
-                className="bevel-rail-new-channel"
-              >
-                {BEVEL_COPY.newChannel}
-              </button>
-            ) : null}
-            {headerAction}
-          </div>
+        <div className="bevel-rail-header-brand">
+          <WorkspaceBrand productName={productName} />
+          {platformHomeHref ? (
+            <a
+              href={platformHomeHref}
+              className="bevel-rail-platform-back"
+              title={`Back to ${platformHomeLabel || productName || 'home'}`}
+            >
+              ← {platformHomeLabel || productName || 'home'}
+            </a>
+          ) : null}
+          {headerAction ? (
+            <div className="bevel-rail-header-actions">{headerAction}</div>
+          ) : null}
         </div>
-        <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
-          {privateAgentsOnly ? 'Private agents' : BEVEL_COPY.channelsLabel}
-        </p>
+        <div className="bevel-rail-tracks-head">
+          <p className="bevel-rail-tracks-label">
+            {privateAgentsOnly ? 'Private agents' : BEVEL_COPY.channelsLabel}
+          </p>
+          {!privateAgentsOnly ? (
+            <button
+              type="button"
+              onClick={() => {
+                setCreatedSlug(null)
+                setShowCreate(true)
+              }}
+              className="bevel-rail-new-channel"
+            >
+              {BEVEL_COPY.newChannel}
+            </button>
+          ) : null}
+        </div>
         {status === 'authenticated' ? (
           <div className="mt-2">
             <ConversationSearch />
@@ -513,7 +510,7 @@ export function BevelRail({
           </Link>
         </nav>
         <nav aria-label={BEVEL_COPY.pinnedLabel}>
-          <p className="bevel-rail-section-label mb-1.5 px-1">
+          <p className="bevel-rail-section-label">
             {BEVEL_COPY.pinnedLabel}
           </p>
           {pinned.length === 0 ? (
