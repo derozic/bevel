@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { PLATFORM_AGENTS } from '@bevel/schema/platform-agents'
+import { PLATFORM_AGENTS } from './platform-agents.js'
 import { config } from './config.js'
 
 export type CatalogAgent = {

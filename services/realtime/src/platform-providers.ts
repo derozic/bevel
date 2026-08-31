@@ -3,7 +3,7 @@ import {
   isPlatformAgentId,
   resolvePlatformAgentId,
   type PlatformAgentId,
-} from '@bevel/schema/platform-agents'
+} from './platform-agents.js'
 
 type ChatTurn = { role: string; content: string }
 

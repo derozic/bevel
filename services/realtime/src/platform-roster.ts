@@ -1,4 +1,4 @@
-import { resolvePlatformAgentId } from '@bevel/schema/platform-agents'
+import { resolvePlatformAgentId } from './platform-agents.js'
 import { loadMergedRegistry } from './registry-merge.js'
 import { AgentPresence } from './schema/ChatState.js'
 
