@@ -21,6 +21,13 @@ function collapsePreview(raw: string): string {
   return raw.replace(/\s+/g, ' ').trim()
 }
 
+/** Axios / fetch failures should never become the feed teaser. */
+export function isTransportNoise(text: string): boolean {
+  return /request failed|status code\s*\d{3}|failed to fetch|network request failed|econnrefused|axioserror|load failed/i.test(
+    text,
+  )
+}
+
 /** Escalations and unread items outrank a newer-but-quieter event. */
 export function timelineImportance(item: TimelineTeaserItem): number {
   const escalated = item.kind === 'escalation' || item.escalated
@@ -53,7 +60,9 @@ export function formatTimelineTeaser(item: TimelineTeaserItem): string {
   const where = item.channelSlug ? ` ~${item.channelSlug}` : ''
   const escalated = item.kind === 'escalation' || item.escalated
   const mark = escalated ? '^ ' : ''
-  if (!snippet) return `${mark}${actor}${where}`.trim()
+  if (!snippet || isTransportNoise(snippet)) {
+    return `${mark}${actor}${where}`.trim()
+  }
   return `${mark}${actor}${where} · ${snippet}`
 }
 
@@ -72,7 +81,10 @@ export function latestConversationPreview(
   conversations: ConversationPreview[],
 ): string | null {
   const ranked = conversations
-    .filter((row) => (row.preview || '').trim())
+    .filter((row) => {
+      const preview = (row.preview || '').trim()
+      return preview.length > 0 && !isTransportNoise(preview)
+    })
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   const top = ranked[0]
   if (!top?.preview?.trim()) return null
