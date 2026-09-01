@@ -64,6 +64,6 @@ export async function mintRealtimeToken(payload: {
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject(payload.sub)
     .setIssuedAt()
-    .setExpirationTime('30m')
+    .setExpirationTime('12h')
     .sign(jwtSecret())
 }

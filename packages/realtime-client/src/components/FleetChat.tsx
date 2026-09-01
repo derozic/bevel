@@ -68,8 +68,28 @@ import {
 import { useBubbleGestures } from '../lib/bubble-gestures'
 import type { GestureKind } from '@bevel/schema'
 
-const SEAT_RETRY_MAX = 2
-const SEAT_RETRY_DELAY_MS = 700
+const SEAT_RETRY_MAX = 5
+const SEAT_RETRY_DELAY_MS = 900
+
+function jwtStillValid(token?: string): boolean {
+  if (!token) return false
+  try {
+    const part = token.split('.')[1]
+    if (!part) return false
+    const padded = part.replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(padded)) as { exp?: number }
+    return typeof payload.exp !== 'number' || payload.exp * 1000 > Date.now() + 8_000
+  } catch {
+    return true
+  }
+}
+
+function isTransientJoinFailure(msg: string): boolean {
+  return (
+    isSeatReservationExpired(msg) ||
+    /1006|abnormal close|timed out|timeout|connection lost|websocket/i.test(msg)
+  )
+}
 
 type PendingChatImage = {
   id: string
@@ -601,7 +621,11 @@ export function FleetChat({
   displayNameRef.current = displayName
   sessionTitleRef.current = newSessionTitle
   // Latch the last good token — a brief session blip must not tear down the room.
-  if (realtimeToken) tokenRef.current = realtimeToken
+  // Drop an expired JWT so we do not keep matchmaking with a dead seat.
+  if (realtimeToken && jwtStillValid(realtimeToken)) tokenRef.current = realtimeToken
+  else if (tokenRef.current && !jwtStillValid(tokenRef.current)) {
+    tokenRef.current = jwtStillValid(realtimeToken) ? realtimeToken : undefined
+  }
   const [sessionId, setSessionId] = useState<string | null>(() => bootSnapshot?.sessionId ?? null)
   const [sessionTitle, setSessionTitle] = useState<string | null>(
     () => bootSnapshot?.sessionTitle ?? null
@@ -822,6 +846,11 @@ export function FleetChat({
 
     const connectTimeout = window.setTimeout(() => {
       if (!cancelled && !roomRef.current) {
+        if (connectionAttempt < SEAT_RETRY_MAX) {
+          setIssue({ title: BEVEL_COPY.errors.seatReservationRetry })
+          scheduleSeatRetry(() => cancelled, () => setConnectionAttempt((n) => n + 1))
+          return
+        }
         setIssue(
           resolveBevelConnectionIssue('connection timed out', {
             isChannel,
@@ -830,7 +859,7 @@ export function FleetChat({
         )
         setConnected(false)
       }
-    }, 15_000)
+    }, 20_000)
 
     // React Strict Mode mounts, unmounts, remounts. Delay matchmake so the
     // first pass never reserves a seat that the cleanup immediately drops.
@@ -1044,7 +1073,7 @@ export function FleetChat({
         if (cancelled) return
         const msg =
           formatFleetError(e) || BEVEL_COPY.errors.connectionFailed
-        if (isSeatReservationExpired(msg) && connectionAttempt < SEAT_RETRY_MAX) {
+        if (isTransientJoinFailure(msg) && connectionAttempt < SEAT_RETRY_MAX) {
           setIssue({ title: BEVEL_COPY.errors.seatReservationRetry })
           scheduleSeatRetry(() => cancelled, () => setConnectionAttempt((n) => n + 1))
           return
