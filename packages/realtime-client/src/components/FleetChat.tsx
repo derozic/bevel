@@ -892,10 +892,21 @@ export function FleetChat({
             const next = toChatMsg(msg)
             setMessages((prev) => {
               const idx = prev.findIndex((m) => m.id === next.id)
+              const withoutLocal =
+                next.speakerType === 'human'
+                  ? prev.filter(
+                      (m) =>
+                        !(
+                          m.id.startsWith('local_') &&
+                          m.body === next.body &&
+                          m.speakerType === 'human'
+                        ),
+                    )
+                  : prev
               const merged =
                 idx === -1
-                  ? [...prev, next]
-                  : prev.map((m) => (m.id === next.id ? next : m))
+                  ? [...withoutLocal, next]
+                  : withoutLocal.map((m) => (m.id === next.id ? next : m))
               return dedupeMessagesById(merged)
             })
           }
@@ -1288,9 +1299,30 @@ export function FleetChat({
     }
 
     if (!message.trim()) return
+    if (!connected || !roomRef.current) {
+      setIssue({
+        title: "Couldn't send — not connected.",
+        hint: BEVEL_COPY.errors.connectionHint,
+      })
+      return
+    }
 
     const directTarget =
       !isChannel && agentIds.length === 1 ? agentIds[0] : undefined
+
+    const optimistic: ChatMsg = {
+      id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      speaker: displayName,
+      speakerId: fleet.userId,
+      speakerAvatar: fleet.avatarUrl,
+      speakerType: 'human',
+      body: message,
+      status: 'final',
+      ts: Date.now(),
+    }
+    setMessages((prev) => dedupeMessagesById([...prev, optimistic]))
+    setInput('')
+    setCaret(0)
 
     roomRef.current.send('chat', {
       text: message,
@@ -1300,7 +1332,6 @@ export function FleetChat({
       work,
       workRepo: work ? activeWorkRepo : undefined,
     })
-    setInput('')
   }
 
   function sendGesture(messageId: string, kind: GestureKind) {

@@ -27,7 +27,8 @@ export function mentionedCanonicalIds(
   const out: string[] = []
   for (const m of text.matchAll(/@([a-z0-9_-]+)\b/gi)) {
     const raw = m[1]!.toLowerCase()
-    const id = byId.get(raw) || byName.get(raw) || resolvePlatformAgentId(raw)
+    const id =
+      byId.get(raw) || byName.get(raw) || resolvePlatformAgentId(raw) || raw
     if (!id || seen.has(id)) continue
     seen.add(id)
     out.push(id)
@@ -71,7 +72,8 @@ export function ensureAgentsInRoster(
   const added: string[] = []
   for (const raw of ids) {
     const id = canonicalizeAgentId(raw)
-    if (!id || state.agentIds.includes(id)) continue
+    const seated = [...(state.agentIds as unknown as string[])]
+    if (!id || seated.includes(id)) continue
     const meta = catalog.find((a) => a.id === id)
     if (!meta) continue
     state.agentIds.push(id)

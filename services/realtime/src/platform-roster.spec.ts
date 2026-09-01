@@ -25,6 +25,15 @@ describe('platform roster targeting', () => {
     ).toEqual(['openai', 'claude', 'hermes'])
   })
 
+  it('keeps @hermes plus platform seats even when only Hermes is seated', () => {
+    expect(
+      mentionedCanonicalIds(
+        '@hermes @claude @grok @openai what is your favorite web framework and why?',
+        [{ id: 'hermes', name: 'Hermes' }],
+      ),
+    ).toEqual(['hermes', 'claude', 'grok', 'openai'])
+  })
+
   it('dispatches every mentioned platform agent, not just the first', () => {
     expect(
       resolveDispatchTargets({

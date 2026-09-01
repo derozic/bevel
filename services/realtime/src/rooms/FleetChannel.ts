@@ -174,7 +174,16 @@ export class FleetChannel extends Room {
     // Do not await Postgres here. Colyseus holds the seat reservation until
     // onCreate finishes; a slow API call expires the join (close 4002).
     this.onMessage('chat', (client, payload: ChatPayload) => {
-      void this.handleChat(client, payload)
+      void this.handleChat(client, payload).catch((err) => {
+        console.error('[fleet_channel] chat handler failed', {
+          channel: this.channelSlug,
+          err: err instanceof Error ? err.message : String(err),
+        })
+        this.pushSystemMessage(
+          err instanceof Error ? err.message : 'Could not send that message.',
+          'error',
+        )
+      })
     })
     this.onMessage('load_history', (client, payload: LoadHistoryPayload) => {
       void this.handleLoadHistory(client, payload)
@@ -508,8 +517,9 @@ export class FleetChannel extends Room {
       meta: { messageId: human.id, channelSlug: this.channelSlug, tags },
     })
 
-    // Await human turn durability before agent dispatch — survives mid-flight restart.
-    const humanOk = await this.persistMessage({
+    // Persist in the background. Do not block dispatch on Postgres — a hung
+    // write used to swallow the turn (composer cleared, thread never echoed).
+    void this.persistMessage({
       id: human.id,
       speakerId: human.speakerId,
       speakerName: human.speaker,
@@ -519,13 +529,14 @@ export class FleetChannel extends Room {
       status: 'final',
       tags,
       createdAt: new Date(human.ts).toISOString(),
+    }).then((humanOk) => {
+      if (!humanOk) {
+        console.error('[fleet_channel] human message not durable', {
+          channel: this.channelSlug,
+          id: human.id,
+        })
+      }
     })
-    if (!humanOk) {
-      console.error('[fleet_channel] human message not durable', {
-        channel: this.channelSlug,
-        id: human.id,
-      })
-    }
 
     this.seatIncomingAgents(text, payload)
     const targets = this.resolveTargetAgents(text, payload.targetAgent)
@@ -844,8 +855,9 @@ export class FleetChannel extends Room {
       id: a.id,
       name: a.name,
     }))
+    const incoming = Array.isArray(payload.agentIds) ? payload.agentIds : []
     ensureAgentsInRoster(this.state, [
-      ...(payload.agentIds ?? []),
+      ...incoming,
       ...(payload.targetAgent ? [payload.targetAgent] : []),
       ...mentionedCanonicalIds(text, seated),
     ])

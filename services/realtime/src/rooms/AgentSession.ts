@@ -188,7 +188,16 @@ export class AgentSession extends Room {
     })
 
     this.onMessage('chat', (client, payload: ChatPayload) => {
-      void this.handleChat(client.sessionId, payload)
+      void this.handleChat(client.sessionId, payload).catch((err) => {
+        console.error('[agent_session] chat handler failed', {
+          session: this.persistSlug,
+          err: err instanceof Error ? err.message : String(err),
+        })
+        this.pushSystemMessage(
+          err instanceof Error ? err.message : 'Could not send that message.',
+          'error',
+        )
+      })
     })
     this.onMessage('gesture', (client, payload: GesturePayload) => {
       void this.handleGesture(client, payload)
@@ -386,7 +395,7 @@ export class AgentSession extends Room {
       meta: { messageId: human.id },
     })
 
-    const humanOk = await this.persistMessage({
+    void this.persistMessage({
       id: human.id,
       speakerId: human.speakerId,
       speakerName: human.speaker,
@@ -395,13 +404,14 @@ export class AgentSession extends Room {
       body: text,
       status: 'final',
       createdAt: new Date(human.ts).toISOString(),
+    }).then((humanOk) => {
+      if (!humanOk) {
+        console.error('[agent_session] human message not durable', {
+          session: this.persistSlug,
+          id: human.id,
+        })
+      }
     })
-    if (!humanOk) {
-      console.error('[agent_session] human message not durable', {
-        session: this.persistSlug,
-        id: human.id,
-      })
-    }
 
     this.seatIncomingAgents(text, payload)
     const targets = this.resolveTargetAgents(text, payload.targetAgent)
@@ -609,8 +619,9 @@ export class AgentSession extends Room {
       id: a.id,
       name: a.name,
     }))
+    const incoming = Array.isArray(payload.agentIds) ? payload.agentIds : []
     ensureAgentsInRoster(this.state, [
-      ...(payload.agentIds ?? []),
+      ...incoming,
       ...(payload.targetAgent ? [payload.targetAgent] : []),
       ...mentionedCanonicalIds(text, seated),
     ])
