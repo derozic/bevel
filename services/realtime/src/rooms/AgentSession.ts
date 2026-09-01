@@ -32,11 +32,11 @@ import {
 } from '../schema/ChatState.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { removeHumansByUserId } from '../human-presence.js'
+import { sanitizeAgentError } from '../sanitize-agent-error.js'
 import {
   SYSTEM_SPEAKER,
   agentThinking,
   askingFleet,
-  fleetRateLimited,
   handingToAgent,
   memberJoined,
   memberLeft,
@@ -194,7 +194,7 @@ export class AgentSession extends Room {
           err: err instanceof Error ? err.message : String(err),
         })
         this.pushSystemMessage(
-          err instanceof Error ? err.message : 'Could not send that message.',
+          sanitizeAgentError('Session', err).publicMessage,
           'error',
         )
       })
@@ -594,21 +594,16 @@ export class AgentSession extends Room {
         })
       } else {
         const agentName = agentRow?.name ?? target
-        const reason = result.reason
-        const is429 =
-          (reason instanceof Error &&
-            (reason.message.includes('429') ||
-              reason.message.includes('rate limit') ||
-              reason.name === 'OpenRouterRateLimitError')) ||
-          false
-        const errBody = is429
-          ? fleetRateLimited(agentName)
-          : reason instanceof Error
-            ? reason.message
-            : 'Agent failed'
-        this.pushAgentReply(target, agentName, errBody, {
+        const sanitized = sanitizeAgentError(agentName, result.reason)
+        console.error('[agent_session] agent failed', {
+          session: this.persistSlug,
+          agent: target,
+          code: sanitized.code,
+          detail: sanitized.detail,
+        })
+        this.pushAgentReply(target, agentName, sanitized.publicMessage, {
           phase: 'error',
-          rateLimited: is429,
+          rateLimited: sanitized.code === 'rate_limit',
         })
       }
     }

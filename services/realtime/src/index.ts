@@ -22,3 +22,4 @@ if (process.env.COLYSEUS_SIMULATE_LATENCY_MS) {
 }
 
 console.log(`Derozic fleet realtime listening on :${config.port}`)
+console.log(`fleet runner root: ${config.repoRoot}`)

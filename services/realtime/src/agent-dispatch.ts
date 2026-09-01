@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { config } from './config.js'
@@ -8,6 +9,50 @@ import {
 } from './platform-providers.js'
 
 const require = createRequire(import.meta.url)
+
+type FleetRunner = {
+  runAgentChat?: (
+    name: string,
+    message: string,
+    history?: { role: string; content: string }[],
+    runOpts?: {
+      metadata?: Record<string, unknown>
+      mode?: string
+    },
+  ) => Promise<{ output: string; model: string; confidence: number }>
+  runAgentWork?: (
+    name: string,
+    message: string,
+    history?: { role: string; content: string }[],
+    opts?: { workspaceRoot?: string; workRepo?: string },
+  ) => Promise<{ output: string; model: string; confidence: number }>
+}
+
+function runnerCandidates(): string[] {
+  const root = config.repoRoot
+  return [
+    join(root, 'dist', 'runner.js'),
+    join(root, 'agents', 'dist', 'runner.js'),
+  ].filter((path, i, all) => all.indexOf(path) === i)
+}
+
+function loadFleetRunner(): FleetRunner {
+  let lastErr: unknown
+  for (const runnerPath of runnerCandidates()) {
+    if (!existsSync(runnerPath)) continue
+    try {
+      return require(runnerPath) as FleetRunner
+    } catch (err) {
+      lastErr = err
+    }
+  }
+  const tried = runnerCandidates().join(', ')
+  if (lastErr instanceof Error) {
+    lastErr.message = `${lastErr.message} (tried ${tried})`
+    throw lastErr
+  }
+  throw new Error(`Fleet runner not found (tried ${tried})`)
+}
 
 export type DispatchChatOpts = {
   /** Solo personal-agent session (e.g. /talk/hermes). */
@@ -27,17 +72,9 @@ export async function dispatchAgentChat(
   if (isPlatformAgent(agentId)) {
     return dispatchPlatformAgentChat(agentId, message, history)
   }
-  const runnerPath = join(config.repoRoot, 'dist', 'runner.js')
-  const { runAgentChat } = require(runnerPath) as {
-    runAgentChat: (
-      name: string,
-      message: string,
-      history?: { role: string; content: string }[],
-      runOpts?: {
-        metadata?: Record<string, unknown>
-        mode?: string
-      },
-    ) => Promise<{ output: string; model: string; confidence: number }>
+  const { runAgentChat } = loadFleetRunner()
+  if (typeof runAgentChat !== 'function') {
+    throw new Error('Fleet runner is missing runAgentChat')
   }
   const res = await runAgentChat(agentId, message, history, {
     metadata: {
@@ -65,14 +102,9 @@ export async function dispatchAgentWork(
       history,
     )
   }
-  const runnerPath = join(config.repoRoot, 'dist', 'runner.js')
-  const { runAgentWork } = require(runnerPath) as {
-    runAgentWork: (
-      name: string,
-      message: string,
-      history?: { role: string; content: string }[],
-      opts?: { workspaceRoot?: string; workRepo?: string }
-    ) => Promise<{ output: string; model: string; confidence: number }>
+  const { runAgentWork } = loadFleetRunner()
+  if (typeof runAgentWork !== 'function') {
+    throw new Error('Fleet runner is missing runAgentWork')
   }
   const res = await runAgentWork(agentId, message, history, {
     workspaceRoot: resolveWorkspaceForRepo(workRepo),

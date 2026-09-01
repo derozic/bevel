@@ -126,7 +126,7 @@ COLYSEUS_PUBLIC_ADDRESS=realtime.bevel.is
 API_INTERNAL_URL=http://127.0.0.1:43203
 FLEET_INTERNAL_API_KEY=SECRET
 AUTH_SECRET=same-as-web
-AGENTS_REPO_ROOT=/opt/bevel
+AGENTS_REPO_ROOT=/opt/bevel/agents
 AGENTS_SESSIONS_DIR=/opt/bevel/data/sessions
 ```
 

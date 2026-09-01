@@ -35,12 +35,12 @@ import {
   HumanPresence,
 } from '../schema/ChatState.js'
 import { removeHumansByUserId } from '../human-presence.js'
+import { sanitizeAgentError } from '../sanitize-agent-error.js'
 import {
   SYSTEM_SPEAKER,
   agentThinking,
   askingFleet,
   channelMemberJoined,
-  fleetRateLimited,
   handingToAgent,
   pickAgent,
   puttingOnWork,
@@ -180,7 +180,7 @@ export class FleetChannel extends Room {
           err: err instanceof Error ? err.message : String(err),
         })
         this.pushSystemMessage(
-          err instanceof Error ? err.message : 'Could not send that message.',
+          sanitizeAgentError('Channel', err).publicMessage,
           'error',
         )
       })
@@ -832,20 +832,17 @@ export class FleetChannel extends Room {
         )
       } else {
         const agentName = agentRow?.name ?? target
-        const reason = result.reason
-        const is429 =
-          reason instanceof Error &&
-          (reason.message.includes('429') || reason.name === 'OpenRouterRateLimitError')
-        await this.pushAgentReply(
-          target,
-          agentName,
-          is429
-            ? fleetRateLimited(agentName)
-            : reason instanceof Error
-              ? reason.message
-              : 'Agent failed',
-          { ...workMeta, status: 'error' },
-        )
+        const sanitized = sanitizeAgentError(agentName, result.reason)
+        console.error('[fleet_channel] agent failed', {
+          channel: this.channelSlug,
+          agent: target,
+          code: sanitized.code,
+          detail: sanitized.detail,
+        })
+        await this.pushAgentReply(target, agentName, sanitized.publicMessage, {
+          ...workMeta,
+          status: 'error',
+        })
       }
     }
   }
