@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { BEVEL_COPY, resolveBevelConnectionIssue } from './bevel-copy'
 
 describe('chat copy', () => {
+  it('join copy is current, not modem-era', () => {
+    expect(BEVEL_COPY.connectingSession).toBe('Opening the thread…')
+    expect(BEVEL_COPY.connectingSession).not.toMatch(/dial/i)
+    expect(BEVEL_COPY.connectingChannel('general')).toBe('Opening ~general…')
+    expect(BEVEL_COPY.reconnecting).toBe('Reconnecting…')
+  })
+
   it('empty multi-agent rooms do not interpolate undefined', () => {
     expect(BEVEL_COPY.emptySessionMulti([])).toBe(BEVEL_COPY.emptySession)
     expect(BEVEL_COPY.emptySessionMulti(['Hermes'])).toContain('Hermes')

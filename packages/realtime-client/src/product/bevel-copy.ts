@@ -21,9 +21,9 @@ export const BEVEL_COPY = {
   humanDmsSoon: 'People DMs (e.g. Peter) need a new room type — not wired yet.',
   agentDirectHint: 'Message opens a private thread. Track chips keep them in the room.',
 
-  connectingChannel: (slug: string) => `Waking up ~${slug}…`,
-  connectingSession: 'Dialing in…',
-  reconnecting: 'Back in a sec…',
+  connectingChannel: (slug: string) => `Opening ~${slug}…`,
+  connectingSession: 'Opening the thread…',
+  reconnecting: 'Reconnecting…',
 
   emptyChannel: (slug: string) =>
     `~${slug} is listening. Drop a line—or @mention an agent and watch them light up.`,
