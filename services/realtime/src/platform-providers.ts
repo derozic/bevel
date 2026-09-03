@@ -19,10 +19,20 @@ const DEFAULT_MODELS: Record<PlatformAgentId, string> = {
   grok: process.env.GROK_MODEL?.trim() || 'grok-3',
 }
 
+const OPENROUTER_MODELS: Record<PlatformAgentId, string> = {
+  openai: process.env.OPENAI_OPENROUTER_MODEL?.trim() || 'openai/gpt-4o',
+  claude: process.env.ANTHROPIC_OPENROUTER_MODEL?.trim() || 'anthropic/claude-sonnet-4',
+  grok: process.env.GROK_OPENROUTER_MODEL?.trim() || 'x-ai/grok-3',
+}
+
 function keyFor(id: PlatformAgentId): string {
   if (id === 'openai') return (process.env.OPENAI_API_KEY || '').trim()
   if (id === 'claude') return (process.env.ANTHROPIC_API_KEY || '').trim()
   return (process.env.GROK_API_KEY || process.env.XAI_API_KEY || '').trim()
+}
+
+function openRouterKey(): string {
+  return (process.env.OPENROUTER_API_KEY || '').trim()
 }
 
 function keyHint(id: PlatformAgentId): string {
@@ -102,6 +112,34 @@ export function isPlatformAgent(agentId: string): boolean {
   return Boolean(resolvePlatformAgentId(agentId))
 }
 
+async function dispatchViaOpenRouter(
+  id: PlatformAgentId,
+  name: string,
+  message: string,
+  history: ChatTurn[],
+  key: string,
+): Promise<PlatformChatResult> {
+  const model = OPENROUTER_MODELS[id]
+  const { status, json } = await postJson(
+    'https://openrouter.ai/api/v1/chat/completions',
+    {
+      authorization: `Bearer ${key}`,
+      'http-referer': 'https://bevel.is',
+      'x-title': 'BEVEL',
+    },
+    {
+      model,
+      temperature: 0.7,
+      messages: openAiMessages(id, message, history),
+    },
+  )
+  if (status !== 200) {
+    const err = json.error as { message?: string } | undefined
+    throw new Error(err?.message || `${name} OpenRouter request failed: ${status}`)
+  }
+  return { output: openAiText(json) || '…', model, confidence: 0.7 }
+}
+
 export async function dispatchPlatformAgentChat(
   agentId: string,
   message: string,
@@ -113,6 +151,10 @@ export async function dispatchPlatformAgentChat(
   }
   const key = keyFor(id)
   const name = PLATFORM_AGENTS.find((a) => a.id === id)?.name ?? id
+  const routerKey = openRouterKey()
+  if (!key && routerKey) {
+    return dispatchViaOpenRouter(id, name, message, history, routerKey)
+  }
   if (!key) {
     return {
       output: `${name} is not configured on this host. Set ${keyHint(id)} on the realtime process.`,

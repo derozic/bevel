@@ -128,7 +128,13 @@ FLEET_INTERNAL_API_KEY=SECRET
 AUTH_SECRET=same-as-web
 AGENTS_REPO_ROOT=/opt/bevel/agents
 AGENTS_SESSIONS_DIR=/opt/bevel/data/sessions
+OPENROUTER_API_KEY=SECRET
+OPENAI_API_KEY=SECRET
+ANTHROPIC_API_KEY=SECRET
+GROK_API_KEY=SECRET
 ```
+
+Hermes and the fleet runner use `OPENROUTER_API_KEY`. ChatGPT / Claude / Grok prefer their native keys and fall back to OpenRouter when a native key is missing. The OpenRouter key itself has a per-key credit cap (`limit`); raising workspace credits does not lift that cap.
 
 Build before start: `cd /opt/bevel/services/realtime && pnpm run build`.
 

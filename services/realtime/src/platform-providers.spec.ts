@@ -9,6 +9,7 @@ const saved = {
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   GROK_API_KEY: process.env.GROK_API_KEY,
   XAI_API_KEY: process.env.XAI_API_KEY,
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 }
 
 afterEach(() => {
@@ -16,6 +17,7 @@ afterEach(() => {
   process.env.ANTHROPIC_API_KEY = saved.ANTHROPIC_API_KEY
   process.env.GROK_API_KEY = saved.GROK_API_KEY
   process.env.XAI_API_KEY = saved.XAI_API_KEY
+  process.env.OPENROUTER_API_KEY = saved.OPENROUTER_API_KEY
   vi.unstubAllGlobals()
 })
 
@@ -32,10 +34,33 @@ describe('platform providers', () => {
 
   it('returns a configured-host message when the key is missing', async () => {
     delete process.env.OPENAI_API_KEY
+    delete process.env.OPENROUTER_API_KEY
     const res = await dispatchPlatformAgentChat('chatgpt', 'hello')
     expect(res.confidence).toBe(0)
     expect(res.output).toMatch(/OPENAI_API_KEY/)
     expect(res.output).toMatch(/ChatGPT/)
+  })
+
+  it('falls back to OpenRouter when the native key is missing', async () => {
+    delete process.env.GROK_API_KEY
+    delete process.env.XAI_API_KEY
+    process.env.OPENROUTER_API_KEY = 'sk-or-test'
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'from grok via openrouter' } }],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await dispatchPlatformAgentChat('grok', 'hi', [])
+    expect(res.output).toBe('from grok via openrouter')
+    expect(res.model).toBe('x-ai/grok-3')
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
+    expect(init.headers).toMatchObject({
+      authorization: 'Bearer sk-or-test',
+    })
   })
 
   it('posts OpenAI-compatible chat completions for ChatGPT', async () => {
