@@ -15,7 +15,7 @@ export type PlatformChatResult = {
 
 const DEFAULT_MODELS: Record<PlatformAgentId, string> = {
   openai: process.env.OPENAI_MODEL?.trim() || 'gpt-4o',
-  claude: process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-20250514',
+  claude: process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-5',
   grok: process.env.GROK_MODEL?.trim() || 'grok-4.3',
 }
 

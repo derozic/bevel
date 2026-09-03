@@ -90,6 +90,29 @@ describe('platform providers', () => {
     expect(urls[1]).toBe('https://openrouter.ai/api/v1/chat/completions')
   })
 
+  it('posts Anthropic messages for native Claude Sonnet 4.5', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test'
+    delete process.env.OPENROUTER_API_KEY
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      json: async () => ({
+        content: [{ type: 'text', text: 'from claude' }],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await dispatchPlatformAgentChat('claude', 'hi', [])
+    expect(res.output).toBe('from claude')
+    expect(res.model).toBe('claude-sonnet-4-5')
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://api.anthropic.com/v1/messages')
+    expect(init.headers).toMatchObject({
+      'x-api-key': 'sk-ant-test',
+    })
+    const body = JSON.parse(String(init.body))
+    expect(body.model).toBe('claude-sonnet-4-5')
+  })
+
   it('posts OpenAI-compatible chat completions for native Grok 4.3', async () => {
     process.env.XAI_API_KEY = 'xai-test'
     delete process.env.GROK_API_KEY
