@@ -125,3 +125,23 @@ export function sanitizeAgentError(
     detail,
   }
 }
+
+/** True when a fulfilled agent reply is actually a leaked stack / provider dump. */
+export function isLeakedAgentFailure(text: string): boolean {
+  const lower = text.toLowerCase()
+  return (
+    lower.includes('cannot find module') ||
+    lower.includes('require stack') ||
+    lower.includes('axioserror') ||
+    lower.includes('status code 403') ||
+    lower.includes('status code 401') ||
+    lower.includes('key limit exceeded') ||
+    lower.includes('no credits remaining')
+  )
+}
+
+/** Channel bubble text: keep real replies, rewrite leaked internals. */
+export function publicAgentBubble(agentName: string, text: string): string {
+  if (!text || !isLeakedAgentFailure(text)) return text
+  return sanitizeAgentError(agentName, text).publicMessage
+}

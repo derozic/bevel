@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeAgentError } from './sanitize-agent-error'
+import { publicAgentBubble, sanitizeAgentError } from './sanitize-agent-error'
 
 describe('sanitizeAgentError', () => {
   it('does not leak Bearer tokens or runner stacks', () => {
@@ -30,5 +30,14 @@ describe('sanitizeAgentError', () => {
     )
     expect(out.code).toBe('model')
     expect(out.publicMessage).toMatch(/model routing/)
+  })
+
+  it('rewrites leaked runner stacks that arrived as fulfilled output', () => {
+    const leaked =
+      "Cannot find module '/opt/bevel/dist/runner.js'\nRequire stack:\n- /opt/bevel/services/realtime/dist/agent-dispatch.js"
+    const out = publicAgentBubble('Johnny', leaked)
+    expect(out).toMatch(/fleet runner/)
+    expect(out).not.toMatch(/opt\/bevel/)
+    expect(publicAgentBubble('Johnny', 'pong')).toBe('pong')
   })
 })

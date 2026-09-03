@@ -32,7 +32,7 @@ import {
 } from '../schema/ChatState.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { removeHumansByUserId } from '../human-presence.js'
-import { sanitizeAgentError } from '../sanitize-agent-error.js'
+import { publicAgentBubble, sanitizeAgentError } from '../sanitize-agent-error.js'
 import {
   SYSTEM_SPEAKER,
   agentThinking,
@@ -504,6 +504,7 @@ export class AgentSession extends Room {
   }
 
   private pushAgentReply(target: string, agentName: string, output: string, meta?: Record<string, unknown>) {
+    output = publicAgentBubble(agentName, output)
     const reply = new ChatMessage()
     reply.id = uid()
     reply.sessionId = this.state.sessionId

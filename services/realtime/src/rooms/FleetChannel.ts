@@ -35,7 +35,7 @@ import {
   HumanPresence,
 } from '../schema/ChatState.js'
 import { removeHumansByUserId } from '../human-presence.js'
-import { sanitizeAgentError } from '../sanitize-agent-error.js'
+import { publicAgentBubble, sanitizeAgentError } from '../sanitize-agent-error.js'
 import {
   SYSTEM_SPEAKER,
   agentThinking,
@@ -587,6 +587,7 @@ export class FleetChannel extends Room {
       status?: ChatMessage['status']
     } = {},
   ) {
+    output = publicAgentBubble(agentName, output)
     const existingId = opts.messageId
     let reply: ChatMessage | undefined
     if (existingId) {
