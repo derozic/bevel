@@ -53,12 +53,14 @@ export function sanitizeAgentError(
     }
   }
   if (
+    lower.includes('no credits remaining') ||
+    lower.includes('insufficient_quota') ||
     lower.includes('key limit exceeded') ||
     lower.includes('status code 403') ||
     lower.includes('error code 403')
   ) {
     return {
-      publicMessage: `${agentName} cannot reach OpenRouter (key limit or forbidden). An operator needs to check the OpenRouter dashboard.`,
+      publicMessage: `${agentName} cannot reach the model provider (credits or key limit). An operator needs to check OpenRouter and the native provider keys on realtime.`,
       code: 'forbidden',
       detail,
     }

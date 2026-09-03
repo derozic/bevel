@@ -14,6 +14,15 @@ describe('sanitizeAgentError', () => {
     expect(out.detail).toMatch(/\[redacted/)
   })
 
+  it('maps empty provider credits to operator copy', () => {
+    const out = sanitizeAgentError(
+      'ChatGPT',
+      new Error('You have no credits remaining. Add credits to continue using the API'),
+    )
+    expect(out.code).toBe('forbidden')
+    expect(out.publicMessage).toMatch(/credits or key limit/)
+  })
+
   it('maps retired-model 404s to routing copy', () => {
     const out = sanitizeAgentError(
       'Loom',

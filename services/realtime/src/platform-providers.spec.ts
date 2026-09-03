@@ -63,6 +63,33 @@ describe('platform providers', () => {
     })
   })
 
+  it('falls back to OpenRouter when the native provider is out of credits', async () => {
+    process.env.OPENAI_API_KEY = 'sk-dead'
+    process.env.OPENROUTER_API_KEY = 'sk-or-test'
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 429,
+        json: async () => ({
+          error: { message: 'You have no credits remaining.' },
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: 'from openrouter after native fail' } }],
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await dispatchPlatformAgentChat('openai', 'hi', [])
+    expect(res.output).toBe('from openrouter after native fail')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const urls = fetchMock.mock.calls.map((c) => c[0])
+    expect(urls[0]).toBe('https://api.openai.com/v1/chat/completions')
+    expect(urls[1]).toBe('https://openrouter.ai/api/v1/chat/completions')
+  })
+
   it('posts OpenAI-compatible chat completions for ChatGPT', async () => {
     process.env.OPENAI_API_KEY = 'sk-test'
     const fetchMock = vi.fn().mockResolvedValue({

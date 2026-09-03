@@ -163,6 +163,23 @@ export async function dispatchPlatformAgentChat(
     }
   }
 
+  try {
+    return await dispatchNative(id, name, message, history, key)
+  } catch (err) {
+    if (routerKey) {
+      return dispatchViaOpenRouter(id, name, message, history, routerKey)
+    }
+    throw err
+  }
+}
+
+async function dispatchNative(
+  id: PlatformAgentId,
+  name: string,
+  message: string,
+  history: ChatTurn[],
+  key: string,
+): Promise<PlatformChatResult> {
   const model = DEFAULT_MODELS[id]
   if (id === 'claude') {
     const { status, json } = await postJson(
