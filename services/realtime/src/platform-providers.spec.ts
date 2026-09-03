@@ -55,7 +55,7 @@ describe('platform providers', () => {
 
     const res = await dispatchPlatformAgentChat('grok', 'hi', [])
     expect(res.output).toBe('from grok via openrouter')
-    expect(res.model).toBe('x-ai/grok-3')
+    expect(res.model).toBe('x-ai/grok-4.3')
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
     expect(init.headers).toMatchObject({

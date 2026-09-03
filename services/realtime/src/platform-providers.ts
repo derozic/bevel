@@ -22,7 +22,7 @@ const DEFAULT_MODELS: Record<PlatformAgentId, string> = {
 const OPENROUTER_MODELS: Record<PlatformAgentId, string> = {
   openai: process.env.OPENAI_OPENROUTER_MODEL?.trim() || 'openai/gpt-4o',
   claude: process.env.ANTHROPIC_OPENROUTER_MODEL?.trim() || 'anthropic/claude-sonnet-4',
-  grok: process.env.GROK_OPENROUTER_MODEL?.trim() || 'x-ai/grok-3',
+  grok: process.env.GROK_OPENROUTER_MODEL?.trim() || 'x-ai/grok-4.3',
 }
 
 function keyFor(id: PlatformAgentId): string {
