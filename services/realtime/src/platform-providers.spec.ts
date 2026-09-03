@@ -90,6 +90,30 @@ describe('platform providers', () => {
     expect(urls[1]).toBe('https://openrouter.ai/api/v1/chat/completions')
   })
 
+  it('posts OpenAI-compatible chat completions for native Grok 4.3', async () => {
+    process.env.XAI_API_KEY = 'xai-test'
+    delete process.env.GROK_API_KEY
+    delete process.env.OPENROUTER_API_KEY
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'from xai' } }],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await dispatchPlatformAgentChat('grok', 'hi', [])
+    expect(res.output).toBe('from xai')
+    expect(res.model).toBe('grok-4.3')
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://api.x.ai/v1/chat/completions')
+    expect(init.headers).toMatchObject({
+      authorization: 'Bearer xai-test',
+    })
+    const body = JSON.parse(String(init.body))
+    expect(body.model).toBe('grok-4.3')
+  })
+
   it('posts OpenAI-compatible chat completions for ChatGPT', async () => {
     process.env.OPENAI_API_KEY = 'sk-test'
     const fetchMock = vi.fn().mockResolvedValue({
