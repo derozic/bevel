@@ -103,7 +103,6 @@ class _BevelHomePageState extends State<BevelHomePage> {
   OnboardingState _onboarding = OnboardingState();
   final _escalations = EscalationRepository();
   String? _status;
-  String? _lastDeepLink;
   var _didAutoOpenWorkspace = false;
   var _workspaceOpen = false;
   String? _lastAuthCompleteCode;
@@ -171,8 +170,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
         });
       }
     } catch (e) {
+      debugPrint('Native probe limited: $e');
       if (!mounted) return;
-      setState(() => _status = 'Native probe limited: $e');
+      setState(() => _status = 'Could not finish setup. Try Continue with Google.');
     }
   }
 
@@ -196,8 +196,6 @@ class _BevelHomePageState extends State<BevelHomePage> {
     if (!mounted) return;
     final action = DeepLinkService.parse(uri);
     setState(() {
-      _lastDeepLink = uri.toString();
-      _status = 'Deep link: ${action.kind} → ${action.route ?? uri}';
       if (action.handoff != null) {
         _pendingHandoff = action.handoff;
       }
@@ -1128,8 +1126,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
               const SizedBox(height: 24),
               Text(
                 'v${BevelConfig.versionLabel}'
-                '${caps != null ? ' · ${caps.platformLabel}' : ''}'
-                '${_lastDeepLink != null ? '\nLast link: $_lastDeepLink' : ''}',
+                '${caps != null ? ' · ${caps.platformLabel}' : ''}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               if (_status != null) ...[

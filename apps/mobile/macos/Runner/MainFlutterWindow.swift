@@ -31,5 +31,13 @@ class MainFlutterWindow: NSWindow {
     )
 
     super.awakeFromNib()
+
+    // window_manager's waitUntilReadyToShow can hide the nib window and then
+    // fail to foreground (OSStatus 13). Always order front ourselves.
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
+    }
   }
 }

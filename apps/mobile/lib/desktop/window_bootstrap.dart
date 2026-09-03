@@ -23,9 +23,16 @@ Future<void> bootstrapDesktopWindow() async {
     title: BevelConfig.appName,
   );
 
-  await windowManager.waitUntilReadyToShow(options, () async {
+  // Do not hide-then-show. waitUntilReadyToShow can leave a headless process
+  // when macOS refuses to foreground (OSStatus 13).
+  try {
+    await windowManager.setMinimumSize(options.minimumSize ?? const Size(880, 600));
+    await windowManager.setSize(options.size ?? const Size(1280, 840));
     await windowManager.setTitle(BevelConfig.appName);
+    await windowManager.center();
     await windowManager.show();
     await windowManager.focus();
-  });
+  } catch (e) {
+    debugPrint('Desktop window show failed: $e');
+  }
 }
