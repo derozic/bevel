@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArchiveBoxIcon,
   CheckIcon,
@@ -26,7 +26,7 @@ import {
   type GestureKind,
 } from '@bevel/schema'
 import type { ChatMsg } from '../lib/colyseus-messages'
-import { isPlayfulTouch, notifyNativeGesture } from '../lib/bubble-gestures'
+import { notifyNativeGesture } from '../lib/bubble-gestures'
 
 const SIGNALS: Array<{
   kind: GestureKind
@@ -75,7 +75,6 @@ function GestureButton({
   Solid,
   active,
   count,
-  large,
   onPick,
 }: {
   kind: GestureKind
@@ -84,7 +83,6 @@ function GestureButton({
   Solid: typeof HandThumbUpSolid
   active: boolean
   count: number
-  large?: boolean
   onPick: (kind: GestureKind) => void
 }) {
   const Icon = active ? Solid : Outline
@@ -92,7 +90,7 @@ function GestureButton({
   return (
     <button
       type="button"
-      className={large ? 'fleet-chat-gesture fleet-chat-gesture--dock' : 'fleet-chat-gesture'}
+      className="fleet-chat-gesture"
       data-kind={kind}
       data-active={active ? 'true' : 'false'}
       data-pop={pop ? 'true' : undefined}
@@ -114,9 +112,7 @@ export function MessageGestures({
   message,
   selfId,
   incoming,
-  dockOpen = false,
   onToggle,
-  onCloseDock,
 }: {
   message: ChatMsg
   selfId: string
@@ -129,50 +125,27 @@ export function MessageGestures({
   const counts = gestureCounts(gestures)
   const mine = userGestureKinds(gestures, selfId)
   const votePrompt = message.votePrompt?.trim()
-  const [playful, setPlayful] = useState(false)
-  const [hint, setHint] = useState(false)
-
-  useEffect(() => {
-    const touch = isPlayfulTouch()
-    setPlayful(touch)
-    if (!touch || typeof window === 'undefined') return
-    try {
-      setHint(window.localStorage.getItem('bevel.gesture.hint') !== '1')
-    } catch {
-      setHint(true)
-    }
-  }, [])
+  const chips = SIGNALS.filter((s) => counts[s.kind] > 0)
 
   const pick = (kind: GestureKind) => {
     notifyNativeGesture(kind)
     onToggle(kind)
-    if (hint) {
-      setHint(false)
-      try {
-        window.localStorage.setItem('bevel.gesture.hint', '1')
-      } catch {
-        /* ignore */
-      }
+    try {
+      window.localStorage.setItem('bevel.gesture.hint', '1')
+    } catch {
+      /* ignore */
     }
-    onCloseDock?.()
   }
 
-  const showBar = incoming || Boolean(votePrompt) || gestures.length > 0
-  if (!showBar || message.status === 'pending' || message.status === 'streaming') {
+  if (message.status === 'pending' || message.status === 'streaming') {
     return null
   }
-
-  const showChips =
-    !playful ||
-    gestures.length > 0 ||
-    Boolean(votePrompt)
+  if (!votePrompt && chips.length === 0) return null
 
   return (
     <div
       className="fleet-chat-gestures"
       data-incoming={incoming ? 'true' : 'false'}
-      data-playful={playful ? 'true' : 'false'}
-      data-dock={dockOpen ? 'true' : 'false'}
     >
       {votePrompt ? (
         <div className="fleet-chat-vote" role="group" aria-label="Vote">
@@ -206,43 +179,18 @@ export function MessageGestures({
         </div>
       ) : null}
 
-      {incoming && dockOpen && !playful ? (
-        <div className="fleet-chat-gesture-dock" role="dialog" aria-label="React">
-          {SIGNALS.map((s) => (
+      {chips.length > 0 ? (
+        <div className="fleet-chat-gesture-row" role="group" aria-label="Message reactions">
+          {chips.map((s) => (
             <GestureButton
               key={s.kind}
               {...s}
               active={mine.has(s.kind)}
               count={counts[s.kind]}
-              large
               onPick={pick}
             />
           ))}
         </div>
-      ) : null}
-
-      {incoming && showChips ? (
-        <div className="fleet-chat-gesture-row" role="group" aria-label="Message signals">
-          {SIGNALS.map((s) => {
-            const count = counts[s.kind]
-            if (playful && count === 0 && !mine.has(s.kind)) return null
-            return (
-              <GestureButton
-                key={s.kind}
-                {...s}
-                active={mine.has(s.kind)}
-                count={count}
-                onPick={pick}
-              />
-            )
-          })}
-        </div>
-      ) : null}
-
-      {incoming && playful && hint && gestures.length === 0 && !votePrompt ? (
-        <p className="fleet-chat-gesture-hint">
-          Tap to react · swipe for up or down · tap twice to heart
-        </p>
       ) : null}
     </div>
   )
@@ -272,6 +220,18 @@ export function GestureThumbTray({
   const votePrompt = message.votePrompt?.trim()
   const [popKind, setPopKind] = useState<GestureKind | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!moreOpen) return
+    const onDoc = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (target && moreRef.current?.contains(target)) return
+      setMoreOpen(false)
+    }
+    document.addEventListener('pointerdown', onDoc)
+    return () => document.removeEventListener('pointerdown', onDoc)
+  }, [moreOpen])
 
   const pick = (kind: GestureKind) => {
     notifyNativeGesture(kind)
@@ -291,6 +251,7 @@ export function GestureThumbTray({
       className="fleet-chat-action-bar"
       role="toolbar"
       aria-label="Message actions"
+      data-open={moreOpen ? 'true' : undefined}
       onPointerDown={(e) => e.stopPropagation()}
     >
       {votePrompt ? (
@@ -332,14 +293,11 @@ export function GestureThumbTray({
             onClick={() => pick(kind)}
           >
             <Icon className="fleet-chat-action-icon" />
-            {count > 0 ? (
-              <span className="fleet-chat-action-count">{count}</span>
-            ) : null}
           </button>
         )
       })}
       <span className="fleet-chat-action-sep" aria-hidden />
-      <div className="fleet-chat-action-more">
+      <div className="fleet-chat-action-more" ref={moreRef}>
         <button
           type="button"
           className="fleet-chat-action-btn"

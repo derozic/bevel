@@ -385,7 +385,6 @@ function MessageRow({
   dockOpen,
   burst,
   onOpenDock,
-  onCloseDock,
   onArchive,
   onDelete,
 }: {
@@ -401,7 +400,6 @@ function MessageRow({
   dockOpen?: boolean
   burst?: GestureKind | null
   onOpenDock?: () => void
-  onCloseDock?: () => void
   onArchive?: () => void
   onDelete?: () => void
 }) {
@@ -441,7 +439,7 @@ function MessageRow({
         )}
         <div className="fleet-chat-msg-stack">
           <GestureBubble
-            enabled={!isSelf}
+            enabled={Boolean(onGesture)}
             burst={!isSelf ? burst : null}
             className="fleet-chat-bubble fleet-chat-bubble--human"
             onToggle={onGesture ? (kind) => onGesture(m.id, kind) : undefined}
@@ -465,9 +463,7 @@ function MessageRow({
               message={m}
               selfId={selfId}
               incoming={!isSelf}
-              dockOpen={dockOpen && !isSelf}
               onToggle={(kind) => onGesture(m.id, kind)}
-              onCloseDock={onCloseDock}
             />
           ) : null}
           {onGesture || onArchive || onDelete ? (
@@ -543,9 +539,7 @@ function MessageRow({
             message={m}
             selfId={selfId}
             incoming
-            dockOpen={dockOpen}
             onToggle={(kind) => onGesture(m.id, kind)}
-            onCloseDock={onCloseDock}
           />
         ) : null}
         {onGesture || onArchive || onDelete ? (
@@ -1659,7 +1653,6 @@ export function FleetChat({
               dockOpen={gestureDockId === m.id}
               burst={gestureBurst?.id === m.id ? gestureBurst.kind : null}
               onOpenDock={() => setGestureDockId(m.id)}
-              onCloseDock={() => setGestureDockId(null)}
               onArchive={
                 connected ? () => sendMessageAction(m.id, 'archive') : undefined
               }
