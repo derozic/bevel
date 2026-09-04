@@ -5,6 +5,7 @@ import {
   appendChannelMessage,
   fetchChannelMessagesPage,
   persistChannelGesture,
+  persistChannelMessageLifecycle,
   type FleetChannelMessageRecord,
 } from '../fleet-channel-api.js'
 import { enqueuePersist, flushPersistQueue } from '../persist-queue.js'
@@ -69,6 +70,11 @@ type SpeakerProfile = {
 type GesturePayload = {
   messageId?: string
   kind?: string
+}
+
+type MessageActionPayload = {
+  messageId?: string
+  action?: string
 }
 
 type ChatPayload = {
@@ -201,6 +207,9 @@ export class AgentSession extends Room {
     })
     this.onMessage('gesture', (client, payload: GesturePayload) => {
       void this.handleGesture(client, payload)
+    })
+    this.onMessage('message_action', (client, payload: MessageActionPayload) => {
+      void this.handleMessageAction(client, payload)
     })
   }
 
@@ -452,6 +461,19 @@ export class AgentSession extends Room {
       if (row?.id === id) return row
     }
     return undefined
+  }
+
+  private async handleMessageAction(client: Client, payload: MessageActionPayload) {
+    const actionRaw = String(payload.action ?? '').trim().toLowerCase()
+    const messageId = String(payload.messageId ?? '').trim()
+    if (!messageId || (actionRaw !== 'delete' && actionRaw !== 'archive')) return
+    const profile = this.speakerProfiles.get(client.sessionId)
+    if (!profile) return
+    if (!this.findMessage(messageId)) return
+    this.removeMessageById(messageId)
+    void enqueuePersist(`lifecycle:${messageId}`, () =>
+      persistChannelMessageLifecycle(this.persistSlug, messageId, actionRaw),
+    )
   }
 
   private async handleGesture(client: Client, payload: GesturePayload) {

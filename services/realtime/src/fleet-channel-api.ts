@@ -222,6 +222,34 @@ export async function appendChannelMessage(
  * Persist a gesture through the gesture endpoint so subscribers get
  * `gesture.created` (not a duplicate `message.created` from a full upsert).
  */
+export async function persistChannelMessageLifecycle(
+  slug: string,
+  messageId: string,
+  action: 'delete' | 'archive',
+  tenant?: string | null,
+): Promise<boolean> {
+  const base = apiBase()
+  if (!base) return false
+  const url = `${base}${withTenant(`/api/v1/fleet/channels/${encodeURIComponent(slug)}/messages/${encodeURIComponent(messageId)}/lifecycle`, tenant)}`
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: internalHeaders(),
+      body: JSON.stringify({ action }),
+      signal: AbortSignal.timeout(PERSIST_TIMEOUT_MS),
+    })
+    return res.ok
+  } catch (e) {
+    console.error('[fleet-channel-api] lifecycle failed', {
+      slug,
+      messageId,
+      action,
+      error: e instanceof Error ? e.message : String(e),
+    })
+    return false
+  }
+}
+
 export async function persistChannelGesture(
   slug: string,
   messageId: string,

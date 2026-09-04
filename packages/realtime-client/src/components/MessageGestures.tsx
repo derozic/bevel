@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import {
+  ArchiveBoxIcon,
   CheckIcon,
+  EllipsisHorizontalIcon,
   HandThumbDownIcon,
   HandThumbUpIcon,
   HeartIcon,
   StarIcon,
+  TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import {
@@ -245,33 +248,37 @@ export function MessageGestures({
   )
 }
 
-/** Fat bottom tray — sits above the composer in the thumb zone. */
+/** Slack-sized hover/tap bar: icon reactions plus an ellipsis for archive/delete. */
 export function GestureThumbTray({
   message,
   selfId,
-  speaker,
   burst,
   onToggle,
-  onClose,
+  onArchive,
+  onDelete,
 }: {
   message: ChatMsg
   selfId: string
-  speaker: string
+  speaker?: string
   burst?: GestureKind | null
   onToggle: (kind: GestureKind) => void
-  onClose: () => void
+  onClose?: () => void
+  onArchive?: () => void
+  onDelete?: () => void
 }) {
   const gestures = message.reactions ?? []
   const counts = gestureCounts(gestures)
   const mine = userGestureKinds(gestures, selfId)
   const votePrompt = message.votePrompt?.trim()
   const [popKind, setPopKind] = useState<GestureKind | null>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const pick = (kind: GestureKind) => {
     notifyNativeGesture(kind)
     setPopKind(kind)
     window.setTimeout(() => setPopKind((cur) => (cur === kind ? null : cur)), 480)
     onToggle(kind)
+    setMoreOpen(false)
     try {
       window.localStorage.setItem('bevel.gesture.hint', '1')
     } catch {
@@ -280,73 +287,97 @@ export function GestureThumbTray({
   }
 
   return (
-    <div className="fleet-chat-thumb-tray" role="dialog" aria-label="React to message">
-      <div className="fleet-chat-thumb-tray-head">
-        <p className="fleet-chat-thumb-tray-title">
-          React to {speaker}
-        </p>
-        <button
-          type="button"
-          className="fleet-chat-thumb-tray-close"
-          aria-label="Close reactions"
-          onClick={onClose}
-        >
-          <XMarkIcon className="fleet-chat-gesture-icon" />
-        </button>
-      </div>
+    <div
+      className="fleet-chat-action-bar"
+      role="toolbar"
+      aria-label="Message actions"
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       {votePrompt ? (
-        <div className="fleet-chat-thumb-vote" role="group" aria-label="Vote">
-          <p className="fleet-chat-vote-prompt">{votePrompt}</p>
-          <div className="fleet-chat-thumb-vote-row">
-            <button
-              type="button"
-              className="fleet-chat-thumb-btn fleet-chat-thumb-btn--vote"
-              data-active={mine.has('vote_yes') ? 'true' : 'false'}
-              data-pop={popKind === 'vote_yes' ? 'true' : undefined}
-              onClick={() => pick('vote_yes')}
-            >
-              <CheckIcon className="fleet-chat-thumb-icon" />
-              <span>Yes{counts.vote_yes ? ` ${counts.vote_yes}` : ''}</span>
-            </button>
-            <button
-              type="button"
-              className="fleet-chat-thumb-btn fleet-chat-thumb-btn--vote"
-              data-active={mine.has('vote_no') ? 'true' : 'false'}
-              data-pop={popKind === 'vote_no' ? 'true' : undefined}
-              onClick={() => pick('vote_no')}
-            >
-              <XMarkIcon className="fleet-chat-thumb-icon" />
-              <span>No{counts.vote_no ? ` ${counts.vote_no}` : ''}</span>
-            </button>
-          </div>
+        <div className="fleet-chat-action-votes" role="group" aria-label="Vote">
+          <button
+            type="button"
+            className="fleet-chat-action-btn"
+            data-active={mine.has('vote_yes') ? 'true' : 'false'}
+            aria-label="Yes"
+            onClick={() => pick('vote_yes')}
+          >
+            <CheckIcon className="fleet-chat-action-icon" />
+          </button>
+          <button
+            type="button"
+            className="fleet-chat-action-btn"
+            data-active={mine.has('vote_no') ? 'true' : 'false'}
+            aria-label="No"
+            onClick={() => pick('vote_no')}
+          >
+            <XMarkIcon className="fleet-chat-action-icon" />
+          </button>
         </div>
       ) : null}
-      <div className="fleet-chat-thumb-grid">
-        {SIGNALS.map(({ kind, label, Outline, Solid }, i) => {
-          const active = mine.has(kind)
-          const Icon = active ? Solid : Outline
-          const count = counts[kind]
-          return (
+      {SIGNALS.map(({ kind, label, Outline, Solid }) => {
+        const active = mine.has(kind)
+        const Icon = active ? Solid : Outline
+        const count = counts[kind]
+        return (
+          <button
+            key={kind}
+            type="button"
+            className="fleet-chat-action-btn"
+            data-kind={kind}
+            data-active={active ? 'true' : 'false'}
+            data-pop={popKind === kind || burst === kind ? 'true' : undefined}
+            aria-pressed={active}
+            aria-label={count ? `${label}, ${count}` : label}
+            onClick={() => pick(kind)}
+          >
+            <Icon className="fleet-chat-action-icon" />
+            {count > 0 ? (
+              <span className="fleet-chat-action-count">{count}</span>
+            ) : null}
+          </button>
+        )
+      })}
+      <span className="fleet-chat-action-sep" aria-hidden />
+      <div className="fleet-chat-action-more">
+        <button
+          type="button"
+          className="fleet-chat-action-btn"
+          aria-label="More actions"
+          aria-haspopup="menu"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen((open) => !open)}
+        >
+          <EllipsisHorizontalIcon className="fleet-chat-action-icon" />
+        </button>
+        {moreOpen ? (
+          <div className="fleet-chat-action-menu" role="menu">
             <button
-              key={kind}
               type="button"
-              className="fleet-chat-thumb-btn"
-              data-kind={kind}
-              data-active={active ? 'true' : 'false'}
-              data-pop={popKind === kind || burst === kind ? 'true' : undefined}
-              style={{ animationDelay: `${i * 35}ms` }}
-              aria-pressed={active}
-              aria-label={count ? `${label}, ${count}` : label}
-              onClick={() => pick(kind)}
+              role="menuitem"
+              className="fleet-chat-action-menu-item"
+              onClick={() => {
+                setMoreOpen(false)
+                onArchive?.()
+              }}
             >
-              <Icon className="fleet-chat-thumb-icon" />
-              <span className="fleet-chat-thumb-label">{label}</span>
-              {count > 0 ? (
-                <span className="fleet-chat-thumb-count">{count}</span>
-              ) : null}
+              <ArchiveBoxIcon className="fleet-chat-action-icon" />
+              Archive
             </button>
-          )
-        })}
+            <button
+              type="button"
+              role="menuitem"
+              className="fleet-chat-action-menu-item fleet-chat-action-menu-item--danger"
+              onClick={() => {
+                setMoreOpen(false)
+                onDelete?.()
+              }}
+            >
+              <TrashIcon className="fleet-chat-action-icon" />
+              Delete
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   )

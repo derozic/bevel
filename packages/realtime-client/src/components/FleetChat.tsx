@@ -386,6 +386,8 @@ function MessageRow({
   burst,
   onOpenDock,
   onCloseDock,
+  onArchive,
+  onDelete,
 }: {
   m: ChatMsg
   agents: FleetAgent[]
@@ -400,6 +402,8 @@ function MessageRow({
   burst?: GestureKind | null
   onOpenDock?: () => void
   onCloseDock?: () => void
+  onArchive?: () => void
+  onDelete?: () => void
 }) {
   const rowProps = {
     id: `msg-${m.id}`,
@@ -464,6 +468,16 @@ function MessageRow({
               dockOpen={dockOpen && !isSelf}
               onToggle={(kind) => onGesture(m.id, kind)}
               onCloseDock={onCloseDock}
+            />
+          ) : null}
+          {onGesture || onArchive || onDelete ? (
+            <GestureThumbTray
+              message={m}
+              selfId={selfId}
+              burst={!isSelf ? burst : null}
+              onToggle={(kind) => onGesture?.(m.id, kind)}
+              onArchive={onArchive}
+              onDelete={onDelete}
             />
           ) : null}
         </div>
@@ -532,6 +546,16 @@ function MessageRow({
             dockOpen={dockOpen}
             onToggle={(kind) => onGesture(m.id, kind)}
             onCloseDock={onCloseDock}
+          />
+        ) : null}
+        {onGesture || onArchive || onDelete ? (
+          <GestureThumbTray
+            message={m}
+            selfId={selfId}
+            burst={burst}
+            onToggle={(kind) => onGesture?.(m.id, kind)}
+            onArchive={onArchive}
+            onDelete={onDelete}
           />
         ) : null}
       </div>
@@ -1380,6 +1404,14 @@ export function FleetChat({
     room.send('gesture', { messageId, kind })
   }
 
+  function sendMessageAction(messageId: string, action: 'archive' | 'delete') {
+    const room = roomRef.current
+    if (!room || !connected) return
+    setMessages((prev) => prev.filter((row) => row.id !== messageId))
+    setGestureDockId(null)
+    room.send('message_action', { messageId, action })
+  }
+
   const loadEarlierHistory = () => {
     if (!isChannel || !connected || historyLoading || !historyHasMore) return
     if (!historyCursor.before) return
@@ -1422,11 +1454,6 @@ export function FleetChat({
     agentIds.length === 1 && sessionAgentNames[0]
       ? BEVEL_COPY.placeholderDirectSession(sessionAgentNames[0]!)
       : BEVEL_COPY.placeholderSession
-  const dockedMessage =
-    gestureDockId != null
-      ? messages.find((m) => m.id === gestureDockId) ?? null
-      : null
-
   return (
     <div
       className={cn('fleet-chat', fillViewport && 'fleet-chat--fill', className)}
@@ -1584,7 +1611,7 @@ export function FleetChat({
             const target = e.target as HTMLElement | null
             if (
               target?.closest(
-                '.fleet-chat-gesture-dock, .fleet-chat-gestures, .fleet-chat-thumb-tray',
+                '.fleet-chat-gesture-dock, .fleet-chat-gestures, .fleet-chat-thumb-tray, .fleet-chat-action-bar',
               )
             ) {
               return
@@ -1633,26 +1660,15 @@ export function FleetChat({
               burst={gestureBurst?.id === m.id ? gestureBurst.kind : null}
               onOpenDock={() => setGestureDockId(m.id)}
               onCloseDock={() => setGestureDockId(null)}
+              onArchive={
+                connected ? () => sendMessageAction(m.id, 'archive') : undefined
+              }
+              onDelete={
+                connected ? () => sendMessageAction(m.id, 'delete') : undefined
+              }
             />
           ))}
         </div>
-
-        {dockedMessage ? (
-          <GestureThumbTray
-            message={dockedMessage}
-            selfId={selfId}
-            speaker={
-              catalog.find((a) => a.id === dockedMessage.agentId)?.name ||
-              dockedMessage.speaker ||
-              'this message'
-            }
-            burst={
-              gestureBurst?.id === dockedMessage.id ? gestureBurst.kind : null
-            }
-            onToggle={(kind) => sendGesture(dockedMessage.id, kind)}
-            onClose={() => setGestureDockId(null)}
-          />
-        ) : null}
 
         {fleet.githubAuthEnabled && !fleet.canPutOnWork ? (
           <div className="fleet-chat-work-hint">

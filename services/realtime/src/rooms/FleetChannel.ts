@@ -7,6 +7,7 @@ import {
   fetchChannel,
   fetchChannelMessagesPage,
   persistChannelGesture,
+  persistChannelMessageLifecycle,
   type FleetChannelMessageRecord,
 } from '../fleet-channel-api.js'
 import { enqueuePersist, flushPersistQueue } from '../persist-queue.js'
@@ -89,6 +90,11 @@ type LoadHistoryPayload = {
 type GesturePayload = {
   messageId?: string
   kind?: string
+}
+
+type MessageActionPayload = {
+  messageId?: string
+  action?: string
 }
 
 /** Initial room hydrate size (Colyseus shared state). Older history is paged per-client. */
@@ -190,6 +196,9 @@ export class FleetChannel extends Room {
     })
     this.onMessage('gesture', (client, payload: GesturePayload) => {
       void this.handleGesture(client, payload)
+    })
+    this.onMessage('message_action', (client, payload: MessageActionPayload) => {
+      void this.handleMessageAction(client, payload)
     })
     void this.hydrateFromApi(options)
   }
@@ -369,6 +378,34 @@ export class FleetChannel extends Room {
       if (row?.id === id) return row
     }
     return undefined
+  }
+
+  private async handleMessageAction(client: Client, payload: MessageActionPayload) {
+    const actionRaw = String(payload.action ?? '').trim().toLowerCase()
+    const messageId = String(payload.messageId ?? '').trim()
+    if (!messageId || (actionRaw !== 'delete' && actionRaw !== 'archive')) return
+    const profile = this.speakerProfiles.get(client.sessionId)
+    if (!profile) return
+    const msg = this.findMessage(messageId)
+    if (!msg) return
+    this.removeMessageById(messageId)
+    recordEvent({
+      ts: Date.now(),
+      sessionId: this.channelSlug,
+      type: 'message_action',
+      speaker: profile.name,
+      speakerType: 'human',
+      body: `${actionRaw} ${messageId}`,
+      meta: { messageId, action: actionRaw, agentId: msg.agentId },
+    })
+    void enqueuePersist(`lifecycle:${messageId}`, () =>
+      persistChannelMessageLifecycle(
+        this.channelSlug,
+        messageId,
+        actionRaw,
+        this.tenantSlug || null,
+      ),
+    )
   }
 
   private async handleGesture(client: Client, payload: GesturePayload) {
