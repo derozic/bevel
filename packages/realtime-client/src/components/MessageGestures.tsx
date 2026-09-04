@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArchiveBoxIcon,
   CheckIcon,
@@ -8,6 +8,7 @@ import {
   HandThumbDownIcon,
   HandThumbUpIcon,
   HeartIcon,
+  LinkIcon,
   StarIcon,
   TrashIcon,
   XMarkIcon,
@@ -27,6 +28,31 @@ import {
 } from '@bevel/schema'
 import type { ChatMsg } from '../lib/colyseus-messages'
 import { notifyNativeGesture } from '../lib/bubble-gestures'
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    /* fall through to execCommand */
+  }
+  try {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.setAttribute('readonly', '')
+    el.style.position = 'fixed'
+    el.style.left = '-9999px'
+    document.body.appendChild(el)
+    el.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(el)
+    return ok
+  } catch {
+    return false
+  }
+}
 
 const SIGNALS: Array<{
   kind: GestureKind
@@ -201,6 +227,7 @@ export function GestureThumbTray({
   message,
   selfId,
   burst,
+  permalink,
   onToggle,
   onArchive,
   onDelete,
@@ -209,6 +236,7 @@ export function GestureThumbTray({
   selfId: string
   speaker?: string
   burst?: GestureKind | null
+  permalink?: string
   onToggle: (kind: GestureKind) => void
   onClose?: () => void
   onArchive?: () => void
@@ -220,18 +248,64 @@ export function GestureThumbTray({
   const votePrompt = message.votePrompt?.trim()
   const [popKind, setPopKind] = useState<GestureKind | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
+  const copiedTimer = useRef<number | null>(null)
+
+  const copyLink = useCallback(async () => {
+    if (!permalink) return
+    const absolute = permalink.startsWith('http')
+      ? permalink
+      : permalink.startsWith('?')
+        ? `${window.location.origin}${window.location.pathname}${permalink}`
+        : `${window.location.origin}${permalink}`
+    const ok = await copyText(absolute)
+    if (!ok) return
+    setCopied(true)
+    if (copiedTimer.current) window.clearTimeout(copiedTimer.current)
+    copiedTimer.current = window.setTimeout(() => {
+      setCopied(false)
+      setMoreOpen(false)
+    }, 900)
+  }, [permalink])
 
   useEffect(() => {
-    if (!moreOpen) return
+    if (!moreOpen) {
+      setCopied(false)
+      return
+    }
     const onDoc = (event: PointerEvent) => {
       const target = event.target as Node | null
       if (target && moreRef.current?.contains(target)) return
       setMoreOpen(false)
     }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMoreOpen(false)
+        return
+      }
+      if ((event.key === 'l' || event.key === 'L') && permalink) {
+        event.preventDefault()
+        event.stopPropagation()
+        void copyLink()
+      }
+    }
     document.addEventListener('pointerdown', onDoc)
-    return () => document.removeEventListener('pointerdown', onDoc)
-  }, [moreOpen])
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('pointerdown', onDoc)
+      document.removeEventListener('keydown', onKey, true)
+    }
+  }, [moreOpen, permalink, copyLink])
+
+  useEffect(
+    () => () => {
+      if (copiedTimer.current) window.clearTimeout(copiedTimer.current)
+    },
+    [],
+  )
 
   const pick = (kind: GestureKind) => {
     notifyNativeGesture(kind)
@@ -310,30 +384,63 @@ export function GestureThumbTray({
         </button>
         {moreOpen ? (
           <div className="fleet-chat-action-menu" role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              className="fleet-chat-action-menu-item"
-              onClick={() => {
-                setMoreOpen(false)
-                onArchive?.()
-              }}
-            >
-              <ArchiveBoxIcon className="fleet-chat-action-icon" />
-              Archive
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className="fleet-chat-action-menu-item fleet-chat-action-menu-item--danger"
-              onClick={() => {
-                setMoreOpen(false)
-                onDelete?.()
-              }}
-            >
-              <TrashIcon className="fleet-chat-action-icon" />
-              Delete
-            </button>
+            {permalink ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="fleet-chat-action-menu-item"
+                onClick={() => {
+                  void copyLink()
+                }}
+              >
+                <span className="fleet-chat-action-menu-main">
+                  {copied ? (
+                    <CheckIcon className="fleet-chat-action-icon" />
+                  ) : (
+                    <LinkIcon className="fleet-chat-action-icon" />
+                  )}
+                  {copied ? 'Copied' : 'Copy link'}
+                </span>
+                {copied ? null : (
+                  <span className="fleet-chat-action-menu-kbd">L</span>
+                )}
+              </button>
+            ) : null}
+            {onArchive ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="fleet-chat-action-menu-item"
+                onClick={() => {
+                  setMoreOpen(false)
+                  onArchive()
+                }}
+              >
+                <span className="fleet-chat-action-menu-main">
+                  <ArchiveBoxIcon className="fleet-chat-action-icon" />
+                  Archive
+                </span>
+              </button>
+            ) : null}
+            {onDelete ? (
+              <>
+                <span className="fleet-chat-action-menu-sep" aria-hidden />
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="fleet-chat-action-menu-item fleet-chat-action-menu-item--danger"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    onDelete()
+                  }}
+                >
+                  <span className="fleet-chat-action-menu-main">
+                    <TrashIcon className="fleet-chat-action-icon" />
+                    Delete message
+                  </span>
+                </button>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>

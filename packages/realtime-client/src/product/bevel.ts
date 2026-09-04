@@ -54,3 +54,38 @@ export const BEVEL_PRODUCT = {
 } as const
 
 export type BevelProduct = typeof BEVEL_PRODUCT
+
+/** Canonical jump path: `/~general?msg=` or `/session/:id?msg=`. */
+export function messagePermalinkPath(opts: {
+  kind: 'channel' | 'session'
+  channelSlug?: string
+  sessionId?: string | null
+  messageId: string
+}): string {
+  const msg = encodeURIComponent(opts.messageId)
+  if (opts.kind === 'channel') {
+    const slug = (opts.channelSlug || 'general').trim().replace(/^[#^~]+/, '').toLowerCase()
+    return `/~${slug}?msg=${msg}`
+  }
+  if (opts.sessionId) {
+    return `/session/${encodeURIComponent(opts.sessionId)}?msg=${msg}`
+  }
+  return `?msg=${msg}`
+}
+
+/** Absolute permalink for Copy link (current host + canonical path). */
+export function messagePermalink(opts: {
+  kind: 'channel' | 'session'
+  channelSlug?: string
+  sessionId?: string | null
+  messageId: string
+}): string {
+  const path = messagePermalinkPath(opts)
+  if (typeof window === 'undefined') return path
+  if (path.startsWith('?')) {
+    const url = new URL(window.location.href)
+    url.searchParams.set('msg', opts.messageId)
+    return url.toString()
+  }
+  return `${window.location.origin}${path}`
+}

@@ -53,7 +53,7 @@ import {
   resolveBevelConnectionIssue,
   type BevelConnectionIssue,
 } from '../product/bevel-copy'
-import { channelTag } from '../product/bevel'
+import { channelTag, messagePermalinkPath } from '../product/bevel'
 import type { FleetAgent } from '../types'
 import { AgentChip } from './AgentChip'
 import { HumanAvatar } from './HumanAvatar'
@@ -387,6 +387,7 @@ function MessageRow({
   onOpenDock,
   onArchive,
   onDelete,
+  permalink,
 }: {
   m: ChatMsg
   agents: FleetAgent[]
@@ -402,6 +403,7 @@ function MessageRow({
   onOpenDock?: () => void
   onArchive?: () => void
   onDelete?: () => void
+  permalink?: string
 }) {
   const rowProps = {
     id: `msg-${m.id}`,
@@ -466,11 +468,12 @@ function MessageRow({
               onToggle={(kind) => onGesture(m.id, kind)}
             />
           ) : null}
-          {onGesture || onArchive || onDelete ? (
+          {onGesture || onArchive || onDelete || permalink ? (
             <GestureThumbTray
               message={m}
               selfId={selfId}
               burst={!isSelf ? burst : null}
+              permalink={permalink}
               onToggle={(kind) => onGesture?.(m.id, kind)}
               onArchive={onArchive}
               onDelete={onDelete}
@@ -542,11 +545,12 @@ function MessageRow({
             onToggle={(kind) => onGesture(m.id, kind)}
           />
         ) : null}
-        {onGesture || onArchive || onDelete ? (
+        {onGesture || onArchive || onDelete || permalink ? (
           <GestureThumbTray
             message={m}
             selfId={selfId}
             burst={burst}
+            permalink={permalink}
             onToggle={(kind) => onGesture?.(m.id, kind)}
             onArchive={onArchive}
             onDelete={onDelete}
@@ -1659,6 +1663,12 @@ export function FleetChat({
               onDelete={
                 connected ? () => sendMessageAction(m.id, 'delete') : undefined
               }
+              permalink={messagePermalinkPath({
+                kind: isChannel ? 'channel' : 'session',
+                channelSlug,
+                sessionId: sessionId || resumeSessionId,
+                messageId: m.id,
+              })}
             />
           ))}
         </div>

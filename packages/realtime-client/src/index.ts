@@ -31,6 +31,8 @@ export {
   CHANNEL_ESCALATED_PREFIX,
   channelTag,
   isEscalatedChannelTag,
+  messagePermalink,
+  messagePermalinkPath,
   type BevelProduct,
 } from './product/bevel'
 export {
