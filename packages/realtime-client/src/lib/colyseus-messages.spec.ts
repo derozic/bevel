@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   dedupeMessagesById,
   isValidSchemaMessage,
+  readHumanParticipants,
   readSchemaMessages,
   toChatMsg,
   type ChatMsg,
@@ -57,5 +58,25 @@ describe('room messages', () => {
     const next = dedupeMessagesById(prev)
     expect(next).toHaveLength(1)
     expect(next[0]!.body).toBe('two')
+  })
+})
+
+describe('human presence', () => {
+  it('treats rooms without status as here', () => {
+    const list = readHumanParticipants({
+      length: 1,
+      0: { clientId: 'c1', userId: 'u1', name: 'Scott' },
+    })
+    expect(list).toHaveLength(1)
+    expect(list[0]!.status).toBe('here')
+  })
+
+  it('keeps idle and reconnecting', () => {
+    const list = readHumanParticipants({
+      length: 2,
+      0: { clientId: 'c1', userId: 'u1', name: 'Scott', status: 'idle' },
+      1: { clientId: 'c2', userId: 'u2', name: 'Ada', status: 'reconnecting' },
+    })
+    expect(list.map((p) => p.status)).toEqual(['idle', 'reconnecting'])
   })
 })
