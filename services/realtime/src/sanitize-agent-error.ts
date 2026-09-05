@@ -126,10 +126,10 @@ export function sanitizeAgentError(
   }
 }
 
-/** OpenRouter key-cap / auth failures that a native xAI or Anthropic key can cover. */
+/** OpenRouter key-cap, auth, or retired-model failures a native key can cover. */
 export function shouldFallbackToNative(reason: unknown): boolean {
   const code = sanitizeAgentError('agent', reason).code
-  return code === 'forbidden' || code === 'auth'
+  return code === 'forbidden' || code === 'auth' || code === 'model'
 }
 
 /** True when a fulfilled agent reply is actually a leaked stack / provider dump. */

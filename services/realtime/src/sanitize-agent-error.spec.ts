@@ -46,7 +46,7 @@ describe('sanitizeAgentError', () => {
     expect(shouldFallbackToNative(new Error('Unauthorized'))).toBe(true)
     expect(
       shouldFallbackToNative(new Error('Request failed with status code 404')),
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('rewrites leaked runner stacks that arrived as fulfilled output', () => {
