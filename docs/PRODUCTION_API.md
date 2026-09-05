@@ -151,6 +151,12 @@ realtime.bevel.is {
 	}
 	reverse_proxy 127.0.0.1:43208 {
 		flush_interval -1
+		transport http {
+			versions 1.1
+			read_timeout 0
+			write_timeout 0
+			dial_timeout 10s
+		}
 	}
 }
 ```

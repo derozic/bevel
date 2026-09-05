@@ -71,5 +71,12 @@ export {
   dedupeHumanParticipantsByUser,
   type ChatMsg,
   type HumanParticipant,
+  type PresenceStatus,
 } from './lib/colyseus-messages'
+export {
+  channelLampState,
+  channelLampLabel,
+  coercePresenceStatus,
+  type ChannelLamp,
+} from './lib/channel-lamp'
 export { cn } from './lib/utils'

@@ -46,6 +46,12 @@ import {
   sanitizeErrorText,
 } from '../lib/format-error'
 import { pinRealtimeEndpoint } from '../lib/realtime-client'
+import {
+  channelLampLabel,
+  channelLampState,
+  coercePresenceStatus,
+  isAbnormalClose,
+} from '../lib/channel-lamp'
 import { cn } from '../lib/utils'
 import {
   BEVEL_COPY,
@@ -277,7 +283,7 @@ function sameParticipants(a: HumanParticipant[], b: HumanParticipant[]): boolean
   if (a.length !== b.length) return false
   const key = (list: HumanParticipant[]) =>
     list
-      .map((p) => `${p.userId}:${p.clientId}`)
+      .map((p) => `${p.userId}:${p.clientId}:${p.status ?? 'here'}:${p.seats ?? 1}`)
       .sort()
       .join('\0')
   return key(a) === key(b)
@@ -668,6 +674,10 @@ export function FleetChat({
   const joinedRoomKeyRef = useRef<string | null>(null)
   const priorRoomKeyRef = useRef<string | undefined>(undefined)
   const connectGenRef = useRef(0)
+  const leaveTimerRef = useRef<number | null>(null)
+  const lastInputAtRef = useRef(Date.now())
+  const lastPresenceSentRef = useRef(0)
+  const [reconnecting, setReconnecting] = useState(false)
   const tokenReady = Boolean(tokenRef.current)
   // People currently in the room. When a userMenu (account avatar) is mounted,
   // drop the current user from presence so we do not show two identical faces —
@@ -790,11 +800,41 @@ export function FleetChat({
     // immediately tear the seat down when session/html hydrates to 2x4m.
     if (isChannel && !fleet.tenantSlug) return
 
-    const gen = ++connectGenRef.current
-    let cancelled = false
+    if (leaveTimerRef.current) {
+      window.clearTimeout(leaveTimerRef.current)
+      leaveTimerRef.current = null
+    }
+
     const previousRoomKey = priorRoomKeyRef.current
     const switchingRoom = previousRoomKey !== undefined && previousRoomKey !== roomKey
     priorRoomKeyRef.current = roomKey
+
+    if (
+      !switchingRoom &&
+      roomRef.current &&
+      joinedRoomKeyRef.current === roomKey
+    ) {
+      return () => {
+        const room = roomRef.current
+        const key = roomKey
+        leaveTimerRef.current = window.setTimeout(() => {
+          if (joinedRoomKeyRef.current !== key || roomRef.current !== room) return
+          room?.leave()
+          if (roomRef.current === room) {
+            roomRef.current = null
+            joinedRoomKeyRef.current = null
+          }
+        }, 250)
+      }
+    }
+
+    const gen = ++connectGenRef.current
+    let cancelled = false
+
+    if (switchingRoom && roomRef.current) {
+      roomRef.current.leave()
+      roomRef.current = null
+    }
 
     if (switchingRoom && previousRoomKey) {
       writeRoomSnapshot(previousRoomKey, {
@@ -899,9 +939,21 @@ export function FleetChat({
         try {
           roomRef.current = room
           joinedRoomKeyRef.current = roomKey
+          room.reconnection.enabled = true
+          room.reconnection.minUptime = 1_000
+          room.reconnection.maxRetries = 20
           setConnected(true)
+          setReconnecting(false)
           setIssue(null)
           setSessionId(room.roomId)
+          lastInputAtRef.current = Date.now()
+          room.send('presence', {
+            visible:
+              typeof document === 'undefined'
+                ? true
+                : document.visibilityState === 'visible',
+            lastInputAt: lastInputAtRef.current,
+          })
 
           type RoomState = {
             sessionId?: string
@@ -1075,12 +1127,46 @@ export function FleetChat({
             },
           )
 
-          room.onLeave(() => {
+          room.onDrop(() => {
             if (cancelled || connectGenRef.current !== gen) return
+            setReconnecting(true)
+            setConnected(false)
+            setIssue({ title: BEVEL_COPY.reconnecting })
+          })
+          room.onReconnect(() => {
+            if (cancelled || connectGenRef.current !== gen) return
+            setReconnecting(false)
+            setConnected(true)
+            setIssue(null)
+            room.send('presence', {
+              visible: document.visibilityState === 'visible',
+              lastInputAt: lastInputAtRef.current,
+            })
+          })
+          room.onLeave((code) => {
+            if (cancelled || connectGenRef.current !== gen) return
+            if (room.reconnection?.isReconnecting) {
+              setReconnecting(true)
+              setConnected(false)
+              setIssue({ title: BEVEL_COPY.reconnecting })
+              return
+            }
             if (joinedRoomKeyRef.current === roomKey) {
               joinedRoomKeyRef.current = null
             }
+            if (roomRef.current === room) roomRef.current = null
+            setReconnecting(false)
             setConnected(false)
+            if (
+              isAbnormalClose(code) &&
+              jwtStillValid(tokenRef.current) &&
+              connectionAttempt < SEAT_RETRY_MAX
+            ) {
+              setIssue({ title: BEVEL_COPY.reconnecting })
+              scheduleSeatRetry(() => cancelled, () =>
+                setConnectionAttempt((n) => n + 1),
+              )
+            }
           })
         } catch (e) {
           setIssue({
@@ -1108,12 +1194,50 @@ export function FleetChat({
       cancelled = true
       window.clearTimeout(joinDelay)
       window.clearTimeout(connectTimeout)
-      if (connectGenRef.current === gen) {
-        roomRef.current?.leave()
-        roomRef.current = null
-      }
+      const room = roomRef.current
+      const key = roomKey
+      leaveTimerRef.current = window.setTimeout(() => {
+        if (joinedRoomKeyRef.current !== key || roomRef.current !== room) return
+        room?.leave()
+        if (roomRef.current === room) {
+          roomRef.current = null
+          joinedRoomKeyRef.current = null
+        }
+      }, 250)
     }
   }, [roomKey, connectionAttempt, fleet.realtimeUrl, isChannel, tokenReady, tenantSlug, fleet.tenantSlug])
+
+  function bumpPresence(fromInput = false) {
+    const room = roomRef.current
+    if (!room) return
+    const now = Date.now()
+    if (fromInput) lastInputAtRef.current = now
+    if (now - lastPresenceSentRef.current < 1_500 && !fromInput) return
+    if (fromInput && now - lastPresenceSentRef.current < 1_200) return
+    lastPresenceSentRef.current = now
+    room.send('presence', {
+      visible: document.visibilityState === 'visible',
+      lastInputAt: lastInputAtRef.current,
+    })
+  }
+
+  useEffect(() => {
+    if (!connected) return
+    const send = () => bumpPresence(false)
+    send()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') lastInputAtRef.current = Date.now()
+      bumpPresence(document.visibilityState === 'visible')
+    }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onVis)
+    const id = window.setInterval(send, 25_000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', onVis)
+      window.clearInterval(id)
+    }
+  }, [connected, roomKey])
 
   useEffect(() => {
     writeRoomSnapshot(roomKey, {
@@ -1435,6 +1559,22 @@ export function FleetChat({
     ? BEVEL_COPY.connectingChannel(channelSlug)
     : BEVEL_COPY.connectingSession
   const statusLabel = headerLabel
+  const lamp = channelLampState({
+    connected,
+    reconnecting:
+      reconnecting ||
+      issue?.title === BEVEL_COPY.reconnecting ||
+      issue?.title === BEVEL_COPY.errors.seatReservationRetry,
+  })
+  const selfPresence = (() => {
+    const mine = participants.find(
+      (p) => p.userId?.trim() && p.userId.trim() === fleet.userId?.trim(),
+    )
+    if (mine?.status) return coercePresenceStatus(mine.status)
+    if (connected) return 'here' as const
+    if (reconnecting) return 'reconnecting' as const
+    return undefined
+  })()
   const showConnectingNotice = !connected && !issue && tokenReady
 
   const sampleAgent = agentIds[0] ?? catalog[0]?.id
@@ -1469,7 +1609,12 @@ export function FleetChat({
             </button>
           ) : null}
           <span className="fleet-chat-header-title">
-            <span className="fleet-chat-live-dot" data-live={live ? 'true' : 'false'} aria-hidden />
+            <span
+              className="fleet-chat-channel-lamp"
+              data-lamp={lamp}
+              aria-label={channelLampLabel(lamp)}
+              title={channelLampLabel(lamp)}
+            />
             {statusLabel}
           </span>
           <span className="fleet-chat-replay-slot">
@@ -1495,6 +1640,7 @@ export function FleetChat({
                     name={p.name}
                     avatarUrl={p.avatar}
                     size="sm"
+                    presence={coercePresenceStatus(p.status)}
                   />
                 ))}
               </div>
@@ -1505,6 +1651,13 @@ export function FleetChat({
           {userMenu ? (
             <div className="fleet-chat-user-menu" data-account-menu>
               {userMenu}
+              {selfPresence ? (
+                <span
+                  className="fleet-presence-pip"
+                  data-presence={selfPresence}
+                  aria-label={selfPresence}
+                />
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -1827,6 +1980,7 @@ export function FleetChat({
                 setInput(e.target.value)
                 setCaret(e.target.selectionStart ?? e.target.value.length)
                 setMentionHighlight(0)
+                bumpPresence(true)
               }}
               onSelect={(e) => {
                 const t = e.currentTarget

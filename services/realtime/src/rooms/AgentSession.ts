@@ -32,7 +32,11 @@ import {
   HumanPresence,
 } from '../schema/ChatState.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
-import { removeHumansByUserId } from '../human-presence.js'
+import {
+  HumanPresenceBook,
+  PRESENCE_RECONNECT_SECONDS,
+  PRESENCE_TICK_MS,
+} from '../human-presence.js'
 import { publicAgentBubble, sanitizeAgentError } from '../sanitize-agent-error.js'
 import {
   SYSTEM_SPEAKER,
@@ -132,11 +136,13 @@ function recordToChatMessage(
 }
 
 export class AgentSession extends Room {
-  maxClients = 32
+  maxClients = 8
+  seatReservationTimeout = 45
   declare state: AgentSessionState
   private speakerNames = new Map<string, string>()
   private speakerProfiles = new Map<string, SpeakerProfile>()
   private persistSlug = 'dm-session'
+  private humans: HumanPresenceBook<HumanPresence> | null = null
 
   static async onAuth(
     token: string,
@@ -211,6 +217,23 @@ export class AgentSession extends Room {
     this.onMessage('message_action', (client, payload: MessageActionPayload) => {
       void this.handleMessageAction(client, payload)
     })
+    this.onMessage(
+      'presence',
+      (client, payload: { visible?: boolean; lastInputAt?: number }) => {
+        this.humans?.heartbeat(client.sessionId, {
+          visible: payload?.visible,
+          lastInputAt: payload?.lastInputAt,
+          now: Date.now(),
+        })
+        this.publishOccupancy()
+      },
+    )
+    this.humans = new HumanPresenceBook(this.state.humans, () => new HumanPresence())
+    this.clock.setInterval(() => {
+      this.humans?.tick(Date.now())
+      this.publishOccupancy()
+    }, PRESENCE_TICK_MS)
+    this.publishOccupancy()
   }
 
   async onDispose() {
@@ -236,15 +259,14 @@ export class AgentSession extends Room {
     }
     this.speakerNames.set(client.sessionId, name)
     this.speakerProfiles.set(client.sessionId, profile)
-
-    removeHumansByUserId(this.state.humans, profile.userId)
-
-    const row = new HumanPresence()
-    row.clientId = client.sessionId
-    row.userId = profile.userId
-    row.name = profile.name
-    row.avatar = profile.avatar
-    this.state.humans.push(row)
+    this.humans?.join({
+      sessionId: client.sessionId,
+      userId: profile.userId,
+      name: profile.name,
+      avatar: profile.avatar,
+      now: Date.now(),
+    })
+    this.publishOccupancy()
 
     const body = memberJoined(name)
     this.pushSystemMessage(body, 'final')
@@ -256,6 +278,25 @@ export class AgentSession extends Room {
       speakerType: 'system',
       body,
     })
+  }
+
+  onDrop(client: Client) {
+    this.humans?.drop(client.sessionId, Date.now())
+    this.publishOccupancy()
+    void this.allowReconnection(client, PRESENCE_RECONNECT_SECONDS).then(
+      () => {
+        this.humans?.reconnect(client.sessionId, Date.now())
+        this.publishOccupancy()
+      },
+      () => {
+        /* onLeave removes the seat */
+      },
+    )
+  }
+
+  onReconnect(client: Client) {
+    this.humans?.reconnect(client.sessionId, Date.now())
+    this.publishOccupancy()
   }
 
   onLeave(client: Client) {
@@ -272,12 +313,17 @@ export class AgentSession extends Room {
     })
     this.speakerNames.delete(client.sessionId)
     this.speakerProfiles.delete(client.sessionId)
-    for (let i = 0; i < this.state.humans.length; i++) {
-      if (this.state.humans[i]?.clientId === client.sessionId) {
-        this.state.humans.splice(i, 1)
-        break
-      }
-    }
+    this.humans?.leave(client.sessionId, Date.now())
+    this.publishOccupancy()
+  }
+
+  private publishOccupancy() {
+    const occupancy = this.humans?.occupancy() ?? { humans: 0, reconnecting: 0 }
+    this.setMetadata({
+      sessionId: this.state.sessionId,
+      humans: occupancy.humans,
+      reconnecting: occupancy.reconnecting,
+    })
   }
 
   private pushSystemMessage(body: string, status: ChatMessage['status']): ChatMessage {

@@ -22,6 +22,11 @@ export class HumanPresence extends Schema {
   @type('string') userId: string = ''
   @type('string') name: string = ''
   @type('string') avatar: string = ''
+  /** here | idle | reconnecting */
+  @type('string') status: string = 'here'
+  @type('number') lastSeenAt: number = 0
+  @type('number') lastInputAt: number = 0
+  @type('number') seats: number = 1
 }
 
 export class AgentPresence extends Schema {
