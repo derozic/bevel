@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  dispatchFleetNativeFallback,
   dispatchPlatformAgentChat,
   isPlatformAgent,
 } from './platform-providers'
@@ -135,6 +136,30 @@ describe('platform providers', () => {
     })
     const body = JSON.parse(String(init.body))
     expect(body.model).toBe('grok-4.3')
+  })
+
+  it('routes fleet OpenRouter 403s through native Grok', async () => {
+    process.env.XAI_API_KEY = 'xai-test'
+    delete process.env.GROK_API_KEY
+    delete process.env.ANTHROPIC_API_KEY
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'hermes via xai' } }],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await dispatchFleetNativeFallback('hermes', 'ping', [])
+    expect(res.output).toBe('hermes via xai')
+    expect(res.model).toBe('grok-4.3')
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://api.x.ai/v1/chat/completions')
+    expect(init.headers).toMatchObject({
+      authorization: 'Bearer xai-test',
+    })
+    const body = JSON.parse(String(init.body))
+    expect(body.messages[0].content).toMatch(/You are hermes/)
   })
 
   it('posts OpenAI-compatible chat completions for ChatGPT', async () => {

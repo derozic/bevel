@@ -52,6 +52,26 @@ function systemPrompt(id: PlatformAgentId): string {
   ].join(' ')
 }
 
+function fleetFallbackSystemPrompt(agentId: string): string {
+  const name = agentId.trim() || 'fleet agent'
+  return [
+    `You are ${name}, a BEVEL fleet agent in a multi-party channel with humans and other agents.`,
+    'Stay in character. Be concrete. No emoji in code or formal artifacts.',
+    'If another agent is in the thread, build on them — do not pretend to be them.',
+  ].join(' ')
+}
+
+function openAiCompatibleMessages(
+  system: string,
+  message: string,
+  history: ChatTurn[],
+) {
+  const prior = history
+    .filter((h) => h.role === 'user' || h.role === 'assistant')
+    .map((h) => ({ role: h.role as 'user' | 'assistant', content: h.content }))
+  return [{ role: 'system' as const, content: system }, ...prior, { role: 'user' as const, content: message }]
+}
+
 function openAiMessages(id: PlatformAgentId, message: string, history: ChatTurn[]) {
   const prior = history
     .filter((h) => h.role === 'user' || h.role === 'assistant')
@@ -221,4 +241,92 @@ async function dispatchNative(
     throw new Error(err?.message || `${name} request failed: ${status}`)
   }
   return { output: openAiText(json) || '…', model, confidence: 0.7 }
+}
+
+/**
+ * Fleet Hermes/Loom/Johnny go through OpenRouter. When that key is capped,
+ * reuse the native xAI or Anthropic keys already on realtime.
+ */
+export async function dispatchFleetNativeFallback(
+  agentId: string,
+  message: string,
+  history: ChatTurn[] = [],
+): Promise<PlatformChatResult> {
+  const system = fleetFallbackSystemPrompt(agentId)
+  const xaiKey = (process.env.GROK_API_KEY || process.env.XAI_API_KEY || '').trim()
+  const anthropicKey = (process.env.ANTHROPIC_API_KEY || '').trim()
+  if (xaiKey) {
+    try {
+      return await dispatchNativeOpenAi(
+        'https://api.x.ai/v1/chat/completions',
+        xaiKey,
+        process.env.GROK_MODEL?.trim() || 'grok-4.3',
+        system,
+        message,
+        history,
+        agentId,
+      )
+    } catch (err) {
+      if (!anthropicKey) throw err
+    }
+  }
+  if (anthropicKey) {
+    return await dispatchNativeClaude(anthropicKey, system, message, history)
+  }
+  throw new Error(
+    `${agentId} cannot fall back to a native provider. Set XAI_API_KEY or ANTHROPIC_API_KEY on realtime.`,
+  )
+}
+
+async function dispatchNativeOpenAi(
+  url: string,
+  key: string,
+  model: string,
+  system: string,
+  message: string,
+  history: ChatTurn[],
+  name: string,
+): Promise<PlatformChatResult> {
+  const { status, json } = await postJson(
+    url,
+    { authorization: `Bearer ${key}` },
+    {
+      model,
+      temperature: 0.7,
+      messages: openAiCompatibleMessages(system, message, history),
+    },
+  )
+  if (status !== 200) {
+    const err = json.error as { message?: string } | undefined
+    throw new Error(err?.message || `${name} native request failed: ${status}`)
+  }
+  return { output: openAiText(json) || '…', model, confidence: 0.7 }
+}
+
+async function dispatchNativeClaude(
+  key: string,
+  system: string,
+  message: string,
+  history: ChatTurn[],
+): Promise<PlatformChatResult> {
+  const model = process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-5'
+  const { status, json } = await postJson(
+    'https://api.anthropic.com/v1/messages',
+    {
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+    },
+    {
+      model,
+      max_tokens: 4096,
+      temperature: 0.7,
+      system,
+      messages: claudeMessages(message, history),
+    },
+  )
+  if (status !== 200) {
+    const err = json.error as { message?: string } | undefined
+    throw new Error(err?.message || `Claude native request failed: ${status}`)
+  }
+  return { output: claudeText(json) || '…', model, confidence: 0.7 }
 }

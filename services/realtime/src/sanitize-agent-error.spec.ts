@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { publicAgentBubble, sanitizeAgentError } from './sanitize-agent-error'
+import {
+  publicAgentBubble,
+  sanitizeAgentError,
+  shouldFallbackToNative,
+} from './sanitize-agent-error'
 
 describe('sanitizeAgentError', () => {
   it('does not leak Bearer tokens or runner stacks', () => {
@@ -30,6 +34,19 @@ describe('sanitizeAgentError', () => {
     )
     expect(out.code).toBe('model')
     expect(out.publicMessage).toMatch(/model routing/)
+  })
+
+  it('falls back to native keys on OpenRouter 403 and auth misses', () => {
+    expect(
+      shouldFallbackToNative(new Error('Request failed with status code 403')),
+    ).toBe(true)
+    expect(
+      shouldFallbackToNative(new Error('You have no credits remaining')),
+    ).toBe(true)
+    expect(shouldFallbackToNative(new Error('Unauthorized'))).toBe(true)
+    expect(
+      shouldFallbackToNative(new Error('Request failed with status code 404')),
+    ).toBe(false)
   })
 
   it('rewrites leaked runner stacks that arrived as fulfilled output', () => {

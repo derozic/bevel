@@ -4,9 +4,11 @@ import { join } from 'node:path'
 import { config } from './config.js'
 import { resolveWorkspaceForRepo } from './work-repos.js'
 import {
+  dispatchFleetNativeFallback,
   dispatchPlatformAgentChat,
   isPlatformAgent,
 } from './platform-providers.js'
+import { shouldFallbackToNative } from './sanitize-agent-error.js'
 
 const require = createRequire(import.meta.url)
 
@@ -76,17 +78,25 @@ export async function dispatchAgentChat(
   if (typeof runAgentChat !== 'function') {
     throw new Error('Fleet runner is missing runAgentChat')
   }
-  const res = await runAgentChat(agentId, message, history, {
-    metadata: {
-      personalAgent: opts.personalAgent === true,
-      solo: opts.personalAgent === true,
-      role: opts.personalAgent ? 'personal' : 'fleet',
-      channelSlug: opts.channelSlug,
-      tenant: opts.tenant,
-      fleet: opts.personalAgent !== true,
-    },
-  })
-  return res
+  try {
+    return await runAgentChat(agentId, message, history, {
+      metadata: {
+        personalAgent: opts.personalAgent === true,
+        solo: opts.personalAgent === true,
+        role: opts.personalAgent ? 'personal' : 'fleet',
+        channelSlug: opts.channelSlug,
+        tenant: opts.tenant,
+        fleet: opts.personalAgent !== true,
+      },
+    })
+  } catch (err) {
+    if (!shouldFallbackToNative(err)) throw err
+    try {
+      return await dispatchFleetNativeFallback(agentId, message, history)
+    } catch {
+      throw err
+    }
+  }
 }
 
 export async function dispatchAgentWork(
@@ -106,9 +116,17 @@ export async function dispatchAgentWork(
   if (typeof runAgentWork !== 'function') {
     throw new Error('Fleet runner is missing runAgentWork')
   }
-  const res = await runAgentWork(agentId, message, history, {
-    workspaceRoot: resolveWorkspaceForRepo(workRepo),
-    workRepo,
-  })
-  return res
+  try {
+    return await runAgentWork(agentId, message, history, {
+      workspaceRoot: resolveWorkspaceForRepo(workRepo),
+      workRepo,
+    })
+  } catch (err) {
+    if (!shouldFallbackToNative(err)) throw err
+    try {
+      return await dispatchFleetNativeFallback(agentId, message, history)
+    } catch {
+      throw err
+    }
+  }
 }
