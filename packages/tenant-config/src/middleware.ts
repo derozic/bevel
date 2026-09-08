@@ -31,22 +31,21 @@ export function withTenantResolution(
   const { publicPaths = ['/api/health'] } = options
   const pathname = request.nextUrl.pathname
 
-  if (publicPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-    return NextResponse.next()
-  }
-
   const host = normalizeHost(
     request.headers.get('x-forwarded-host') ??
       request.headers.get('host') ??
       request.nextUrl.host,
   )
 
-  if (isPlatformHost(host)) {
-    return NextResponse.next()
-  }
-
   const requestHeaders = new Headers(request.headers)
-  requestHeaders.set(TENANT_HOST_HEADER, host)
+  if (host) requestHeaders.set(TENANT_HOST_HEADER, host)
+
+  const skipAuthz = publicPaths.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  )
+  if (skipAuthz || isPlatformHost(host)) {
+    return NextResponse.next({ request: { headers: requestHeaders } })
+  }
 
   return NextResponse.next({
     request: { headers: requestHeaders },

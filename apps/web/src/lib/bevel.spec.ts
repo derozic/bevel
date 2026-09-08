@@ -8,6 +8,7 @@ import {
   bevelDirectSessionId,
   bevelTagPath,
   bevelTalkPath,
+  isRedundantChannelName,
   normalizeBevelChannelSlug,
 } from './bevel'
 
@@ -17,6 +18,13 @@ describe('workspace URLs', () => {
     expect(bevelTalkPath('Hermes')).toBe('/talk/hermes')
     expect(bevelTalkPath('hermes', 'johnny')).toBe('/talk/hermes?agents=johnny')
     expect(bevelTagPath('On Call')).toBe('/tags/on-call')
+  })
+
+  it('hides a channel name that just repeats the slug', () => {
+    expect(isRedundantChannelName('product', 'product')).toBe(true)
+    expect(isRedundantChannelName('product', '~product')).toBe(true)
+    expect(isRedundantChannelName('ops', '')).toBe(true)
+    expect(isRedundantChannelName('product', 'Product workspace')).toBe(false)
   })
 
   it('normalizes channel slugs and rejects junk', () => {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/theme.dart';
+
 /// Phone/narrow layout channel + destination picker (parity with tablet rail).
 class ChannelPickerSheet extends StatelessWidget {
   const ChannelPickerSheet({
@@ -25,11 +27,12 @@ class ChannelPickerSheet extends StatelessWidget {
     VoidCallback? onOpenTimeline,
     VoidCallback? onOpenNotifications,
   }) {
+    final p = context.bevel;
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0F1419),
+      backgroundColor: p.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       isScrollControlled: true,
       builder: (ctx) => ChannelPickerSheet(
@@ -63,7 +66,7 @@ class ChannelPickerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final p = context.bevel;
     final list = channels.isNotEmpty
         ? channels
         : const <(String, String)>[
@@ -88,19 +91,19 @@ class ChannelPickerSheet extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF334155),
+                    color: p.border,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                 child: Text(
                   'Channels',
                   style: TextStyle(
                     fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFF4F7F5),
+                    fontWeight: FontWeight.w600,
+                    color: p.ink,
                   ),
                 ),
               ),
@@ -113,48 +116,46 @@ class ChannelPickerSheet extends StatelessWidget {
                       ListTile(
                         leading: Icon(
                           Icons.schedule_outlined,
-                          color: _isActive('/timeline')
-                              ? scheme.primary
-                              : const Color(0xFF94A3B8),
+                          color: _isActive('/timeline') ? p.accent : p.muted,
                         ),
-                        title: const Text(
+                        title: Text(
                           'Timeline',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFF4F7F5),
+                            color: p.ink,
                           ),
                         ),
-                        subtitle: const Text(
+                        subtitle: Text(
                           'Mentions and escalations',
-                          style: TextStyle(color: Color(0xFF64748B)),
+                          style: TextStyle(color: p.subtle),
                         ),
                         selected: _isActive('/timeline'),
                         onTap: onOpenTimeline,
                       ),
                     if (onOpenNotifications != null)
                       ListTile(
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.notifications_outlined,
-                          color: Color(0xFF94A3B8),
+                          color: p.muted,
                         ),
-                        title: const Text(
+                        title: Text(
                           'Notification settings',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFF4F7F5),
+                            color: p.ink,
                           ),
                         ),
                         onTap: onOpenNotifications,
                       ),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
                       child: Text(
                         'WORKSPACE',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                          color: Color(0xFF64748B),
+                          letterSpacing: 1.0,
+                          color: p.subtle,
                         ),
                       ),
                     ),
@@ -162,56 +163,50 @@ class ChannelPickerSheet extends StatelessWidget {
                       ListTile(
                         leading: Icon(
                           Icons.tag_rounded,
-                          color: _isActive('/~$slug')
-                              ? scheme.primary
-                              : const Color(0xFF94A3B8),
+                          color: _isActive('/~$slug') ? p.accent : p.muted,
                         ),
                         title: Text(
                           '~$slug',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontFamily: 'monospace',
-                            color: _isActive('/~$slug')
-                                ? scheme.primary
-                                : const Color(0xFFF4F7F5),
+                            color: _isActive('/~$slug') ? p.accent : p.ink,
                           ),
                         ),
                         subtitle: Text(
                           name,
-                          style: const TextStyle(color: Color(0xFF64748B)),
+                          style: TextStyle(color: p.subtle),
                         ),
                         selected: _isActive('/~$slug'),
                         onTap: () => onSelectPath('/~$slug'),
                       ),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
                       child: Text(
                         'AGENTS',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                          color: Color(0xFF64748B),
+                          letterSpacing: 1.0,
+                          color: p.subtle,
                         ),
                       ),
                     ),
                     ListTile(
                       leading: Icon(
                         Icons.auto_awesome_outlined,
-                        color: _isActive('/talk/hermes')
-                            ? scheme.primary
-                            : const Color(0xFF94A3B8),
+                        color: _isActive('/talk/hermes') ? p.accent : p.muted,
                       ),
-                      title: const Text(
+                      title: Text(
                         'Hermes',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFFF4F7F5),
+                          color: p.ink,
                         ),
                       ),
-                      subtitle: const Text(
+                      subtitle: Text(
                         'Personal + fleet agent',
-                        style: TextStyle(color: Color(0xFF64748B)),
+                        style: TextStyle(color: p.subtle),
                       ),
                       selected: _isActive('/talk/hermes'),
                       onTap: () => onSelectPath('/talk/hermes'),
@@ -219,20 +214,18 @@ class ChannelPickerSheet extends StatelessWidget {
                     ListTile(
                       leading: Icon(
                         Icons.chat_bubble_outline,
-                        color: _isActive('/me')
-                            ? scheme.primary
-                            : const Color(0xFF94A3B8),
+                        color: _isActive('/me') ? p.accent : p.muted,
                       ),
-                      title: const Text(
+                      title: Text(
                         'Private space',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFFF4F7F5),
+                          color: p.ink,
                         ),
                       ),
-                      subtitle: const Text(
+                      subtitle: Text(
                         'Your agents only',
-                        style: TextStyle(color: Color(0xFF64748B)),
+                        style: TextStyle(color: p.subtle),
                       ),
                       selected: _isActive('/me'),
                       onTap: () => onSelectPath('/me'),

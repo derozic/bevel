@@ -4,6 +4,8 @@ import { dispatchAgentChat } from '../agent-dispatch.js'
 import {
   appendChannelMessage,
   fetchChannelMessagesPage,
+  persistChannelGesture,
+  persistChannelMessageLifecycle,
   type FleetChannelMessageRecord,
 } from '../fleet-channel-api.js'
 import { enqueuePersist, flushPersistQueue } from '../persist-queue.js'
@@ -19,6 +21,11 @@ import {
 import { readRecording, recordEvent, type SessionEvent } from '../recording.js'
 import { loadMergedRegistry } from '../registry-merge.js'
 import {
+  ensureAgentsInRoster,
+  mentionedCanonicalIds,
+  resolveDispatchTargets,
+} from '../platform-roster.js'
+import {
   AgentPresence,
   AgentSessionState,
   ChatMessage,
@@ -26,11 +33,11 @@ import {
 } from '../schema/ChatState.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { removeHumansByUserId } from '../human-presence.js'
+import { publicAgentBubble, sanitizeAgentError } from '../sanitize-agent-error.js'
 import {
   SYSTEM_SPEAKER,
   agentThinking,
   askingFleet,
-  fleetRateLimited,
   handingToAgent,
   memberJoined,
   memberLeft,
@@ -65,10 +72,16 @@ type GesturePayload = {
   kind?: string
 }
 
+type MessageActionPayload = {
+  messageId?: string
+  action?: string
+}
+
 type ChatPayload = {
   text: string
   speaker?: string
   targetAgent?: string
+  agentIds?: string[]
 }
 
 function uid(): string {
@@ -181,10 +194,22 @@ export class AgentSession extends Room {
     })
 
     this.onMessage('chat', (client, payload: ChatPayload) => {
-      void this.handleChat(client.sessionId, payload)
+      void this.handleChat(client.sessionId, payload).catch((err) => {
+        console.error('[agent_session] chat handler failed', {
+          session: this.persistSlug,
+          err: err instanceof Error ? err.message : String(err),
+        })
+        this.pushSystemMessage(
+          sanitizeAgentError('Session', err).publicMessage,
+          'error',
+        )
+      })
     })
     this.onMessage('gesture', (client, payload: GesturePayload) => {
       void this.handleGesture(client, payload)
+    })
+    this.onMessage('message_action', (client, payload: MessageActionPayload) => {
+      void this.handleMessageAction(client, payload)
     })
   }
 
@@ -379,7 +404,7 @@ export class AgentSession extends Room {
       meta: { messageId: human.id },
     })
 
-    const humanOk = await this.persistMessage({
+    void this.persistMessage({
       id: human.id,
       speakerId: human.speakerId,
       speakerName: human.speaker,
@@ -388,14 +413,16 @@ export class AgentSession extends Room {
       body: text,
       status: 'final',
       createdAt: new Date(human.ts).toISOString(),
+    }).then((humanOk) => {
+      if (!humanOk) {
+        console.error('[agent_session] human message not durable', {
+          session: this.persistSlug,
+          id: human.id,
+        })
+      }
     })
-    if (!humanOk) {
-      console.error('[agent_session] human message not durable', {
-        session: this.persistSlug,
-        id: human.id,
-      })
-    }
 
+    this.seatIncomingAgents(text, payload)
     const targets = this.resolveTargetAgents(text, payload.targetAgent)
     if (targets.length === 0) {
       const names = this.state.agents.map((a) => a.name)
@@ -436,6 +463,19 @@ export class AgentSession extends Room {
     return undefined
   }
 
+  private async handleMessageAction(client: Client, payload: MessageActionPayload) {
+    const actionRaw = String(payload.action ?? '').trim().toLowerCase()
+    const messageId = String(payload.messageId ?? '').trim()
+    if (!messageId || (actionRaw !== 'delete' && actionRaw !== 'archive')) return
+    const profile = this.speakerProfiles.get(client.sessionId)
+    if (!profile) return
+    if (!this.findMessage(messageId)) return
+    this.removeMessageById(messageId)
+    void enqueuePersist(`lifecycle:${messageId}`, () =>
+      persistChannelMessageLifecycle(this.persistSlug, messageId, actionRaw),
+    )
+  }
+
   private async handleGesture(client: Client, payload: GesturePayload) {
     const kindRaw = String(payload.kind ?? '').trim().toLowerCase()
     const messageId = String(payload.messageId ?? '').trim()
@@ -452,18 +492,13 @@ export class AgentSession extends Room {
       userName: profile.name,
     })
     msg.reactionsJson = JSON.stringify(next)
-    void this.persistMessage({
-      id: msg.id,
-      speakerId: msg.speakerId || msg.agentId || 'unknown',
-      speakerName: msg.speaker,
-      speakerAvatar: msg.speakerAvatar,
-      speakerType: msg.speakerType,
-      agentId: msg.agentId,
-      body: msg.body,
-      status: msg.status || 'final',
-      reactions: next,
-      votePrompt: msg.votePrompt || undefined,
-    })
+    void enqueuePersist(`gesture:${msg.id}`, () =>
+      persistChannelGesture(this.persistSlug, msg.id, {
+        kind,
+        userId: profile.userId,
+        userName: profile.name,
+      }),
+    )
     recordEvent({
       ts: Date.now(),
       sessionId: this.state.sessionId,
@@ -491,6 +526,7 @@ export class AgentSession extends Room {
   }
 
   private pushAgentReply(target: string, agentName: string, output: string, meta?: Record<string, unknown>) {
+    output = publicAgentBubble(agentName, output)
     const reply = new ChatMessage()
     reply.id = uid()
     reply.sessionId = this.state.sessionId
@@ -581,56 +617,41 @@ export class AgentSession extends Room {
         })
       } else {
         const agentName = agentRow?.name ?? target
-        const reason = result.reason
-        const is429 =
-          (reason instanceof Error &&
-            (reason.message.includes('429') ||
-              reason.message.includes('rate limit') ||
-              reason.name === 'OpenRouterRateLimitError')) ||
-          false
-        const errBody = is429
-          ? fleetRateLimited(agentName)
-          : reason instanceof Error
-            ? reason.message
-            : 'Agent failed'
-        this.pushAgentReply(target, agentName, errBody, {
+        const sanitized = sanitizeAgentError(agentName, result.reason)
+        console.error('[agent_session] agent failed', {
+          session: this.persistSlug,
+          agent: target,
+          code: sanitized.code,
+          detail: sanitized.detail,
+        })
+        this.pushAgentReply(target, agentName, sanitized.publicMessage, {
           phase: 'error',
-          rateLimited: is429,
+          rateLimited: sanitized.code === 'rate_limit',
         })
       }
     }
   }
 
+  private seatIncomingAgents(text: string, payload: ChatPayload) {
+    const seated = [...this.state.agents].map((a) => ({
+      id: a.id,
+      name: a.name,
+    }))
+    const incoming = Array.isArray(payload.agentIds) ? payload.agentIds : []
+    ensureAgentsInRoster(this.state, [
+      ...incoming,
+      ...(payload.targetAgent ? [payload.targetAgent] : []),
+      ...mentionedCanonicalIds(text, seated),
+    ])
+  }
+
   private resolveTargetAgents(text: string, explicit?: string): string[] {
-    const inSession = (id: string) => this.state.agentIds.includes(id)
-
-    if (explicit) {
-      const id = explicit.toLowerCase()
-      return inSession(id) ? [id] : []
-    }
-
-    const mention = text.match(/@([a-z0-9_-]+)\b/i)
-    if (mention) {
-      const id = mention[1].toLowerCase()
-      return inSession(id) ? [id] : []
-    }
-
-    const lower = text.toLowerCase()
-    for (const agent of this.state.agents) {
-      const id = agent.id.toLowerCase()
-      const name = agent.name.toLowerCase()
-      if (
-        lower.includes(`@${id}`) ||
-        new RegExp(`\\b${id}\\b`, 'i').test(text) ||
-        new RegExp(`\\b${name}\\b`, 'i').test(text)
-      ) {
-        return [id]
-      }
-    }
-
-    if (this.state.agentIds.length === 1) return [this.state.agentIds[0]]
-
-    return [...this.state.agentIds]
+    return resolveDispatchTargets({
+      text,
+      explicit,
+      agentIds: [...this.state.agentIds],
+      agents: [...this.state.agents].map((a) => ({ id: a.id, name: a.name })),
+    })
   }
 
   getTranscript() {

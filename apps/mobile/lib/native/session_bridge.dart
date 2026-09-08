@@ -77,6 +77,7 @@ class SessionBridge {
 (function() {
   try {
     document.documentElement.setAttribute('data-bevel-native', '1');
+    document.documentElement.setAttribute('data-bevel-gestures', 'playful');
     document.documentElement.classList.add('bevel-native-shell');
     if (!document.getElementById('bevel-native-style')) {
       var s = document.createElement('style');
@@ -93,6 +94,9 @@ class SessionBridge {
         'html[data-bevel-native="1"] body { overscroll-behavior: none; }',
         'html[data-bevel-native="1"] .bevel-workspace-root {',
         '  height: 100% !important; max-height: 100% !important;',
+        '}',
+        'html[data-bevel-native="1"] .fleet-chat {',
+        '  touch-action: manipulation;',
         '}',
       ].join('\\n');
       (document.head || document.documentElement).appendChild(s);

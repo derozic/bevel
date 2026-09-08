@@ -1,5 +1,9 @@
 import Link from 'next/link'
-import { bevelApiFetch } from '@/lib/bevel-api.server'
+import {
+  bevelApiFetch,
+  hostTenantSlug,
+  withTenantQuery,
+} from '@/lib/bevel-api.server'
 import { bevelTagPath } from '@/lib/bevel'
 
 type TagCloudRow = {
@@ -13,7 +17,8 @@ type TagCloudRow = {
 export default async function TagsIndexPage() {
   let tags: TagCloudRow[] = []
   try {
-    const res = await bevelApiFetch('/api/v1/tags')
+    const tenant = await hostTenantSlug()
+    const res = await bevelApiFetch(withTenantQuery('/api/v1/tags', tenant))
     const data = (await res.json().catch(() => ({}))) as { tags?: TagCloudRow[] }
     tags = Array.isArray(data.tags) ? data.tags : []
   } catch {

@@ -28,6 +28,17 @@ export {
   type BevelProduct,
 }
 
+/** True when the channel title is just the slug again (~ops / ops). */
+export function isRedundantChannelName(
+  slug: string,
+  name?: string | null,
+): boolean {
+  const n = (name || '').trim().toLowerCase()
+  if (!n) return true
+  const s = slug.trim().toLowerCase()
+  return n === s || n === `~${s}` || n === `#${s}` || n === `^${s}`
+}
+
 /** Sort rail channels: escalated first (A–Z), then normal (A–Z). */
 export function sortChannelsByEscalation<T extends { slug: string }>(
   channels: T[],

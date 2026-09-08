@@ -24,6 +24,7 @@ export FLEET_CHANNEL_API_URL="${FLEET_CHANNEL_API_URL:-$API_INTERNAL_URL}"
 # Fleet agents package (registry + SOUL/skills + dist/runner.js)
 export AGENTS_REPO_ROOT="${AGENTS_REPO_ROOT:-$HOME/dev/agents}"
 export AGENTS_REGISTRY_PATH="${AGENTS_REGISTRY_PATH:-$ROOT/registry.json}"
+export AGENTS_GLOBAL_SETTINGS_PATH="${AGENTS_GLOBAL_SETTINGS_PATH:-$ROOT/data/agent-global-settings.json}"
 
 free_port() {
   local port="$1"

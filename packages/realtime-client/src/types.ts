@@ -10,4 +10,6 @@ export type FleetAgent = {
   summary?: string
   /** Top capabilities surfaced on hover */
   capabilities?: string[]
+  /** Extra @tokens that resolve to this agent */
+  aliases?: string[]
 }

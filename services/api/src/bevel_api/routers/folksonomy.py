@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bevel_api.db.models.user import User
 from bevel_api.deps import get_session
+from bevel_api.lib import memberships as memberships_lib
 from bevel_api.lib import tenants as yaml_tenants
 from bevel_api.repositories import channels as channels_repo
 from bevel_api.repositories import folksonomy as folk_repo
@@ -19,11 +21,11 @@ from bevel_api.routers.timeline import _require_user, _user_id_from_headers
 router = APIRouter(prefix="/v1", tags=["Folksonomy"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
-DEFAULT_TENANT = "2x4m"
-
 
 async def _tenant(session: AsyncSession, slug: str | None) -> Any:
-    key = (slug or DEFAULT_TENANT).strip().lower()
+    key = (slug or "").strip().lower()
+    if not key:
+        raise HTTPException(400, "tenant required")
     row = await tenants_repo.get_by_slug(session, key)
     if row:
         return row
@@ -32,6 +34,27 @@ async def _tenant(session: AsyncSession, slug: str | None) -> Any:
         return await tenants_repo.upsert_from_yaml(session, key, raw)
     except FileNotFoundError as exc:
         raise HTTPException(404, f"tenant not found: {key}") from exc
+
+
+async def _authorized_tenant(
+    session: AsyncSession, user: User, slug: str | None
+) -> Any:
+    key = (slug or "").strip().lower()
+    if not key and user.tenant_id:
+        home = await tenants_repo.get_by_id(session, user.tenant_id)
+        if home:
+            key = home.slug
+    row = await _tenant(session, key)
+    email = (user.email or "").strip().lower()
+    home_slug = None
+    if user.tenant_id:
+        home = await tenants_repo.get_by_id(session, user.tenant_id)
+        home_slug = home.slug if home else None
+    if not memberships_lib.user_may_access_workspace(
+        email, row.slug, home_slug=home_slug
+    ):
+        raise HTTPException(403, "not a member of this workspace")
+    return row
 
 
 def _hydrate_agents(ids: list[str]) -> list[dict[str, Any]]:
@@ -150,7 +173,7 @@ async def apply_tag(
     user = await _require_user(
         session, request, user_id=uid, email=email, name=x_bevel_user_name
     )
-    row = await _tenant(session, body.tenant)
+    row = await _authorized_tenant(session, user, body.tenant)
     tagging = await folk_repo.apply(
         session,
         tenant_id=row.id,
@@ -180,8 +203,8 @@ async def remove_tag(
     if kind not in folk_repo.KINDS:
         raise HTTPException(400, f"unknown kind: {body.kind}")
     _uid, _email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    await _require_user(session, request, user_id=_uid, email=_email)
-    row = await _tenant(session, body.tenant)
+    user = await _require_user(session, request, user_id=_uid, email=_email)
+    row = await _authorized_tenant(session, user, body.tenant)
     await folk_repo.remove(
         session,
         tenant_id=row.id,

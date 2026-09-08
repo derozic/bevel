@@ -27,6 +27,24 @@ const catalog: FleetAgent[] = [
   { id: 'johnny', name: 'JOHNNY', category: 'ops' },
   { id: 'loom', name: 'Loom', category: 'design' },
   { id: 'hermes', name: 'Hermes', category: 'comms' },
+  {
+    id: 'openai',
+    name: 'ChatGPT',
+    category: 'Platform',
+    aliases: ['chatgpt', 'openai'],
+  },
+  {
+    id: 'claude',
+    name: 'Claude',
+    category: 'Platform',
+    aliases: ['claude', 'anthropic'],
+  },
+  {
+    id: 'grok',
+    name: 'Grok',
+    category: 'Platform',
+    aliases: ['grok', 'xai'],
+  },
 ]
 
 function section(name: string, fn: () => void) {
@@ -108,6 +126,23 @@ section('filterMixedMentionCandidates people first for @; people only for ^', ()
   const hard = filterMixedMentionCandidates('escalation', catalog, people, 'sc')
   assert.ok(hard.every((c) => c.type === 'person'))
   assert.equal(hard.length, 1)
+})
+
+section('parseResolvedMentions folds ChatGPT / Anthropic / xAI aliases', () => {
+  const text = '@chatgpt @anthropic @xai — mixed room'
+  const hits = parseResolvedMentions(text, catalog)
+  assert.deepEqual(
+    hits.map((h) => h.id),
+    ['openai', 'claude', 'grok'],
+  )
+})
+
+section('filterMentionCandidates matches platform aliases', () => {
+  const byAlias = filterMentionCandidates(catalog, 'chatgpt')
+  assert.equal(byAlias.length, 1)
+  assert.equal(byAlias[0]!.id, 'openai')
+  const byXai = filterMentionCandidates(catalog, 'xai')
+  assert.equal(byXai[0]!.id, 'grok')
 })
 
 section('filterMentionCandidates matches id name and category', () => {

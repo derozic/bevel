@@ -1,6 +1,12 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { withTenantResolution } from '@bevel/tenant-config/middleware'
+import {
+  NATIVE_COMPLETE_PATH,
+  NATIVE_LOGIN_COOKIE,
+  NATIVE_RETURNED_COOKIE,
+  shouldInterceptNativeBrowserPath,
+} from '@/lib/auth-native-shared'
 
 const PUBLIC_PATHS = [
   '/api/health',
@@ -40,6 +46,7 @@ const PUBLIC_PATHS = [
   '/security',
   '/download',
   '/status',
+  '/api/status',
   '/console',
   '/_next',
   '/favicon.ico',
@@ -235,22 +242,94 @@ const BEVEL_RESERVED_SEGMENTS = new Set([
  * - Keep /talk and /session as path routes (next.config rewrites)
  * - Stamp tenant host
  */
+/** Flutter/system-browser login must not dump the operator into /talk in Chrome. */
+function isNativeLoginQuery(request: NextRequest): boolean {
+  const q = request.nextUrl.searchParams
+  const native = q.get('native')
+  const cb = q.get('callbackUrl') ?? ''
+  const ret = q.get('return') ?? ''
+  return (
+    native === '1' ||
+    native === 'true' ||
+    cb.includes('native-complete') ||
+    ret.includes('native-complete') ||
+    ret.startsWith('bevel://')
+  )
+}
+
+function stampNativeLoginCookie(response: NextResponse): void {
+  response.cookies.set(NATIVE_LOGIN_COOKIE, '1', {
+    path: '/',
+    maxAge: 15 * 60,
+    sameSite: 'lax',
+    httpOnly: true,
+    secure: true,
+  })
+}
+
+function shouldReturnToNativeApp(request: NextRequest): boolean {
+  if (request.cookies.get(NATIVE_RETURNED_COOKIE)?.value === '1') return false
+  if (request.cookies.get(NATIVE_LOGIN_COOKIE)?.value !== '1') return false
+  const p = request.nextUrl.pathname
+  if (p === NATIVE_COMPLETE_PATH || p.startsWith('/api/')) return false
+  if (p === '/login' || p.startsWith('/login/')) return false
+  if (p.startsWith('/_next')) return false
+  return shouldInterceptNativeBrowserPath(p)
+}
+
+function requestHost(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-host') ??
+    request.headers.get('host') ??
+    request.nextUrl.host
+  )
+    .split(',')[0]
+    ?.trim()
+    .toLowerCase()
+    .split(':')[0] || ''
+}
+
+function isStatusHost(host: string): boolean {
+  return host === 'status.bevel.is' || host === 'status.bevel.lvh.me'
+}
+
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
 
+  if (isStatusHost(requestHost(request)) && (pathname === '/' || pathname === '')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/status'
+    return NextResponse.rewrite(url)
+  }
+
+  // Never expire PKCE/state on /api/auth/* — Next.js copies those Set-Cookie
+  // deletes onto the same request, so the Google callback cannot read the
+  // verifier and Auth.js fails with InvalidCheck (error=Configuration).
   if (pathname.startsWith('/api/auth')) {
-    const res = NextResponse.next()
-    expireStaleDomainOAuthCookies(res, request)
-    return res
+    return NextResponse.next()
+  }
+
+  if (shouldReturnToNativeApp(request)) {
+    return NextResponse.redirect(
+      new URL(NATIVE_COMPLETE_PATH, publicOrigin(request)),
+      302,
+    )
   }
 
   // Escape hatch: clear corrupt session JWTs (Invalid Compact JWE) that cause
   // ERR_TOO_MANY_REDIRECTS when Auth.js partially decrypts old cookies.
+  // Only on explicit ?clear=1 — wiping cookies on every ?error= hid the error
+  // and bounced /login → /welcome → /login.
   const clearSession =
     searchParams.get('clear') === '1' || searchParams.get('clear') === 'session'
-  if (pathname === '/login' && (clearSession || Boolean(searchParams.get('error')))) {
-    const res = NextResponse.next()
+  if (pathname === '/login' && clearSession) {
+    const res = withTenantResolution(request, {
+      publicPaths: PUBLIC_PATHS,
+      unknownTenantUrl: process.env.BEVEL_UNKNOWN_TENANT_URL,
+    })
     expireSessionCookies(res, request)
+    expireStaleDomainOAuthCookies(res, request)
+    if (isNativeLoginQuery(request)) stampNativeLoginCookie(res)
     return res
   }
   if (clearSession) {
@@ -322,10 +401,15 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  return withTenantResolution(request, {
+  const res = withTenantResolution(request, {
     publicPaths: PUBLIC_PATHS,
     unknownTenantUrl: process.env.BEVEL_UNKNOWN_TENANT_URL,
   })
+  if (pathname === '/login') {
+    expireStaleDomainOAuthCookies(res, request)
+    if (isNativeLoginQuery(request)) stampNativeLoginCookie(res)
+  }
+  return res
 }
 
 export const config = {

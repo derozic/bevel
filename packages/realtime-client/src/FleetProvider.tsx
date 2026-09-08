@@ -25,6 +25,8 @@ export type FleetContextValue = {
   authError?: string
   roomMode: FleetRoomMode
   channelSlug?: string
+  /** Workspace slug — isolates fleet_channel rooms per tenant. */
+  tenantSlug?: string
   /** Resume or create a specific agent_session (filterBy sessionId on realtime). */
   sessionId?: string
   sessionTitle?: string
@@ -59,6 +61,7 @@ export function FleetProvider({
   authError,
   roomMode = 'channel',
   channelSlug = 'general',
+  tenantSlug,
   sessionId,
   sessionTitle,
   poweredByLabel = BEVEL_POWERED_BY_LABEL,
@@ -86,6 +89,7 @@ export function FleetProvider({
   authError?: string
   roomMode?: FleetRoomMode
   channelSlug?: string
+  tenantSlug?: string
   sessionId?: string
   sessionTitle?: string
   poweredByLabel?: string
@@ -118,6 +122,7 @@ export function FleetProvider({
       authError,
       roomMode,
       channelSlug,
+      tenantSlug,
       sessionId,
       sessionTitle,
       poweredByLabel,
@@ -145,6 +150,7 @@ export function FleetProvider({
       authError,
       roomMode,
       channelSlug,
+      tenantSlug,
       sessionId,
       sessionTitle,
       poweredByLabel,

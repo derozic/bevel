@@ -4,6 +4,8 @@ import FlutterMacOS
 class MainFlutterWindow: NSWindow {
   /// Retained for the window lifetime so media huddle discovery stays registered.
   private var mediaDeviceChannel: MediaDeviceChannel?
+  /// Local iMessage host (chat.db + AppleScript). Replaces BlueBubbles.
+  private var iMessageChannel: IMessageChannel?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -24,7 +26,18 @@ class MainFlutterWindow: NSWindow {
     mediaDeviceChannel = MediaDeviceChannel(
       messenger: flutterViewController.engine.binaryMessenger
     )
+    iMessageChannel = IMessageChannel(
+      messenger: flutterViewController.engine.binaryMessenger
+    )
 
     super.awakeFromNib()
+
+    // window_manager's waitUntilReadyToShow can hide the nib window and then
+    // fail to foreground (OSStatus 13). Always order front ourselves.
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
+    }
   }
 }

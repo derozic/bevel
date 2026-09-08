@@ -24,6 +24,8 @@ export FLEET_CHANNEL_API_URL="${FLEET_CHANNEL_API_URL:-$API_INTERNAL_URL}"
 # Fleet agents: catalog is synced into BEVEL; code runs from agents repo
 export AGENTS_REPO_ROOT="${AGENTS_REPO_ROOT:-$HOME/dev/agents}"
 export AGENTS_REGISTRY_PATH="${AGENTS_REGISTRY_PATH:-$ROOT/registry.json}"
+# Admin-overridable global guidelines (Karpathy-inspired defaults)
+export AGENTS_GLOBAL_SETTINGS_PATH="${AGENTS_GLOBAL_SETTINGS_PATH:-$ROOT/data/agent-global-settings.json}"
 export NODE_OPTIONS="${NODE_OPTIONS:---dns-result-order=ipv4first}"
 export WATCHPACK_POLLING="${WATCHPACK_POLLING:-true}"
 export NEXT_TELEMETRY_DISABLED=1
@@ -187,8 +189,8 @@ cmd_status() {
 }
 
 cmd_start() {
-  local targets=("${@:-}")
-  if [[ ${#targets[@]} -eq 0 || "${targets[0]}" == "all" ]]; then
+  local targets=("$@")
+  if [[ $# -eq 0 || "${1:-}" == "all" ]]; then
     targets=("${START_ORDER[@]}")
   fi
   echo "Starting BEVEL: ${targets[*]}"
@@ -199,8 +201,8 @@ cmd_start() {
 }
 
 cmd_stop() {
-  local targets=("${@:-}")
-  if [[ ${#targets[@]} -eq 0 || "${targets[0]}" == "all" ]]; then
+  local targets=("$@")
+  if [[ $# -eq 0 || "${1:-}" == "all" ]]; then
     targets=("${STOP_ORDER[@]}")
   fi
   echo "Stopping BEVEL: ${targets[*]}"

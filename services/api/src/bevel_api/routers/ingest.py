@@ -103,6 +103,77 @@ async def notification_ingest_contract() -> dict[str, Any]:
     }
 
 
+class LifeMomentBody(BaseModel):
+    """Owner-only SMS/iMessage life moment. Never writes a workspace channel."""
+
+    address: str = Field(min_length=1, max_length=64)
+    body: str = Field(min_length=1, max_length=2000)
+    smsId: str = Field(min_length=1, max_length=64)
+    signal: str = "life"
+    tags: list[str] = Field(default_factory=list)
+    ts: int = 0
+    userId: str = ""
+    email: str = ""
+    handle: str = ""
+    tenant: str | None = None
+
+
+@router.post("/life-moments")
+async def ingest_life_moment(
+    body: LifeMomentBody,
+    request: Request,
+    _auth: InternalAuth,
+    session: SessionDep,
+) -> dict[str, Any]:
+    """Personal timeline only. SMS/iMessage corpus stays off org channels."""
+    tenant_slug = (body.tenant or DEFAULT_TENANT).strip().lower()
+    tenant = await tenants_repo.get_by_slug(session, tenant_slug)
+    if tenant is None:
+        raise HTTPException(404, f"tenant not found: {tenant_slug}")
+
+    user = await _resolve_user(
+        session,
+        NotificationIngestBody(
+            title=body.address,
+            body=body.body,
+            userId=body.userId,
+            email=body.email,
+            handle=body.handle,
+            tenant=tenant_slug,
+        ),
+    )
+    if user is None:
+        raise HTTPException(404, "user not found for life moment")
+
+    signal = body.signal.strip().lower()
+    if signal not in {"life", "critical"}:
+        signal = "life"
+    item = await timeline_repo.upsert_item(
+        session,
+        tenant_id=tenant.id,
+        recipient_user_id=user.id,
+        kind="sms",
+        priority="high" if signal == "critical" else "normal",
+        actor_user_id=None,
+        actor_label=body.address,
+        source_type="sms",
+        source_id=body.smsId[:128],
+        channel_slug=None,
+        body_preview=body.body[:500],
+        payload={
+            "address": body.address,
+            "signal": signal,
+            "tags": body.tags[:12],
+            "ts": body.ts,
+        },
+    )
+    return {
+        "ok": True,
+        "timeline": {"id": item.id, "kind": item.kind, "sourceId": item.source_id},
+        "workspace": False,
+    }
+
+
 @router.post("/notifications")
 async def ingest_notification(
     body: NotificationIngestBody,

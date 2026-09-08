@@ -5,9 +5,9 @@ import type { Tenant } from '@bevel/schema'
 import {
   isPlatformEntryHost,
   lookupTenantBySlug,
-  needsAuthHandoff,
   publicTenantUrl,
   resolveWorkspacesForEmail,
+  tenantPublicHost,
 } from '@bevel/tenant-config'
 import { Button } from '@bevel/ui'
 import { BevelNavMark } from '@/components/BevelNavMark'
@@ -18,8 +18,13 @@ import {
   BEVEL_PRIVATE_PATH,
   BEVEL_TRADEMARK_NOTICE,
 } from '@/lib/bevel'
+import { BrandSquare } from '@/components/BrandSquare'
 import { auth } from '@/auth'
-import { issueAuthHandoffCode } from '@/lib/auth-handoff'
+import { workspaceOpenHref } from '@/lib/workspace-spaces.server'
+import {
+  NATIVE_COMPLETE_PATH,
+  isNativeLoginPending,
+} from '@/lib/auth-native'
 
 /**
  * Chooser after apex login: **Private** (agents only) + every product workspace
@@ -31,6 +36,10 @@ export default async function WorkspacesPage() {
     redirect('/login?callbackUrl=%2Fworkspaces')
   }
 
+  if (await isNativeLoginPending()) {
+    redirect(NATIVE_COMPLETE_PATH)
+  }
+
   const headerStore = await headers()
   const host = (
     headerStore.get('x-bevel-host') ??
@@ -38,8 +47,10 @@ export default async function WorkspacesPage() {
     headerStore.get('host') ??
     ''
   )
+    .split(',')[0]
+    ?.trim()
     .toLowerCase()
-    .split(':')[0]
+    .split(':')[0] || ''
 
   const onPlatform = isPlatformEntryHost(host)
   const { tenants, domain } = resolveWorkspacesForEmail(session.user.email)
@@ -57,11 +68,11 @@ export default async function WorkspacesPage() {
     !onPlatform &&
     process.env.BEVEL_PLATFORM_AUTO_HANDOFF !== '0'
   ) {
-    redirect(publicTenantUrl(workspaces[0]!, BEVEL_HOME_PATH))
+    redirect(publicTenantUrl(workspaces[0]!, BEVEL_HOME_PATH, host))
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-8 px-6 py-16">
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-8 px-6 py-16">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-3">
           <div className="flex items-center gap-3">
@@ -86,35 +97,25 @@ export default async function WorkspacesPage() {
         <SuiteNav size="sm" showLabel={false} className="shrink-0" />
       </div>
 
-      <ul className="space-y-3">
-        {/* Always offer top-level private (agents only) */}
-        <li>
-          <Link
-            href={BEVEL_PRIVATE_PATH}
-            className="flex items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/5 px-5 py-4 transition hover:border-accent/50 hover:bg-accent/10"
-          >
-            <div>
-              <p className="font-semibold text-foreground">Private</p>
-              <p className="text-xs text-muted">
-                bevel.is · just you and your agents
-              </p>
-            </div>
-            <span className="text-sm font-medium text-accent">Enter</span>
-          </Link>
-        </li>
-
+      <div className="bevel-brand-square-grid bevel-brand-square-grid--wide">
+        <BrandSquare
+          href={BEVEL_PRIVATE_PATH}
+          label="Private"
+          caption="you + agents"
+          logoUrl="/brand/bevel-mark.svg"
+          processKey="private"
+        />
         {workspaces.map((ws) => (
-          <li key={ws.slug}>
-            <WorkspaceOpenLink
-              ws={ws}
-              email={session.user!.email!}
-              name={session.user?.name}
-              image={session.user?.image}
-              fromHost={host}
-            />
-          </li>
+          <WorkspaceOpenLink
+            key={ws.slug}
+            ws={ws}
+            email={session.user!.email!}
+            name={session.user?.name}
+            image={session.user?.image}
+            fromHost={host}
+          />
         ))}
-      </ul>
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <Button asChild variant="outline" size="sm">
@@ -145,38 +146,24 @@ async function WorkspaceOpenLink({
   image?: string | null
   fromHost: string
 }) {
-  const orgHost = ws.host.toLowerCase().split(':')[0] || ws.host
-  const callbackPath = BEVEL_HOME_PATH
-  let href = publicTenantUrl(ws, callbackPath)
-
-  if (fromHost && needsAuthHandoff(fromHost, orgHost)) {
-    const issued = await issueAuthHandoffCode({
-      email,
-      name,
-      imageUrl: image,
-      tenantSlug: ws.slug,
-      callbackPath,
-    })
-    if (issued?.code) {
-      const dest = new URL(`https://${orgHost}/api/auth/handoff`)
-      dest.searchParams.set('code', issued.code)
-      dest.searchParams.set('callbackUrl', callbackPath)
-      href = dest.toString()
-    }
-  }
+  const orgHost = tenantPublicHost(ws, fromHost)
+  const href = await workspaceOpenHref({
+    tenant: ws,
+    fromHost,
+    email,
+    name,
+    image,
+  })
 
   return (
-    <Link
+    <BrandSquare
       href={href}
-      className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface/60 px-5 py-4 transition hover:border-accent/50 hover:bg-surface"
-    >
-      <div>
-        <p className="font-semibold text-foreground">{ws.name}</p>
-        <p className="text-xs text-muted">
-          {ws.host} · namespace {ws.realtime.namespace}
-        </p>
-      </div>
-      <span className="text-sm font-medium text-accent">Enter</span>
-    </Link>
+      label={ws.theme.productName || ws.name}
+      caption={orgHost}
+      logoUrl={ws.theme.brandIconUrl || ws.theme.logoUrl || ws.theme.markUrl}
+      processKey={ws.slug}
+      process={ws.theme.accent}
+      title={`${ws.name} · ${orgHost}`}
+    />
   )
 }

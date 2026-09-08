@@ -4,9 +4,11 @@ import XCTest
 
 class RunnerTests: XCTestCase {
 
-  func testExample() {
-    // If you add code to the Runner application, consider adding tests here.
-    // See https://developer.apple.com/documentation/xctest for more information about using XCTest.
+  func testAppleEpochOffset() {
+    // 2001-01-01T00:00:00Z in unix ms. Keep in lockstep with
+    // IMessageStore.appleDateToUnixMs / Dart appleDateToUnixMs.
+    let appleEpochMs: Int64 = 978_307_200_000
+    XCTAssertEqual(appleEpochMs, 978_307_200_000)
   }
 
 }

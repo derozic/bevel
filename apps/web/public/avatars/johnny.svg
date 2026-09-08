@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="johnny isometric avatar">
-  <rect width="64" height="64" rx="14" fill="#f59e0b22"/>
-  <g><polygon points="32,25 46,32 32,39 18,32" fill="#fbbf24" stroke="#1a1410" stroke-width="1.5"/><polygon points="18,32 32,39 32,57 18,50" fill="#d97706" stroke="#1a1410" stroke-width="1.5"/><polygon points="32,39 46,32 46,50 32,57" fill="#f59e0b" stroke="#1a1410" stroke-width="1.5"/><polygon points="32,17 42,22 32,27 22,22" fill="#fcd34d" stroke="#1a1410" stroke-width="1.5"/><polygon points="22,22 32,27 32,39 22,34" fill="#fbbf24" stroke="#1a1410" stroke-width="1.5"/><polygon points="32,27 42,22 42,34 32,39" fill="#f59e0b" stroke="#1a1410" stroke-width="1.5"/><circle cx="44" cy="18" r="5" fill="#22c55e" stroke="#1a1410" stroke-width="1.5"/></g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <rect width="120" height="120" rx="28" fill="#f59e0b"/>
+  <circle cx="60" cy="58" r="26" fill="#fffbeb" stroke="#fff" stroke-width="3"/>
+  <path d="M44 54h32M44 64h24" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
+  <path d="M34 82h52" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="78" cy="34" r="10" fill="#22c55e" stroke="#fff" stroke-width="3"/>
 </svg>

@@ -30,6 +30,7 @@ from bevel_api.routers import folksonomy as folksonomy_router
 from bevel_api.routers import ingest as ingest_router
 from bevel_api.routers import webhooks as webhooks_router
 from bevel_api.routers import workspaces as workspaces_router
+from bevel_api.routers import agent_settings as agent_settings_router
 
 log = logging.getLogger("bevel_api")
 
@@ -116,6 +117,7 @@ app.include_router(intelligence_router.router, prefix="/api")
 app.include_router(folksonomy_router.router, prefix="/api")
 app.include_router(webhooks_router.router, prefix="/api")
 app.include_router(ingest_router.router, prefix="/api")
+app.include_router(agent_settings_router.router, prefix="/api")
 # Application Service paths expected by Synapse (no /api prefix)
 app.include_router(matrix_router.as_router, prefix="/_matrix/app/v1")
 

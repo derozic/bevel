@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
+import os
 import secrets
 import uuid
 from datetime import datetime, timezone
@@ -17,6 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bevel_api.config import settings
 from bevel_api.db.models.webhook import Webhook, WebhookDelivery
 from bevel_api.repositories.channels import is_direct_thread_slug
+
+LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"})
+SIGNATURE_MAX_AGE_SECONDS = 300
 
 DIRECTIONS = frozenset({"inbound", "outbound"})
 TARGET_KINDS = frozenset({"track", "conversation", "any"})
@@ -151,6 +156,21 @@ def inbound_url(hook_id: str) -> str:
     return f"{base}/api/v1/webhooks/inbound/{hook_id}"
 
 
+def allow_loopback_webhooks() -> bool:
+    """Loopback outbound URLs are an SSRF primitive in production.
+
+    Allow only when explicitly opted in, or when the public API is a local
+    Caddy host (*.lvh.me / loopback). Production (api.bevel.is) stays closed.
+    """
+    flag = os.getenv("BEVEL_ALLOW_LOOPBACK_WEBHOOKS", "").strip().lower()
+    if flag in {"1", "true", "yes"}:
+        return True
+    if flag in {"0", "false", "no"}:
+        return False
+    public = (settings.public_api_url or "").lower()
+    return ".lvh.me" in public or "127.0.0.1" in public or "localhost" in public
+
+
 def is_safe_outbound_url(url: str) -> bool:
     try:
         parsed = urlparse(url)
@@ -161,8 +181,8 @@ def is_safe_outbound_url(url: str) -> bool:
     host = (parsed.hostname or "").lower()
     if not host:
         return False
-    if host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
-        return True
+    if host in LOOPBACK_HOSTS:
+        return allow_loopback_webhooks()
     if host.endswith(".local") or host.endswith(".internal"):
         return False
     if host.startswith("10.") or host.startswith("192.168.") or host.startswith("169.254."):
@@ -199,6 +219,13 @@ def verify_request(secret: str, raw: str, *, signature: str | None, bearer: str 
     ts = parts.get("t")
     v1 = parts.get("v1")
     if not ts or not v1:
+        return False
+    try:
+        ts_int = int(ts)
+    except ValueError:
+        return False
+    now = int(_utcnow().timestamp())
+    if abs(now - ts_int) > SIGNATURE_MAX_AGE_SECONDS:
         return False
     expected = hmac.new(
         secret.encode("utf-8"),
@@ -503,6 +530,51 @@ def delivery_to_api(row: WebhookDelivery) -> dict[str, Any]:
     }
 
 
+def _schedule_delivery(hook_id: str, event: str, payload: dict[str, Any]) -> None:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    task = loop.create_task(_deliver_in_background(hook_id, event, payload))
+    task.add_done_callback(_ignore_task_result)
+
+
+def _ignore_task_result(task: asyncio.Task[None]) -> None:
+    if task.cancelled():
+        return
+    try:
+        exc = task.exception()
+    except asyncio.CancelledError:
+        return
+    if exc:
+        return
+
+
+async def _deliver_in_background(
+    hook_id: str, event: str, payload: dict[str, Any]
+) -> None:
+    """Own session so a slow/black-holed URL cannot block the message write."""
+    from bevel_api.database import get_session as db_session
+
+    try:
+        async with db_session() as session:
+            hook = await get_by_id(session, hook_id)
+            if hook is None or not hook.enabled or hook.direction != "outbound":
+                return
+            ok, detail, attempts = await deliver_outbound(hook, payload)
+            await log_delivery(
+                session,
+                hook,
+                event=event,
+                payload=payload,
+                ok=ok,
+                detail=detail,
+                attempts=attempts,
+            )
+    except Exception:
+        return
+
+
 async def emit(
     session: AsyncSession,
     *,
@@ -515,7 +587,7 @@ async def emit(
     actor: dict[str, Any] | None = None,
     skip_if_webhook_tagged: bool = False,
 ) -> int:
-    """Fan out an outbound event to matching hooks. Never raises."""
+    """Queue outbound fan-out. Never awaits remote HTTP. Never raises."""
     if skip_if_webhook_tagged:
         tags = data.get("tags") if isinstance(data, dict) else None
         if isinstance(tags, list) and "webhook" in tags:
@@ -537,25 +609,12 @@ async def emit(
         conversation=conversation,
         actor=actor,
     )
-    sent = 0
+    queued = 0
     for hook in hooks:
         if not hook_wants_event(hook, event):
             continue
         if event in ROOM_EVENTS and room and not matches_room(hook, room):
             continue
-        try:
-            ok, detail, attempts = await deliver_outbound(hook, payload)
-            await log_delivery(
-                session,
-                hook,
-                event=event,
-                payload=payload,
-                ok=ok,
-                detail=detail,
-                attempts=attempts,
-            )
-            if ok:
-                sent += 1
-        except Exception:
-            continue
-    return sent
+        _schedule_delivery(hook.id, event, payload)
+        queued += 1
+    return queued

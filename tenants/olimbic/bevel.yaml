@@ -12,6 +12,9 @@ feature_access: beta
 brand:
   theme: ./theme.json
   product_name: Olimbic
+  logo: ./logo.svg
+  cmyk:
+    kit_id: olimbic
 
 features:
   async_streams: true

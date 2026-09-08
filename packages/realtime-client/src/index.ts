@@ -13,6 +13,7 @@ export {
 } from './FleetProvider'
 export { AgentChip, type AgentChipProps } from './components/AgentChip'
 export { FleetChat, type FleetChatProps } from './components/FleetChat'
+export { MessageGestures } from './components/MessageGestures'
 export {
   formatFleetError,
   formatRoomErrorEvent,
@@ -30,6 +31,8 @@ export {
   CHANNEL_ESCALATED_PREFIX,
   channelTag,
   isEscalatedChannelTag,
+  messagePermalink,
+  messagePermalinkPath,
   type BevelProduct,
 } from './product/bevel'
 export {

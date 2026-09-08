@@ -6,14 +6,29 @@ import {
   appendChannelMessage,
   fetchChannel,
   fetchChannelMessagesPage,
+  persistChannelGesture,
+  persistChannelMessageLifecycle,
   type FleetChannelMessageRecord,
 } from '../fleet-channel-api.js'
 import { enqueuePersist, flushPersistQueue } from '../persist-queue.js'
+import {
+  applyGesture,
+  formatGestureFeedback,
+  isGestureKind,
+  parseGestures,
+  parseVotePrompt,
+  type GestureKind,
+} from '../gestures.js'
 import { logAgentWorkToProduct } from '../product-log.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { recordEvent } from '../recording.js'
 import { conversationSearchIndex } from '../search-index.js'
 import { loadMergedRegistry } from '../registry-merge.js'
+import {
+  ensureAgentsInRoster,
+  mentionedCanonicalIds,
+  resolveDispatchTargets,
+} from '../platform-roster.js'
 import {
   AgentPresence,
   ChatMessage,
@@ -21,12 +36,12 @@ import {
   HumanPresence,
 } from '../schema/ChatState.js'
 import { removeHumansByUserId } from '../human-presence.js'
+import { publicAgentBubble, sanitizeAgentError } from '../sanitize-agent-error.js'
 import {
   SYSTEM_SPEAKER,
   agentThinking,
   askingFleet,
   channelMemberJoined,
-  fleetRateLimited,
   handingToAgent,
   pickAgent,
   puttingOnWork,
@@ -35,6 +50,7 @@ import {
 
 type JoinOptions = {
   channelSlug?: string
+  tenantSlug?: string
   agentIds?: string[]
   displayName?: string
   authToken?: string
@@ -59,6 +75,8 @@ type ChatPayload = {
   text: string
   speaker?: string
   targetAgent?: string
+  /** Client roster — newly added chips are seated on the next turn. */
+  agentIds?: string[]
   work?: boolean
   workRepo?: string
 }
@@ -67,6 +85,16 @@ type LoadHistoryPayload = {
   before?: string
   beforeId?: string
   limit?: number
+}
+
+type GesturePayload = {
+  messageId?: string
+  kind?: string
+}
+
+type MessageActionPayload = {
+  messageId?: string
+  action?: string
 }
 
 /** Initial room hydrate size (Colyseus shared state). Older history is paged per-client. */
@@ -98,13 +126,17 @@ function recordToChatMessage(row: FleetChannelMessageRecord, channelSlug: string
   msg.body = row.body
   msg.status = row.status
   msg.ts = new Date(row.createdAt).getTime() || Date.now()
+  msg.reactionsJson = JSON.stringify(row.reactions ?? [])
+  msg.votePrompt = parseVotePrompt(row.body, row.votePrompt)
   return msg
 }
 
 export class FleetChannel extends Room {
   maxClients = 32
+  seatReservationTimeout = 30
   declare state: FleetChannelState
   private channelSlug = 'general'
+  private tenantSlug = ''
   private speakerNames = new Map<string, string>()
   private speakerProfiles = new Map<string, SpeakerProfile>()
   /** True when Postgres has messages older than the shared room state window. */
@@ -120,26 +152,19 @@ export class FleetChannel extends Room {
     return claims
   }
 
-  async onCreate(options: JoinOptions) {
+  onCreate(options: JoinOptions) {
     this.setState(new FleetChannelState())
     this.channelSlug = (options.channelSlug ?? 'general').toLowerCase()
+    this.tenantSlug = (options.tenantSlug ?? '').toLowerCase()
     this.state.channelSlug = this.channelSlug
     this.state.createdAt = Date.now()
     this.state.status = 'active'
     this.state.poweredByLabel = BEVEL_POWERED_BY_LABEL
+    this.state.title = `~${this.channelSlug}`
 
-    const channel = await fetchChannel(this.channelSlug)
-    const agentIds = (
-      options.agentIds?.length
-        ? options.agentIds
-        : channel?.defaultAgentIds ?? ['hermes', 'johnny']
-    ).map((id) => id.toLowerCase())
-
-    this.state.title = channel?.name ?? `~${this.channelSlug}`
-    for (const tag of channel?.tags ?? []) {
-      this.state.tags.push(tag)
-    }
-
+    const agentIds = (options.agentIds?.length ? options.agentIds : ['hermes', 'johnny']).map(
+      (id) => id.toLowerCase(),
+    )
     const catalog = loadMergedRegistry()
     for (const id of agentIds) {
       this.state.agentIds.push(id)
@@ -152,17 +177,54 @@ export class FleetChannel extends Room {
       this.state.agents.push(row)
     }
 
+    // Do not await Postgres here. Colyseus holds the seat reservation until
+    // onCreate finishes; a slow API call expires the join (close 4002).
+    this.onMessage('chat', (client, payload: ChatPayload) => {
+      void this.handleChat(client, payload).catch((err) => {
+        console.error('[fleet_channel] chat handler failed', {
+          channel: this.channelSlug,
+          err: err instanceof Error ? err.message : String(err),
+        })
+        this.pushSystemMessage(
+          sanitizeAgentError('Channel', err).publicMessage,
+          'error',
+        )
+      })
+    })
+    this.onMessage('load_history', (client, payload: LoadHistoryPayload) => {
+      void this.handleLoadHistory(client, payload)
+    })
+    this.onMessage('gesture', (client, payload: GesturePayload) => {
+      void this.handleGesture(client, payload)
+    })
+    this.onMessage('message_action', (client, payload: MessageActionPayload) => {
+      void this.handleMessageAction(client, payload)
+    })
+    void this.hydrateFromApi(options)
+  }
+
+  private async hydrateFromApi(options: JoinOptions) {
+    const channel = await fetchChannel(this.channelSlug, this.tenantSlug || null)
+    if (channel?.name) this.state.title = channel.name
+    if (channel?.tags?.length && this.state.tags.length === 0) {
+      for (const tag of channel.tags) this.state.tags.push(tag)
+    }
+    if (!options.agentIds?.length && channel?.defaultAgentIds?.length) {
+      // Roster already seeded from join options; skip mutating live presence.
+    }
+
     const page = await fetchChannelMessagesPage(this.channelSlug, {
       limit: ROOM_HISTORY_LIMIT,
+      tenant: this.tenantSlug || null,
     })
     this.historyHasMore = page.hasMore
     this.historyNextBefore = page.nextBefore
     this.historyNextBeforeId = page.nextBeforeId
 
     for (const row of page.messages) {
+      if (this.findMessage(row.id)) continue
       const msg = recordToChatMessage(row, this.channelSlug)
       this.pushMessage(msg)
-      // Seed search index only (do not re-append history into JSONL)
       if (row.speakerType !== 'system' && row.body?.trim()) {
         conversationSearchIndex.indexDocument({
           key: `${this.channelSlug}::${row.id}`,
@@ -179,16 +241,6 @@ export class FleetChannel extends Room {
         conversationSearchIndex.markReady()
       }
     }
-
-    // Channel copy lives in the client empty state — avoid welcome/join/leave chat noise.
-
-    this.onMessage('chat', (client, payload: ChatPayload) => {
-      void this.handleChat(client, payload)
-    })
-
-    this.onMessage('load_history', (client, payload: LoadHistoryPayload) => {
-      void this.handleLoadHistory(client, payload)
-    })
   }
 
   async onDispose() {
@@ -294,10 +346,14 @@ export class FleetChannel extends Room {
       status: string
       tags?: string[]
       createdAt?: string
+      reactions?: ReturnType<typeof parseGestures>
+      votePrompt?: string
     },
   ): Promise<boolean> {
     return enqueuePersist(msg.id, () =>
-      appendChannelMessage(this.channelSlug, {
+      appendChannelMessage(
+        this.channelSlug,
+        {
         id: msg.id,
         speakerId: msg.speakerId,
         speakerName: msg.speakerName,
@@ -308,8 +364,113 @@ export class FleetChannel extends Room {
         status: msg.status,
         tags: msg.tags,
         createdAt: msg.createdAt,
-      }),
+        reactions: msg.reactions,
+        votePrompt: msg.votePrompt,
+        },
+        this.tenantSlug || null,
+      ),
     )
+  }
+
+  private findMessage(id: string): ChatMessage | undefined {
+    for (let i = 0; i < this.state.messages.length; i++) {
+      const row = this.state.messages[i]
+      if (row?.id === id) return row
+    }
+    return undefined
+  }
+
+  private async handleMessageAction(client: Client, payload: MessageActionPayload) {
+    const actionRaw = String(payload.action ?? '').trim().toLowerCase()
+    const messageId = String(payload.messageId ?? '').trim()
+    if (!messageId || (actionRaw !== 'delete' && actionRaw !== 'archive')) return
+    const profile = this.speakerProfiles.get(client.sessionId)
+    if (!profile) return
+    const msg = this.findMessage(messageId)
+    if (!msg) return
+    this.removeMessageById(messageId)
+    recordEvent({
+      ts: Date.now(),
+      sessionId: this.channelSlug,
+      type: 'message_action',
+      speaker: profile.name,
+      speakerType: 'human',
+      body: `${actionRaw} ${messageId}`,
+      meta: { messageId, action: actionRaw, agentId: msg.agentId },
+    })
+    void enqueuePersist(`lifecycle:${messageId}`, () =>
+      persistChannelMessageLifecycle(
+        this.channelSlug,
+        messageId,
+        actionRaw,
+        this.tenantSlug || null,
+      ),
+    )
+  }
+
+  private async handleGesture(client: Client, payload: GesturePayload) {
+    const kindRaw = String(payload.kind ?? '').trim().toLowerCase()
+    const messageId = String(payload.messageId ?? '').trim()
+    if (!messageId || !isGestureKind(kindRaw)) return
+    const kind = kindRaw as GestureKind
+    const profile = this.speakerProfiles.get(client.sessionId)
+    if (!profile) return
+    const msg = this.findMessage(messageId)
+    if (!msg || msg.status === 'pending' || msg.status === 'streaming') return
+    if (msg.speakerType === 'system') return
+
+    const next = applyGesture(parseGestures(msg.reactionsJson), {
+      kind,
+      userId: profile.userId,
+      userName: profile.name,
+    })
+    msg.reactionsJson = JSON.stringify(next)
+
+    recordEvent({
+      ts: Date.now(),
+      sessionId: this.channelSlug,
+      type: 'gesture',
+      speaker: profile.name,
+      speakerType: 'human',
+      body: `${kind} on ${messageId}`,
+      meta: { messageId, kind, agentId: msg.agentId },
+    })
+
+    void enqueuePersist(`gesture:${msg.id}`, () =>
+      persistChannelGesture(
+        this.channelSlug,
+        msg.id,
+        {
+        kind,
+        userId: profile.userId,
+        userName: profile.name,
+        },
+        this.tenantSlug || null,
+      ),
+    )
+
+    // Thumbs-down on an agent turn is an immediate course-correct signal.
+    if (kind === 'down' && msg.speakerType === 'agent' && msg.agentId) {
+      void this.dispatchGestureFeedback(msg, profile.name)
+    }
+  }
+
+  private async dispatchGestureFeedback(msg: ChatMessage, operatorName: string) {
+    const agentId = msg.agentId
+    if (!agentId) return
+    const agentName =
+      this.state.agents.find((a) => a.id === agentId)?.name || agentId
+    try {
+      const res = await dispatchAgentChat(
+        agentId,
+        `${operatorName} marked your last reply with thumbs down. Briefly acknowledge and offer a better take.\n\nOriginal:\n${msg.body.slice(0, 1200)}`,
+        this.chatHistory(),
+        { channelSlug: this.channelSlug },
+      )
+      await this.pushAgentReply(agentId, agentName, res.output || 'Understood — retrying.')
+    } catch (err) {
+      console.error('[fleet_channel] gesture feedback dispatch failed', err)
+    }
   }
 
   private async handleLoadHistory(client: Client, payload: LoadHistoryPayload) {
@@ -331,6 +492,7 @@ export class FleetChannel extends Room {
       limit,
       before,
       beforeId,
+      tenant: this.tenantSlug || null,
     })
 
     client.send('history', {
@@ -344,6 +506,8 @@ export class FleetChannel extends Room {
         body: m.body,
         status: m.status,
         ts: new Date(m.createdAt).getTime() || Date.now(),
+        reactions: m.reactions ?? [],
+        votePrompt: parseVotePrompt(m.body, m.votePrompt),
       })),
       hasMore: page.hasMore,
       nextBefore: page.nextBefore,
@@ -390,8 +554,9 @@ export class FleetChannel extends Room {
       meta: { messageId: human.id, channelSlug: this.channelSlug, tags },
     })
 
-    // Await human turn durability before agent dispatch — survives mid-flight restart.
-    const humanOk = await this.persistMessage({
+    // Persist in the background. Do not block dispatch on Postgres — a hung
+    // write used to swallow the turn (composer cleared, thread never echoed).
+    void this.persistMessage({
       id: human.id,
       speakerId: human.speakerId,
       speakerName: human.speaker,
@@ -401,14 +566,16 @@ export class FleetChannel extends Room {
       status: 'final',
       tags,
       createdAt: new Date(human.ts).toISOString(),
+    }).then((humanOk) => {
+      if (!humanOk) {
+        console.error('[fleet_channel] human message not durable', {
+          channel: this.channelSlug,
+          id: human.id,
+        })
+      }
     })
-    if (!humanOk) {
-      console.error('[fleet_channel] human message not durable', {
-        channel: this.channelSlug,
-        id: human.id,
-      })
-    }
 
+    this.seatIncomingAgents(text, payload)
     const targets = this.resolveTargetAgents(text, payload.targetAgent)
     if (targets.length === 0) {
       const names = this.state.agents.map((a) => a.name)
@@ -433,10 +600,16 @@ export class FleetChannel extends Room {
     return this.state.messages
       .filter((m) => m.status === 'final' && m.speakerType !== 'system')
       .slice(-24)
-      .map((m) => ({
-        role: m.speakerType === 'human' ? 'user' : 'assistant',
-        content: `${m.speaker}: ${m.body}`,
-      }))
+      .map((m) => {
+        const signals = formatGestureFeedback(parseGestures(m.reactionsJson))
+        const content = signals
+          ? `${m.speaker}: ${m.body}\n[${signals}]`
+          : `${m.speaker}: ${m.body}`
+        return {
+          role: m.speakerType === 'human' ? 'user' : 'assistant',
+          content,
+        }
+      })
   }
 
   private async pushAgentReply(
@@ -451,6 +624,7 @@ export class FleetChannel extends Room {
       status?: ChatMessage['status']
     } = {},
   ) {
+    output = publicAgentBubble(agentName, output)
     const existingId = opts.messageId
     let reply: ChatMessage | undefined
     if (existingId) {
@@ -476,6 +650,9 @@ export class FleetChannel extends Room {
     reply.body = output
     reply.status = opts.status ?? 'final'
     reply.ts = Date.now()
+    if (reply.status === 'final') {
+      reply.votePrompt = parseVotePrompt(output, reply.votePrompt)
+    }
 
     recordEvent({
       ts: reply.ts,
@@ -506,6 +683,7 @@ export class FleetChannel extends Room {
       status: reply.status,
       tags: opts.work ? ['work', 'github'] : undefined,
       createdAt: new Date(reply.ts).toISOString(),
+      votePrompt: reply.votePrompt || undefined,
     })
 
     // Accountability: every work-mode agent move lands in ^product with repo context
@@ -692,42 +870,40 @@ export class FleetChannel extends Room {
         )
       } else {
         const agentName = agentRow?.name ?? target
-        const reason = result.reason
-        const is429 =
-          reason instanceof Error &&
-          (reason.message.includes('429') || reason.name === 'OpenRouterRateLimitError')
-        await this.pushAgentReply(
-          target,
-          agentName,
-          is429
-            ? fleetRateLimited(agentName)
-            : reason instanceof Error
-              ? reason.message
-              : 'Agent failed',
-          { ...workMeta, status: 'error' },
-        )
+        const sanitized = sanitizeAgentError(agentName, result.reason)
+        console.error('[fleet_channel] agent failed', {
+          channel: this.channelSlug,
+          agent: target,
+          code: sanitized.code,
+          detail: sanitized.detail,
+        })
+        await this.pushAgentReply(target, agentName, sanitized.publicMessage, {
+          ...workMeta,
+          status: 'error',
+        })
       }
     }
   }
 
+  private seatIncomingAgents(text: string, payload: ChatPayload) {
+    const seated = [...this.state.agents].map((a) => ({
+      id: a.id,
+      name: a.name,
+    }))
+    const incoming = Array.isArray(payload.agentIds) ? payload.agentIds : []
+    ensureAgentsInRoster(this.state, [
+      ...incoming,
+      ...(payload.targetAgent ? [payload.targetAgent] : []),
+      ...mentionedCanonicalIds(text, seated),
+    ])
+  }
+
   private resolveTargetAgents(text: string, explicit?: string): string[] {
-    const inSession = (id: string) => this.state.agentIds.includes(id)
-    if (explicit) {
-      const id = explicit.toLowerCase()
-      return inSession(id) ? [id] : []
-    }
-    const mention = text.match(/@([a-z0-9_-]+)\b/i)
-    if (mention) {
-      const id = mention[1].toLowerCase()
-      return inSession(id) ? [id] : []
-    }
-    if (this.state.agentIds.length === 1) return [this.state.agentIds[0]]
-    const lower = text.toLowerCase()
-    for (const agent of this.state.agents) {
-      if (lower.includes(`@${agent.id}`) || lower.includes(agent.name.toLowerCase())) {
-        return [agent.id]
-      }
-    }
-    return [...this.state.agentIds]
+    return resolveDispatchTargets({
+      text,
+      explicit,
+      agentIds: [...this.state.agentIds],
+      agents: [...this.state.agents].map((a) => ({ id: a.id, name: a.name })),
+    })
   }
 }

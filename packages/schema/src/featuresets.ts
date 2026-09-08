@@ -115,6 +115,8 @@ export const FEATURE_FLAG_IDS = [
   'sms',
   'otpSms',
   'presenceSms',
+  'imessage',
+  'imessageInbox',
   // Team+
   'liveMedia',
   'ssoSaml',
@@ -215,7 +217,8 @@ export const FEATURE_CATALOG: Record<FeatureFlagId, FeatureFlagDefinition> = {
   customBranding: def({
     id: 'customBranding',
     label: 'Custom branding',
-    description: 'Workspace logos, day-part marks, product name',
+    description:
+      'Workspace logos, day-part marks, product name, and CMYK BrandKit',
     minPlan: 'pro',
     paidOnly: true,
   }),
@@ -238,6 +241,23 @@ export const FEATURE_CATALOG: Record<FeatureFlagId, FeatureFlagDefinition> = {
     label: 'True-sentience SMS',
     description: 'SMS when unread and no desktop/mobile presence',
     minPlan: 'pro',
+    paidOnly: true,
+  }),
+  imessage: def({
+    id: 'imessage',
+    label: 'iMessage host',
+    description:
+      'Optional Mac host so agents can prompt you via iMessage (no BlueBubbles app)',
+    minPlan: 'pro',
+    release: 'beta',
+    paidOnly: true,
+  }),
+  imessageInbox: def({
+    id: 'imessageInbox',
+    label: 'iMessage inbox index',
+    description: 'Enterprise full-history search + RAG over the owner inbox',
+    minPlan: 'enterprise',
+    release: 'beta',
     paidOnly: true,
   }),
   liveMedia: def({
@@ -550,6 +570,8 @@ export function toLegacyFeaturesObject(
   liveMedia: boolean
   otpSms: boolean
   presenceSms: boolean
+  imessage: boolean
+  imessageInbox: boolean
   agentMemory: boolean
   agentTrace: boolean
   voiceRooms: boolean
@@ -573,6 +595,8 @@ export function toLegacyFeaturesObject(
     liveMedia: set.liveMedia,
     otpSms: set.otpSms,
     presenceSms: set.presenceSms,
+    imessage: set.imessage,
+    imessageInbox: set.imessageInbox,
     agentMemory: set.agentMemory,
     agentTrace: set.agentTrace,
     voiceRooms: set.voiceRooms,

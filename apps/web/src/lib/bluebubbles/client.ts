@@ -1,13 +1,14 @@
 /**
- * BlueBubbles iMessage bridge client.
+ * iMessage send client.
  *
- * Server runs on a local Mac (Messages.app). Bevel (local or prod) calls the
- * HTTP API to send “you have a new BEVEL” pings. See docs/BLUEBUBBLES_IMESSAGE.md.
+ * Preferred host is the BEVEL Silicon app (BlueBubbles v1 subset on
+ * 127.0.0.1:1234). A leftover BlueBubbles.app is optional, never required.
+ * See docs/IMESSAGE.md.
  *
- * API shape (BlueBubbles server v1.x):
+ * API shape (BlueBubbles server v1.x, also spoken by BEVEL):
  *   POST {url}/api/v1/message/text
- *   Headers: Authorization or password query (server config)
- *   Body: { chatGuid | address, message, method?: "apple-script" | "private-api" }
+ *   Headers: Authorization or password query
+ *   Body: { chatGuid | address, message, method?: "apple-script" }
  */
 
 export type BlueBubblesConfig = {
@@ -26,10 +27,14 @@ export type SendIMessageResult = {
 }
 
 export function getBlueBubblesConfigFromEnv(): Partial<BlueBubblesConfig> {
-  return {
-    url: process.env.BLUEBUBBLES_URL?.replace(/\/$/, '') ?? '',
-    password: process.env.BLUEBUBBLES_PASSWORD ?? '',
-  }
+  const url = (
+    process.env.BEVEL_IMESSAGE_URL ||
+    process.env.BLUEBUBBLES_URL ||
+    'http://127.0.0.1:1234'
+  ).replace(/\/$/, '')
+  const password =
+    process.env.BEVEL_IMESSAGE_PASSWORD || process.env.BLUEBUBBLES_PASSWORD || ''
+  return { url, password }
 }
 
 export function isBlueBubblesConfigured(
@@ -88,7 +93,7 @@ export async function sendIMessage(opts: {
       ok: false,
       status: 503,
       error:
-        'BlueBubbles not configured (BLUEBUBBLES_URL + BLUEBUBBLES_PASSWORD)',
+        'iMessage host not configured. Enable it in the BEVEL Mac app (Native integrations → iMessage), or set BEVEL_IMESSAGE_URL + BEVEL_IMESSAGE_PASSWORD.',
     }
   }
 

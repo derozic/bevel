@@ -3,7 +3,12 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Client, getStateCallbacks, type Room } from '@colyseus/sdk'
-import { Bars3Icon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
+import {
+  Bars3Icon,
+  PaperAirplaneIcon,
+  PhotoIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline'
 import { useFleet } from '../FleetProvider'
 import { accentStripeColor } from '../lib/accent'
 import {
@@ -19,6 +24,13 @@ import {
 } from '../lib/colyseus-messages'
 import { ChatMessageBody } from '../lib/chat-markdown'
 import {
+  MAX_CHAT_IMAGES,
+  chatImageMarkdown,
+  collectImageFiles,
+  hasChatImageMarkdown,
+  isAllowedChatImageFile,
+} from '../lib/chat-images'
+import {
   applyMention,
   filterMixedMentionCandidates,
   mentionDraftAt,
@@ -33,6 +45,7 @@ import {
   formatRoomErrorEvent,
   sanitizeErrorText,
 } from '../lib/format-error'
+import { pinRealtimeEndpoint } from '../lib/realtime-client'
 import { cn } from '../lib/utils'
 import {
   BEVEL_COPY,
@@ -40,24 +53,69 @@ import {
   resolveBevelConnectionIssue,
   type BevelConnectionIssue,
 } from '../product/bevel-copy'
-import { channelTag } from '../product/bevel'
+import { channelTag, messagePermalinkPath } from '../product/bevel'
 import type { FleetAgent } from '../types'
 import { AgentChip } from './AgentChip'
 import { HumanAvatar } from './HumanAvatar'
 import { BevelPoweredBy } from './BevelPoweredBy'
+import {
+  GestureBurstMark,
+  GestureThumbTray,
+  MessageGestures,
+  displayMessageBody,
+  optimisticGesture,
+} from './MessageGestures'
+import { useBubbleGestures } from '../lib/bubble-gestures'
+import type { GestureKind } from '@bevel/schema'
 
-const SEAT_RETRY_MAX = 2
-const SEAT_RETRY_DELAY_MS = 700
+const SEAT_RETRY_MAX = 5
+const SEAT_RETRY_DELAY_MS = 900
 
-/** Known agent portrait paths served from apps/web/public/avatars. */
-const KNOWN_AGENT_AVATARS: Record<string, string> = {
-  brain: '/avatars/brain.svg',
-  loom: '/avatars/loom.svg',
-  lego: '/avatars/lego.svg',
-  northstar: '/avatars/northstar.svg',
-  tegan: '/avatars/tegan.svg',
-  johnny: '/avatars/johnny.svg',
-  hermes: '/avatars/hermes.svg',
+function jwtStillValid(token?: string): boolean {
+  if (!token) return false
+  try {
+    const part = token.split('.')[1]
+    if (!part) return false
+    const padded = part.replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(padded)) as { exp?: number }
+    return typeof payload.exp !== 'number' || payload.exp * 1000 > Date.now() + 8_000
+  } catch {
+    return true
+  }
+}
+
+function isTransientJoinFailure(msg: string): boolean {
+  return (
+    isSeatReservationExpired(msg) ||
+    /1006|abnormal close|timed out|timeout|connection lost|websocket/i.test(msg)
+  )
+}
+
+type PendingChatImage = {
+  id: string
+  file: File
+  previewUrl: string
+}
+
+async function uploadChatImage(file: File): Promise<{ url: string; name: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch('/api/chat/images', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  const data = (await res.json().catch(() => null)) as
+    | { url?: string; name?: string; error?: string }
+    | null
+  if (!res.ok || !data?.url) {
+    throw new Error(data?.error || `Could not upload image (${res.status})`)
+  }
+  return { url: data.url, name: data.name || file.name || 'image' }
+}
+
+/** Known leftover portraits still served even if they left the registry. */
+const LEGACY_AGENT_AVATARS: Record<string, string> = {
   terry: '/avatars/terry.svg',
   forge: '/avatars/forge.svg',
 }
@@ -76,11 +134,9 @@ function resolveAgentAvatarSrc(
     return raw
   }
   const key = (agent?.id || agentId || speaker || '').trim().toLowerCase()
-  if (key && KNOWN_AGENT_AVATARS[key]) return KNOWN_AGENT_AVATARS[key]
-  const byName = Object.keys(KNOWN_AGENT_AVATARS).find((id) =>
-    (speaker || '').toLowerCase().includes(id),
-  )
-  return byName ? KNOWN_AGENT_AVATARS[byName] : undefined
+  if (key && LEGACY_AGENT_AVATARS[key]) return LEGACY_AGENT_AVATARS[key]
+  if (key && /^[a-z][a-z0-9-]*$/.test(key)) return `/avatars/${key}.svg`
+  return undefined
 }
 
 /** Never surface Colyseus "error undefined" placeholders in the UI. */
@@ -93,9 +149,7 @@ function safeIssue(issue: BevelConnectionIssue): BevelConnectionIssue {
   ) {
     return {
       title: BEVEL_COPY.errors.connectionFailed,
-      hint:
-        sanitizeErrorText(issue.hint) ||
-        'Reload the page. If it persists, restart realtime on port 43208.',
+      hint: sanitizeErrorText(issue.hint) || BEVEL_COPY.errors.connectionHint,
     }
   }
   return {
@@ -119,8 +173,19 @@ function ConnectionNotice({
       data-tone={tone}
       role={tone === 'warn' ? 'alert' : 'status'}
     >
-      <p className="fleet-chat-notice-title">{safe.title}</p>
-      {safe.hint ? <p className="fleet-chat-notice-hint">{safe.hint}</p> : null}
+      <p className="fleet-chat-notice-line">
+        <span className="fleet-chat-notice-title">{safe.title}</span>
+        {safe.hint ? (
+          <span className="fleet-chat-notice-hint">{safe.hint}</span>
+        ) : null}
+      </p>
+      <button
+        type="button"
+        className="fleet-chat-notice-retry"
+        onClick={() => window.location.reload()}
+      >
+        Reload
+      </button>
     </div>
   )
 }
@@ -266,27 +331,85 @@ function formatMessageName(
   return label
 }
 
+function GestureBubble({
+  enabled,
+  burst,
+  className,
+  style,
+  children,
+  onToggle,
+  onOpenDock,
+}: {
+  enabled: boolean
+  burst?: GestureKind | null
+  className: string
+  style?: CSSProperties
+  children: ReactNode
+  onToggle?: (kind: GestureKind) => void
+  onOpenDock?: () => void
+}) {
+  const handlers = useBubbleGestures({
+    enabled: enabled && Boolean(onToggle),
+    onGesture: (kind) => onToggle?.(kind),
+    onOpenDock: () => onOpenDock?.(),
+    openDockOnTap: true,
+  })
+  return (
+    <div
+      className={className}
+      style={style}
+      data-burst={burst || undefined}
+      data-burst-kind={burst || undefined}
+      onPointerDown={handlers.onPointerDown}
+      onPointerMove={handlers.onPointerMove}
+      onPointerUp={handlers.onPointerUp}
+      onPointerCancel={handlers.onPointerCancel}
+      onContextMenu={handlers.onContextMenu}
+    >
+      {children}
+      {burst ? <GestureBurstMark kind={burst} /> : null}
+    </div>
+  )
+}
+
 function MessageRow({
   m,
   agents,
   selfName,
+  selfId,
   focused,
   highlightQuery,
   showAvatars = true,
   nameStyle = 'full_and_display',
+  onGesture,
+  dockOpen,
+  burst,
+  onOpenDock,
+  onArchive,
+  onDelete,
+  permalink,
 }: {
   m: ChatMsg
   agents: FleetAgent[]
   selfName: string
+  selfId: string
   focused?: boolean
   highlightQuery?: string
   showAvatars?: boolean
   nameStyle?: 'full_and_display' | 'display_only'
+  onGesture?: (messageId: string, kind: GestureKind) => void
+  dockOpen?: boolean
+  burst?: GestureKind | null
+  onOpenDock?: () => void
+  onArchive?: () => void
+  onDelete?: () => void
+  permalink?: string
 }) {
   const rowProps = {
     id: `msg-${m.id}`,
     'data-message-id': m.id,
     'data-focused': focused ? 'true' : undefined,
+    'data-reacting': dockOpen ? 'true' : undefined,
     'data-avatars': showAvatars ? 'true' : 'false',
   } as const
 
@@ -305,8 +428,10 @@ function MessageRow({
   }
 
   if (m.speakerType === 'human') {
-    const isSelf = m.speaker === selfName
+    const isSelf =
+      (selfId && m.speakerId && m.speakerId === selfId) || m.speaker === selfName
     const label = formatMessageName(m.speaker, nameStyle)
+    const bodyText = displayMessageBody(m)
     return (
       <div className="fleet-chat-msg-row fleet-chat-msg-row--human" {...rowProps}>
         {showAvatars ? (
@@ -314,19 +439,46 @@ function MessageRow({
         ) : (
           <span className="fleet-chat-avatar-spacer" aria-hidden />
         )}
-        <div className="fleet-chat-bubble fleet-chat-bubble--human">
-          {!isSelf ? (
-            <p className="fleet-chat-msg-label">{label}</p>
+        <div className="fleet-chat-msg-stack">
+          <GestureBubble
+            enabled={Boolean(onGesture)}
+            burst={!isSelf ? burst : null}
+            className="fleet-chat-bubble fleet-chat-bubble--human"
+            onToggle={onGesture ? (kind) => onGesture(m.id, kind) : undefined}
+            onOpenDock={onOpenDock}
+          >
+            {!isSelf ? (
+              <p className="fleet-chat-msg-label">{label}</p>
+            ) : null}
+            <div className="fleet-chat-msg-body">
+              {highlightQuery?.trim() ? (
+                <p className="whitespace-pre-wrap">
+                  <HighlightedText text={bodyText} query={highlightQuery} />
+                </p>
+              ) : (
+                <ChatMessageBody text={bodyText} />
+              )}
+            </div>
+          </GestureBubble>
+          {onGesture ? (
+            <MessageGestures
+              message={m}
+              selfId={selfId}
+              incoming={!isSelf}
+              onToggle={(kind) => onGesture(m.id, kind)}
+            />
           ) : null}
-          <div className="fleet-chat-msg-body">
-            {highlightQuery?.trim() ? (
-              <p className="whitespace-pre-wrap">
-                <HighlightedText text={m.body} query={highlightQuery} />
-              </p>
-            ) : (
-              <ChatMessageBody text={m.body} />
-            )}
-          </div>
+          {onGesture || onArchive || onDelete || permalink ? (
+            <GestureThumbTray
+              message={m}
+              selfId={selfId}
+              burst={!isSelf ? burst : null}
+              permalink={permalink}
+              onToggle={(kind) => onGesture?.(m.id, kind)}
+              onArchive={onArchive}
+              onDelete={onDelete}
+            />
+          ) : null}
         </div>
       </div>
     )
@@ -341,6 +493,7 @@ function MessageRow({
   )
 
   const agentAvatarSrc = resolveAgentAvatarSrc(agent, m.agentId, m.speaker)
+  const bodyText = displayMessageBody(m)
 
   return (
     <div className="fleet-chat-msg-row fleet-chat-msg-row--agent" {...rowProps}>
@@ -364,20 +517,45 @@ function MessageRow({
       ) : (
         <span className="fleet-chat-avatar-spacer" aria-hidden />
       )}
-      <div
-        className="fleet-chat-bubble fleet-chat-bubble--agent"
-        style={accent ? ({ '--msg-accent': accent } as CSSProperties) : undefined}
-      >
-        <p className="fleet-chat-msg-label">{agentLabel}</p>
-        <div className="fleet-chat-msg-body">
-          {highlightQuery?.trim() ? (
-            <p className="whitespace-pre-wrap">
-              <HighlightedText text={m.body} query={highlightQuery} />
-            </p>
-          ) : (
-            <ChatMessageBody text={m.body} />
-          )}
-        </div>
+      <div className="fleet-chat-msg-stack">
+        <GestureBubble
+          enabled
+          burst={burst}
+          className="fleet-chat-bubble fleet-chat-bubble--agent"
+          style={accent ? ({ '--msg-accent': accent } as CSSProperties) : undefined}
+          onToggle={onGesture ? (kind) => onGesture(m.id, kind) : undefined}
+          onOpenDock={onOpenDock}
+        >
+          <p className="fleet-chat-msg-label">{agentLabel}</p>
+          <div className="fleet-chat-msg-body">
+            {highlightQuery?.trim() ? (
+              <p className="whitespace-pre-wrap">
+                <HighlightedText text={bodyText} query={highlightQuery} />
+              </p>
+            ) : (
+              <ChatMessageBody text={bodyText} />
+            )}
+          </div>
+        </GestureBubble>
+        {onGesture ? (
+          <MessageGestures
+            message={m}
+            selfId={selfId}
+            incoming
+            onToggle={(kind) => onGesture(m.id, kind)}
+          />
+        ) : null}
+        {onGesture || onArchive || onDelete || permalink ? (
+          <GestureThumbTray
+            message={m}
+            selfId={selfId}
+            burst={burst}
+            permalink={permalink}
+            onToggle={(kind) => onGesture?.(m.id, kind)}
+            onArchive={onArchive}
+            onDelete={onDelete}
+          />
+        ) : null}
       </div>
     </div>
   )
@@ -404,6 +582,7 @@ export function FleetChat({
 }: FleetChatProps) {
   const fleet = useFleet()
   const displayName = fleet.displayName
+  const selfId = fleet.userId ?? displayName
   const realtimeToken = fleet.realtimeToken
   const catalog = useMemo(() => {
     const list = agentsProp ?? fleet.agents
@@ -417,14 +596,20 @@ export function FleetChat({
   const channelSlug = fleet.channelSlug ?? 'general'
   const resumeSessionId = fleet.sessionId
   const newSessionTitle = fleet.sessionTitle
+  const tenantSlug = fleet.tenantSlug || 'platform'
   const roomKey = isChannel
-    ? `channel:${channelSlug}`
+    ? `channel:${tenantSlug}:${channelSlug}`
     : `session:${resumeSessionId ?? 'new'}`
   const bootSnapshot = readRoomSnapshot(roomKey)
   const bootHasThread = Boolean(
     bootSnapshot?.messages.some((m) => m.speakerType !== 'system')
   )
 
+  const [gestureDockId, setGestureDockId] = useState<string | null>(null)
+  const [gestureBurst, setGestureBurst] = useState<{
+    id: string
+    kind: GestureKind
+  } | null>(null)
   const [connected, setConnected] = useState(false)
   const [uiLive, setUiLive] = useState(bootHasThread)
   const [messages, setMessages] = useState<ChatMsg[]>(() => bootSnapshot?.messages ?? [])
@@ -443,7 +628,11 @@ export function FleetChat({
   const [input, setInput] = useState('')
   const [caret, setCaret] = useState(0)
   const [mentionHighlight, setMentionHighlight] = useState(0)
+  const [pendingImages, setPendingImages] = useState<PendingChatImage[]>([])
+  const [attachBusy, setAttachBusy] = useState(false)
+  const [dropping, setDropping] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [agentIds, setAgentIds] = useState<string[]>(() =>
     bootSnapshot?.agentIds?.length ? bootSnapshot.agentIds : initialAgents
   )
@@ -454,7 +643,11 @@ export function FleetChat({
   displayNameRef.current = displayName
   sessionTitleRef.current = newSessionTitle
   // Latch the last good token — a brief session blip must not tear down the room.
-  if (realtimeToken) tokenRef.current = realtimeToken
+  // Drop an expired JWT so we do not keep matchmaking with a dead seat.
+  if (realtimeToken && jwtStillValid(realtimeToken)) tokenRef.current = realtimeToken
+  else if (tokenRef.current && !jwtStillValid(tokenRef.current)) {
+    tokenRef.current = jwtStillValid(realtimeToken) ? realtimeToken : undefined
+  }
   const [sessionId, setSessionId] = useState<string | null>(() => bootSnapshot?.sessionId ?? null)
   const [sessionTitle, setSessionTitle] = useState<string | null>(
     () => bootSnapshot?.sessionTitle ?? null
@@ -593,6 +786,9 @@ export function FleetChat({
 
   useEffect(() => {
     if (!tokenReady) return
+    // Wait for the workspace slug so we do not matchmake as "platform" and
+    // immediately tear the seat down when session/html hydrates to 2x4m.
+    if (isChannel && !fleet.tenantSlug) return
 
     const gen = ++connectGenRef.current
     let cancelled = false
@@ -638,6 +834,7 @@ export function FleetChat({
           ...init,
           credentials: 'omit',
         }),
+      urlBuilder: (url) => pinRealtimeEndpoint(realtimeUrl, url),
     })
     client.auth.token = authToken
 
@@ -656,6 +853,7 @@ export function FleetChat({
     const joinOptions = isChannel
       ? {
           channelSlug,
+          tenantSlug,
           agentIds: joinRoster,
           displayName: joinDisplayName,
           authToken,
@@ -670,6 +868,11 @@ export function FleetChat({
 
     const connectTimeout = window.setTimeout(() => {
       if (!cancelled && !roomRef.current) {
+        if (connectionAttempt < SEAT_RETRY_MAX) {
+          setIssue({ title: BEVEL_COPY.errors.seatReservationRetry })
+          scheduleSeatRetry(() => cancelled, () => setConnectionAttempt((n) => n + 1))
+          return
+        }
         setIssue(
           resolveBevelConnectionIssue('connection timed out', {
             isChannel,
@@ -678,11 +881,15 @@ export function FleetChat({
         )
         setConnected(false)
       }
-    }, 15_000)
+    }, 20_000)
 
-    client
-      .joinOrCreate(roomName, joinOptions)
-      .then((room) => {
+    // React Strict Mode mounts, unmounts, remounts. Delay matchmake so the
+    // first pass never reserves a seat that the cleanup immediately drops.
+    const joinDelay = window.setTimeout(() => {
+      if (cancelled || connectGenRef.current !== gen) return
+      client
+        .joinOrCreate(roomName, joinOptions)
+        .then((room) => {
         window.clearTimeout(connectTimeout)
         if (cancelled || connectGenRef.current !== gen) {
           room.leave()
@@ -736,10 +943,21 @@ export function FleetChat({
             const next = toChatMsg(msg)
             setMessages((prev) => {
               const idx = prev.findIndex((m) => m.id === next.id)
+              const withoutLocal =
+                next.speakerType === 'human'
+                  ? prev.filter(
+                      (m) =>
+                        !(
+                          m.id.startsWith('local_') &&
+                          m.body === next.body &&
+                          m.speakerType === 'human'
+                        ),
+                    )
+                  : prev
               const merged =
                 idx === -1
-                  ? [...prev, next]
-                  : prev.map((m) => (m.id === next.id ? next : m))
+                  ? [...withoutLocal, next]
+                  : withoutLocal.map((m) => (m.id === next.id ? next : m))
               return dedupeMessagesById(merged)
             })
           }
@@ -830,17 +1048,7 @@ export function FleetChat({
           room.onMessage(
             'history',
             (page: {
-              messages?: Array<{
-                id: string
-                speaker: string
-                speakerId?: string
-                speakerAvatar?: string
-                speakerType: string
-                agentId?: string
-                body: string
-                status: string
-                ts: number
-              }>
+              messages?: Array<SchemaMessage>
               hasMore?: boolean
               nextBefore?: string | null
               nextBeforeId?: string | null
@@ -852,17 +1060,7 @@ export function FleetChat({
                 before: page.nextBefore ?? null,
                 beforeId: page.nextBeforeId ?? null,
               })
-              const older = (page.messages ?? []).map((m) => ({
-                id: m.id,
-                speaker: m.speaker,
-                speakerId: m.speakerId,
-                speakerAvatar: m.speakerAvatar,
-                speakerType: m.speakerType,
-                agentId: m.agentId,
-                body: m.body,
-                status: m.status,
-                ts: m.ts,
-              }))
+              const older = (page.messages ?? []).map((m) => toChatMsg(m))
               if (older.length === 0) return
               const el = threadRef.current
               const prevHeight = el?.scrollHeight ?? 0
@@ -897,23 +1095,25 @@ export function FleetChat({
         if (cancelled) return
         const msg =
           formatFleetError(e) || BEVEL_COPY.errors.connectionFailed
-        if (isSeatReservationExpired(msg) && connectionAttempt < SEAT_RETRY_MAX) {
+        if (isTransientJoinFailure(msg) && connectionAttempt < SEAT_RETRY_MAX) {
           setIssue({ title: BEVEL_COPY.errors.seatReservationRetry })
           scheduleSeatRetry(() => cancelled, () => setConnectionAttempt((n) => n + 1))
           return
         }
         setIssue(resolveBevelConnectionIssue(msg, { isChannel, realtimeUrl }))
       })
+    }, 80)
 
     return () => {
       cancelled = true
+      window.clearTimeout(joinDelay)
       window.clearTimeout(connectTimeout)
       if (connectGenRef.current === gen) {
         roomRef.current?.leave()
         roomRef.current = null
       }
     }
-  }, [roomKey, connectionAttempt, fleet.realtimeUrl, isChannel, tokenReady])
+  }, [roomKey, connectionAttempt, fleet.realtimeUrl, isChannel, tokenReady, tenantSlug, fleet.tenantSlug])
 
   useEffect(() => {
     writeRoomSnapshot(roomKey, {
@@ -1046,9 +1246,51 @@ export function FleetChat({
     })
   }
 
+  function addImageFiles(files: File[]) {
+    if (files.length === 0) return
+    setPendingImages((prev) => {
+      const room = Math.max(0, MAX_CHAT_IMAGES - prev.length)
+      const next = files.filter(isAllowedChatImageFile).slice(0, room)
+      if (next.length === 0) return prev
+      return [
+        ...prev,
+        ...next.map((file) => ({
+          id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          file,
+          previewUrl: URL.createObjectURL(file),
+        })),
+      ]
+    })
+  }
+
+  function removePendingImage(id: string) {
+    setPendingImages((prev) => {
+      const hit = prev.find((p) => p.id === id)
+      if (hit) URL.revokeObjectURL(hit.previewUrl)
+      return prev.filter((p) => p.id !== id)
+    })
+  }
+
+  function handleClipboardPaste(event: React.ClipboardEvent) {
+    const files = collectImageFiles(event.clipboardData)
+    if (files.length === 0) return
+    event.preventDefault()
+    addImageFiles(files)
+  }
+
+  useEffect(() => {
+    return () => {
+      pendingImages.forEach((p) => URL.revokeObjectURL(p.previewUrl))
+    }
+    // revoke leftovers on unmount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function send() {
     const text = input.trim()
-    if (!text || !roomRef.current || ticketBusy) return
+    if ((!text && pendingImages.length === 0) || !roomRef.current || ticketBusy) {
+      return
+    }
 
     let message = text
     const work = workMode && fleet.canPutOnWork && Boolean(activeWorkRepo)
@@ -1083,17 +1325,89 @@ export function FleetChat({
       }
     }
 
+    const queued = pendingImages
+    if (queued.length > 0) {
+      setAttachBusy(true)
+      try {
+        const uploaded = await Promise.all(
+          queued.map((item) => uploadChatImage(item.file)),
+        )
+        const imageMd = uploaded
+          .map((item) => chatImageMarkdown(item.name, item.url))
+          .join('\n')
+        message = [message, imageMd].filter(Boolean).join('\n\n')
+      } catch (err) {
+        setIssue({
+          title: 'Could not attach image',
+          hint: err instanceof Error ? err.message : undefined,
+        })
+        setAttachBusy(false)
+        return
+      }
+      queued.forEach((item) => URL.revokeObjectURL(item.previewUrl))
+      setPendingImages([])
+      setAttachBusy(false)
+    }
+
+    if (!message.trim()) return
+    if (!connected || !roomRef.current) {
+      setIssue({
+        title: "Couldn't send — not connected.",
+        hint: BEVEL_COPY.errors.connectionHint,
+      })
+      return
+    }
+
     const directTarget =
       !isChannel && agentIds.length === 1 ? agentIds[0] : undefined
+
+    const optimistic: ChatMsg = {
+      id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      speaker: displayName,
+      speakerId: fleet.userId,
+      speakerAvatar: fleet.avatarUrl,
+      speakerType: 'human',
+      body: message,
+      status: 'final',
+      ts: Date.now(),
+    }
+    setMessages((prev) => dedupeMessagesById([...prev, optimistic]))
+    setInput('')
+    setCaret(0)
 
     roomRef.current.send('chat', {
       text: message,
       speaker: displayName,
+      agentIds,
       ...(directTarget ? { targetAgent: directTarget } : {}),
       work,
       workRepo: work ? activeWorkRepo : undefined,
     })
-    setInput('')
+  }
+
+  function sendGesture(messageId: string, kind: GestureKind) {
+    const room = roomRef.current
+    if (!room || !connected) return
+    setMessages((prev) =>
+      prev.map((row) =>
+        row.id === messageId
+          ? optimisticGesture(row, kind, selfId, displayName)
+          : row,
+      ),
+    )
+    setGestureBurst({ id: messageId, kind })
+    window.setTimeout(() => {
+      setGestureBurst((cur) => (cur?.id === messageId ? null : cur))
+    }, 760)
+    room.send('gesture', { messageId, kind })
+  }
+
+  function sendMessageAction(messageId: string, action: 'archive' | 'delete') {
+    const room = roomRef.current
+    if (!room || !connected) return
+    setMessages((prev) => prev.filter((row) => row.id !== messageId))
+    setGestureDockId(null)
+    room.send('message_action', { messageId, action })
   }
 
   const loadEarlierHistory = () => {
@@ -1138,7 +1452,6 @@ export function FleetChat({
     agentIds.length === 1 && sessionAgentNames[0]
       ? BEVEL_COPY.placeholderDirectSession(sessionAgentNames[0]!)
       : BEVEL_COPY.placeholderSession
-
   return (
     <div
       className={cn('fleet-chat', fillViewport && 'fleet-chat--fill', className)}
@@ -1275,18 +1588,35 @@ export function FleetChat({
           {issue ? (
             <ConnectionNotice
               issue={issue}
-              tone={issue.hint ? 'warn' : 'info'}
+              tone={/sign in/i.test(issue.title) ? 'warn' : 'info'}
             />
           ) : showConnectingNotice ? (
             <div className="fleet-chat-notice" data-tone="info">
-              <p className="fleet-chat-notice-title">{connectingLabel}</p>
+              <p className="fleet-chat-notice-line">
+                <span className="fleet-chat-notice-title">{connectingLabel}</span>
+              </p>
             </div>
           ) : (
             <span className="fleet-chat-notice-placeholder" aria-hidden />
           )}
         </div>
 
-        <div ref={threadRef} className="fleet-chat-thread">
+        <div
+          ref={threadRef}
+          className="fleet-chat-thread"
+          onPointerDownCapture={(e) => {
+            if (!gestureDockId) return
+            const target = e.target as HTMLElement | null
+            if (
+              target?.closest(
+                '.fleet-chat-gesture-dock, .fleet-chat-gestures, .fleet-chat-thumb-tray, .fleet-chat-action-bar',
+              )
+            ) {
+              return
+            }
+            setGestureDockId(null)
+          }}
+        >
           {isChannel && connected && (historyHasMore || historyLoading) ? (
             <div className="fleet-chat-history-bar">
               <button
@@ -1318,10 +1648,27 @@ export function FleetChat({
               m={m}
               agents={catalog}
               selfName={displayName}
+              selfId={selfId}
               focused={focusMessageId === m.id}
               highlightQuery={highlightQuery}
               showAvatars={showAvatars}
               nameStyle={nameStyle}
+              onGesture={connected ? sendGesture : undefined}
+              dockOpen={gestureDockId === m.id}
+              burst={gestureBurst?.id === m.id ? gestureBurst.kind : null}
+              onOpenDock={() => setGestureDockId(m.id)}
+              onArchive={
+                connected ? () => sendMessageAction(m.id, 'archive') : undefined
+              }
+              onDelete={
+                connected ? () => sendMessageAction(m.id, 'delete') : undefined
+              }
+              permalink={messagePermalinkPath({
+                kind: isChannel ? 'channel' : 'session',
+                channelSlug,
+                sessionId: sessionId || resumeSessionId,
+                messageId: m.id,
+              })}
             />
           ))}
         </div>

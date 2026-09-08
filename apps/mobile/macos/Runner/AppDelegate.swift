@@ -4,8 +4,9 @@ import FlutterMacOS
 @main
 class AppDelegate: FlutterAppDelegate {
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    // Keep app alive in dock when window closes — standard Mac behavior
-    return false
+    // Single-window chat client: closing the window should quit, not leave a
+    // headless dock icon with zero windows.
+    return true
   }
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
@@ -17,10 +18,26 @@ class AppDelegate: FlutterAppDelegate {
     hasVisibleWindows flag: Bool
   ) -> Bool {
     if !flag {
-      for window in sender.windows {
-        window.makeKeyAndOrderFront(self)
+      let windows = sender.windows
+      if windows.isEmpty {
+        mainFlutterWindow?.makeKeyAndOrderFront(self)
+      } else {
+        for window in windows {
+          window.makeKeyAndOrderFront(self)
+        }
       }
+      NSApp.activate(ignoringOtherApps: true)
     }
     return true
+  }
+
+  // Keep FlutterAppDelegate's plugin forwarding (app_links) and bring the
+  // window forward after bevel://auth/complete from the system browser.
+  override func application(_ application: NSApplication, open urls: [URL]) {
+    super.application(application, open: urls)
+    NSApp.activate(ignoringOtherApps: true)
+    for window in application.windows {
+      window.makeKeyAndOrderFront(self)
+    }
   }
 }

@@ -7,23 +7,41 @@ const moduleDir = dirname(fileURLToPath(import.meta.url))
 // Fleet code lives in ~/dev/agents (runner + per-agent SOUL.md).
 // BEVEL copies registry/avatars via pnpm sync:agents; runtime still loads
 // the agents package from AGENTS_REPO_ROOT.
-function resolveAgentsRepoRoot(): string {
-  if (process.env.AGENTS_REPO_ROOT) return process.env.AGENTS_REPO_ROOT
+//
+// A leftover `/opt/bevel/dist/runner.js` (stale agents build dumped into the
+// Bevel checkout) is not a valid root — require that `src/agents` exists too.
+export function isAgentsRepoRoot(dir: string): boolean {
+  if (!dir) return false
+  return (
+    existsSync(join(dir, 'dist', 'runner.js')) && existsSync(join(dir, 'src', 'agents'))
+  )
+}
+
+export function resolveAgentsRepoRoot(opts?: {
+  envRoot?: string | null
+  candidates?: string[]
+}): string {
+  const envRoot = (
+    opts && 'envRoot' in opts ? opts.envRoot : process.env.AGENTS_REPO_ROOT
+  )
+    ?.trim()
   const candidates = [
-    // sibling of bevel: ~/dev/agents
-    join(moduleDir, '../../../../agents'),
-    // when running from compiled dist/ under services/realtime
-    join(moduleDir, '../../../../../agents'),
-    // monorepo-style fallback (legacy)
-    join(moduleDir, '../../..'),
-  ]
+    envRoot,
+    envRoot ? join(envRoot, 'agents') : '',
+    ...(opts?.candidates ?? [
+      // sibling of bevel: ~/dev/agents
+      join(moduleDir, '../../../../agents'),
+      // when running from compiled dist/ under services/realtime
+      join(moduleDir, '../../../../../agents'),
+      // monorepo-style fallback (legacy) — only accepted if src/agents exists
+      join(moduleDir, '../../..'),
+    ]),
+  ].filter((c): c is string => Boolean(c))
+
   for (const c of candidates) {
-    if (existsSync(join(c, 'dist', 'runner.js'))) return c
-    if (existsSync(join(c, 'registry.json')) && existsSync(join(c, 'src', 'agents'))) {
-      return c
-    }
+    if (isAgentsRepoRoot(c)) return c
   }
-  return candidates[0]
+  return envRoot || candidates[0] || join(moduleDir, '../../../../agents')
 }
 
 const repoRoot = resolveAgentsRepoRoot()

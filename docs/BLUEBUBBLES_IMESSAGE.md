@@ -1,5 +1,10 @@
 # BEVEL · BlueBubbles (local Mac iMessage bridge)
 
+**Superseded for the Mac app.** The Silicon host now lives in BEVEL itself
+(`docs/IMESSAGE.md`) — `chat.db` + AppleScript, no Firebase. This page remains
+as the leftover HTTP client (`BLUEBUBBLES_*` / `/api/imessage/send`) until the
+outbox PR lands.
+
 iMessage outbound/inbound for invites and “you have a new BEVEL” pings.
 
 **BlueBubbles runs only on macOS** (this laptop or a dedicated Mini).  

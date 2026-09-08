@@ -35,7 +35,7 @@ See **`docs/IDENTITY.md`**. Roster: **`tenants/memberships.yaml`**.
 
 | Email | Memberships (product) | Hosts |
 |-------|----------------------|--------|
-| `scott@derozic.com` / `s@derozic.com` | 2x4m, decli, demo (admin) | bevel.2x4m.cc, bevel.decli.dev, demo.2x4m.cc |
+| `scott@derozic.com` / `s@derozic.com` | 2x4m, decli, demo, olimbic, 2ndbrain (admin) | bevel.2x4m.cc, bevel.decli.dev, demo.2x4m.cc, bevel.olimbic.games, bevel.2ndbra.in |
 | `sderozic@gmail.com` | preso | bevel.pres0.com |
 | `barndough@gmail.com` | olimbic | bevel.olimbic.games |
 | `rozicscott@gmail.com` | 2ndbrain | bevel.2ndbra.in |

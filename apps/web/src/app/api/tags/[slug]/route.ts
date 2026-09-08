@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server'
-import { bevelApiFetch } from '@/lib/bevel-api.server'
+import {
+  bevelApiFetch,
+  hostTenantSlug,
+  withTenantQuery,
+} from '@/lib/bevel-api.server'
 
 export async function GET(
-  request: Request,
+  _request: Request,
   context: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await context.params
-  const tenant = new URL(request.url).searchParams.get('tenant')
-  const qs = tenant ? `?tenant=${encodeURIComponent(tenant)}` : ''
+  const tenant = await hostTenantSlug()
   try {
     const res = await bevelApiFetch(
-      `/api/v1/tags/${encodeURIComponent(slug)}${qs}`,
+      withTenantQuery(`/api/v1/tags/${encodeURIComponent(slug)}`, tenant),
     )
     const data = await res.json().catch(() => ({}))
     return NextResponse.json(data, { status: res.status })

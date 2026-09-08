@@ -229,10 +229,20 @@ export function AnnouncementProvider({
     ],
   )
 
+  const inNativeShell =
+    typeof navigator !== 'undefined' && /BevelNative/i.test(navigator.userAgent)
+
   const resolved = useMemo(() => {
     return items
       .filter((a) => {
         if (dismissed.has(a.id)) return false
+        if (inNativeShell) {
+          const href = (a.linkHref || '').toLowerCase()
+          const label = (a.linkLabel || '').toLowerCase()
+          if (href.includes('/download') || label.includes('flutter app')) {
+            return false
+          }
+        }
         if (a.audience === 'all') return true
         if (a.audience === 'authenticated') return status === 'authenticated'
         if (a.audience === 'operators') return status === 'authenticated'
@@ -254,7 +264,7 @@ export function AnnouncementProvider({
       })
       .filter((a): a is Announcement => a != null)
       .sort((x, y) => (y.priority ?? 0) - (x.priority ?? 0))
-  }, [items, dismissed, status, nextStep])
+  }, [items, dismissed, status, nextStep, inNativeShell])
 
   const value = useMemo(
     () => ({ items, dismissed, onDismiss, resolved }),

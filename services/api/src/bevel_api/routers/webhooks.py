@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bevel_api.db.models.user import User
 from bevel_api.deps import get_session
+from bevel_api.lib import memberships as memberships_lib
 from bevel_api.lib import tenants as yaml_tenants
 from bevel_api.repositories import channels as channels_repo
 from bevel_api.repositories import messages as messages_repo
@@ -19,11 +21,12 @@ from bevel_api.routers.timeline import _require_user, _user_id_from_headers
 
 router = APIRouter(prefix="/v1", tags=["Webhooks"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-DEFAULT_TENANT = "2x4m"
 
 
 async def _tenant(session: AsyncSession, slug: str | None) -> Any:
-    key = (slug or DEFAULT_TENANT).strip().lower()
+    key = (slug or "").strip().lower()
+    if not key:
+        raise HTTPException(400, "tenant required")
     row = await tenants_repo.get_by_slug(session, key)
     if row:
         return row
@@ -32,6 +35,37 @@ async def _tenant(session: AsyncSession, slug: str | None) -> Any:
         return await tenants_repo.upsert_from_yaml(session, key, raw)
     except FileNotFoundError as exc:
         raise HTTPException(404, f"tenant not found: {key}") from exc
+
+
+async def _home_slug(session: AsyncSession, user: User) -> str | None:
+    if not user.tenant_id:
+        return None
+    home = await tenants_repo.get_by_id(session, user.tenant_id)
+    return home.slug if home else None
+
+
+async def _authorized_tenant(
+    session: AsyncSession, user: User, slug: str | None
+) -> Any:
+    key = (slug or "").strip().lower()
+    if not key:
+        key = (await _home_slug(session, user) or "").strip().lower()
+    if not key:
+        raise HTTPException(400, "tenant required")
+    row = await _tenant(session, key)
+    email = (user.email or "").strip().lower()
+    if not memberships_lib.user_may_access_workspace(
+        email, row.slug, home_slug=await _home_slug(session, user)
+    ):
+        raise HTTPException(403, "not a member of this workspace")
+    return row
+
+
+async def _hook_for_tenant(session: AsyncSession, hook_id: str, tenant_id: str) -> Any:
+    hook = await hooks_repo.get_by_id(session, hook_id)
+    if hook is None or hook.tenant_id != tenant_id:
+        raise HTTPException(404, "webhook not found")
+    return hook
 
 
 class CreateWebhookBody(BaseModel):
@@ -73,8 +107,10 @@ async def list_webhooks(
     x_bevel_user_name: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    await _require_user(session, request, user_id=uid, email=email, name=x_bevel_user_name)
-    row = await _tenant(session, tenant)
+    user = await _require_user(
+        session, request, user_id=uid, email=email, name=x_bevel_user_name
+    )
+    row = await _authorized_tenant(session, user, tenant)
     hooks = await hooks_repo.list_for_tenant(session, row.id)
     return {
         "ok": True,
@@ -96,7 +132,7 @@ async def create_webhook(
     user = await _require_user(
         session, request, user_id=uid, email=email, name=x_bevel_user_name
     )
-    row = await _tenant(session, body.tenant)
+    row = await _authorized_tenant(session, user, body.tenant)
     try:
         hook = await hooks_repo.create(
             session,
@@ -129,10 +165,11 @@ async def patch_webhook(
     x_bevel_user_name: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    await _require_user(session, request, user_id=uid, email=email, name=x_bevel_user_name)
-    hook = await hooks_repo.get_by_id(session, hook_id)
-    if hook is None:
-        raise HTTPException(404, "webhook not found")
+    user = await _require_user(
+        session, request, user_id=uid, email=email, name=x_bevel_user_name
+    )
+    row = await _authorized_tenant(session, user, body.tenant)
+    hook = await _hook_for_tenant(session, hook_id, row.id)
     try:
         hook = await hooks_repo.update(
             session,
@@ -160,10 +197,11 @@ async def delete_webhook(
     x_bevel_user_name: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    await _require_user(session, request, user_id=uid, email=email, name=x_bevel_user_name)
-    hook = await hooks_repo.get_by_id(session, hook_id)
-    if hook is None:
-        raise HTTPException(404, "webhook not found")
+    user = await _require_user(
+        session, request, user_id=uid, email=email, name=x_bevel_user_name
+    )
+    row = await _authorized_tenant(session, user, tenant)
+    hook = await _hook_for_tenant(session, hook_id, row.id)
     await hooks_repo.delete(session, hook)
     return {"ok": True}
 
@@ -173,16 +211,18 @@ async def list_webhook_deliveries(
     hook_id: str,
     request: Request,
     session: SessionDep,
+    tenant: str | None = Query(default=None),
     limit: int = Query(default=25, ge=1, le=100),
     x_bevel_user_id: Annotated[str | None, Header()] = None,
     x_bevel_user_email: Annotated[str | None, Header()] = None,
     x_bevel_user_name: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
     uid, email = _user_id_from_headers(x_bevel_user_id, x_bevel_user_email)
-    await _require_user(session, request, user_id=uid, email=email, name=x_bevel_user_name)
-    hook = await hooks_repo.get_by_id(session, hook_id)
-    if hook is None:
-        raise HTTPException(404, "webhook not found")
+    user = await _require_user(
+        session, request, user_id=uid, email=email, name=x_bevel_user_name
+    )
+    row = await _authorized_tenant(session, user, tenant)
+    hook = await _hook_for_tenant(session, hook_id, row.id)
     rows = await hooks_repo.list_deliveries(session, hook_id, limit=limit)
     return {
         "ok": True,

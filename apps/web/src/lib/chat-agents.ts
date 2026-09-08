@@ -1,3 +1,4 @@
+import { resolvePlatformAgentId } from '@bevel/schema'
 import { agents } from '@/lib/agent-catalog'
 
 /** Default roster for new direct threads — Hermes first as fleet co-founder. */
@@ -18,6 +19,7 @@ export function parseChatAgentsParam(param: string | undefined): string[] | null
   const ids = param
     .split(',')
     .map((id) => id.trim().toLowerCase())
+    .map((id) => resolvePlatformAgentId(id) ?? id)
     .filter((id) => catalogIds.has(id))
 
   return ids.length ? [...new Set(ids)] : null

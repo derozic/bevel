@@ -7,6 +7,7 @@ import { BevelRail, type FleetChannelSummary } from '@/components/BevelRail'
 import type { SessionSummary } from '@/lib/realtime'
 import {
   markBevelInputMode,
+  useSoftWorkspaceLinks,
   useWorkspaceOverlayNav,
 } from '@/lib/workspace-nav'
 
@@ -29,6 +30,7 @@ export function BevelWorkspace({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const overlayNav = useWorkspaceOverlayNav()
+  useSoftWorkspaceLinks()
 
   const openSidebar = useCallback(() => setSidebarOpen(true), [])
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])

@@ -23,6 +23,13 @@ describe('feature catalog', () => {
     expect(free.liveSessions).toBe(true)
   })
 
+  it('iMessage host is a paid beta feature, not a BlueBubbles requirement', () => {
+    expect(defaultFeaturesForPlan('free', 'beta').imessage).toBe(false)
+    expect(defaultFeaturesForPlan('pro', 'stable').imessage).toBe(false)
+    expect(defaultFeaturesForPlan('pro', 'beta').imessage).toBe(true)
+    expect(defaultFeaturesForPlan('enterprise', 'beta').imessageInbox).toBe(true)
+  })
+
   it('turning SMS off via override leaves conversations intact', () => {
     const set = resolveFeatureSet({
       plan: 'pro',

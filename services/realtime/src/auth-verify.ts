@@ -6,6 +6,9 @@ export type RealtimeAuth = {
   sub: string
   role?: string
   picture?: string
+  tenantId?: string
+  tenantSlug?: string
+  namespace?: string
   /** Minted when user can put agents on work (admin, allowlist, or repo write). */
   repoWrite?: boolean
   /** Repos this session may target (owner/name). */
@@ -38,6 +41,14 @@ export async function verifyAuthToken(token: string): Promise<RealtimeAuth | nul
       sub: payload.sub ?? email,
       role: typeof payload.role === 'string' ? payload.role : 'user',
       picture: typeof payload.picture === 'string' ? payload.picture : undefined,
+      tenantId: typeof payload.tenantId === 'string' ? payload.tenantId : undefined,
+      tenantSlug:
+        typeof payload.tenantSlug === 'string'
+          ? payload.tenantSlug
+          : typeof payload.namespace === 'string'
+            ? payload.namespace
+            : undefined,
+      namespace: typeof payload.namespace === 'string' ? payload.namespace : undefined,
       repoWrite: payload.repoWrite === true,
       workRepos:
         typeof payload.workRepos === 'string'

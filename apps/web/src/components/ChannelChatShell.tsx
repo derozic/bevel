@@ -6,6 +6,7 @@ import { FleetChat, FleetProvider, type FleetWorkRepo } from '@bevel/realtime-cl
 import { agents } from '@/lib/agent-catalog'
 import { BEVEL_ARCHIVE_PATH, BEVEL_COPY, bevelTalkPath } from '@/lib/bevel'
 import { UserMenu } from '@/components/UserMenu'
+import { ChatHeaderTools } from '@/components/ChatHeaderTools'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 import {
   ensureNotificationPermission,
@@ -34,6 +35,11 @@ function displayNameFromSession(
   const email = session?.user?.email
   if (email) return email.split('@')[0] ?? email
   return 'operator'
+}
+
+function hostTenantSlug(): string | undefined {
+  if (typeof document === 'undefined') return undefined
+  return document.documentElement.getAttribute('data-tenant-slug') || undefined
 }
 
 export function ChannelChatShell({
@@ -159,9 +165,17 @@ export function ChannelChatShell({
         tagline: a.tagline,
         summary: a.bio || a.summary,
         capabilities: a.skills.slice(0, 4),
+        aliases: a.aliases,
       })),
     []
   )
+
+  const [pageTenant, setPageTenant] = useState<string | undefined>(() =>
+    hostTenantSlug(),
+  )
+  useEffect(() => {
+    setPageTenant(hostTenantSlug())
+  }, [])
 
   const resolvedCanPutOnWork = canPutOnWork || session?.canPutOnWork === true
 
@@ -191,6 +205,7 @@ export function ChannelChatShell({
       authReady={status === 'authenticated' || status === 'unauthenticated'}
       roomMode={roomMode}
       channelSlug={channelSlug}
+      tenantSlug={session?.tenantSlug || pageTenant}
       sessionId={sessionId}
       sessionTitle={sessionTitle}
       showPoweredBy={false}
@@ -222,7 +237,12 @@ export function ChannelChatShell({
         focusMessageId={focusMessageId}
         highlightQuery={highlightQuery}
         onChannelToggle={onChannelToggle}
-        userMenu={<UserMenu size="sm" align="end" />}
+        userMenu={
+          <>
+            <ChatHeaderTools />
+            <UserMenu size="sm" align="end" />
+          </>
+        }
         agentMessageHref={(agentId) => bevelTalkPath(agentId)}
         peopleLookupPath="/api/users/lookup"
         channelEscalated={channelEscalated}

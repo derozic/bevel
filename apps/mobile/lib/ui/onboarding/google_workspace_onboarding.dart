@@ -1,6 +1,11 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../config.dart';
+import '../../theme/theme.dart';
+import 'auth_shell.dart';
 import 'onboarding_state.dart';
 
 /// Multi-step Google Workspace onboarding before the workspace shell.
@@ -29,46 +34,50 @@ class _GoogleWorkspaceOnboardingState extends State<GoogleWorkspaceOnboarding> {
   var _step = 0;
   var _busy = false;
 
-  static const _steps = [
-    _StepCopy(
-      title: 'Welcome to BEVEL',
-      body:
-          'Open channels for humans and agents. @mention for a soft timeline ping. '
-          '^escalate when it needs full attention — push, login popup, and email.',
-      icon: Icons.forum_outlined,
-    ),
-    _StepCopy(
-      title: 'Google Workspace',
-      body:
-          'Sign in with your work Google account using the native Google '
-          'account picker in the app — no Safari handoff. We then plant a '
-          'secure workspace session for chat.',
-      icon: Icons.apartment_outlined,
-    ),
-    _StepCopy(
-      title: 'Your workspace',
-      body:
-          'After sign-in you land in your org host (e.g. bevel.2x4m.cc). '
-          'Channels use ~slug by default; mark high-priority channels as ^slug '
-          'in the rail. Your personal agent (Hermes on desktop) helps on escalations.',
-      icon: Icons.workspaces_outlined,
-    ),
-    _StepCopy(
-      title: 'Stay reachable',
-      body:
-          'We will ask for notification permission after you open the workspace — '
-          'not before. Escalations (^handle) use a louder channel than soft @mentions. '
-          'You can change this anytime in Notification settings.',
-      icon: Icons.notifications_active_outlined,
-    ),
-  ];
+  bool get _isDesktop {
+    if (kIsWeb) return false;
+    return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+  }
+
+  List<_StepCopy> get _steps => [
+        const _StepCopy(
+          title: 'Welcome to BEVEL',
+          body:
+              'Channels for humans and agents. @mention for a quiet timeline ping. '
+              '^escalate when it needs the room.',
+          icon: Icons.forum_outlined,
+        ),
+        _StepCopy(
+          title: 'Google Workspace',
+          body: _isDesktop
+              ? 'Sign in with your work Google account in the system browser — '
+                  'the same Auth.js path as the web app. We plant the session '
+                  'when you return.'
+              : 'Sign in with your work Google account in the in-app picker. '
+                  'We then plant a secure workspace session for chat.',
+          icon: Icons.apartment_outlined,
+        ),
+        const _StepCopy(
+          title: 'Your workspace',
+          body:
+              'You land on your org host. Channels use ~slug. Mark the ones '
+              'that matter as ^slug. Hermes on this Mac helps when you escalate.',
+          icon: Icons.workspaces_outlined,
+        ),
+        const _StepCopy(
+          title: 'Stay reachable',
+          body:
+              'Notifications wait until you open a workspace. Escalations are '
+              'louder than @mentions. Change this anytime in settings.',
+          icon: Icons.notifications_active_outlined,
+        ),
+      ];
 
   Future<void> _next() async {
     if (_step < _steps.length - 1) {
       setState(() => _step++);
       return;
     }
-    // Last step → Google
     setState(() => _busy = true);
     try {
       await widget.onContinueWithGoogle();
@@ -82,163 +91,135 @@ class _GoogleWorkspaceOnboardingState extends State<GoogleWorkspaceOnboarding> {
 
   @override
   Widget build(BuildContext context) {
-    final step = _steps[_step];
-    final scheme = Theme.of(context).colorScheme;
-    final isLast = _step == _steps.length - 1;
+    final steps = _steps;
+    final step = steps[_step];
+    final p = context.bevel;
+    final isLast = _step == steps.length - 1;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E12),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'BEVEL',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: scheme.primary,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${_step + 1} / ${_steps.length}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Progress
-              Row(
-                children: List.generate(_steps.length, (i) {
-                  final active = i <= _step;
-                  return Expanded(
-                    child: Container(
-                      height: 3,
-                      margin: EdgeInsets.only(right: i < _steps.length - 1 ? 6 : 0),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? scheme.primary
-                            : const Color(0xFF243040),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-              const Spacer(),
-              Center(
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(step.icon, size: 36, color: scheme.primary),
-                ),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                step.title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFFF4F7F5),
-                    ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                step.body,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  height: 1.5,
-                  fontSize: 15,
-                ),
-              ),
-              if (_step == 1) ...[
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141A21),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF243040)),
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Workspace tips',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFF4F7F5),
-                          fontSize: 13,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '• Use your org Google account (not a personal alias if SSO is required)\n'
-                        '• Allow cookies for bevel.is and your workspace host\n'
-                        '• After Google, you return via bevel://auth/complete',
-                        style: TextStyle(
-                          color: Color(0xFF94A3B8),
-                          height: 1.45,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
+      backgroundColor: p.cream,
+      body: BevelAuthShell(
+        footer: Text(
+          'v${BevelConfig.versionLabel}',
+          style: TextStyle(fontSize: 11, color: p.subtle, letterSpacing: 0.3),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                BevelMark(size: 22, palette: p),
+                const SizedBox(width: 10),
+                const BevelWordmark(),
+                const Spacer(),
+                Text(
+                  '${_step + 1} / ${steps.length}',
+                  style: TextStyle(fontSize: 11, color: p.subtle),
                 ),
               ],
-              const Spacer(),
-              FilledButton(
-                onPressed: _busy ? null : _next,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: isLast ? scheme.primary : scheme.primary,
-                ),
-                child: _busy
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(
-                        isLast ? 'Continue with Google' : 'Next',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-              ),
-              if (isLast) ...[
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: _busy ? null : widget.onSkipToWorkspace,
-                  child: Text(
-                    'I already signed in — open ${Uri.parse(BevelConfig.workspaceUrl).host}',
-                    textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: List.generate(steps.length, (i) {
+                final active = i <= _step;
+                return Expanded(
+                  child: Container(
+                    height: 2,
+                    margin: EdgeInsets.only(right: i < steps.length - 1 ? 5 : 0),
+                    decoration: BoxDecoration(
+                      color: active ? p.accent : p.border,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
                   ),
+                );
+              }),
+            ),
+            const SizedBox(height: 28),
+            Center(
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: p.cream,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: p.border),
                 ),
-              ] else ...[
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: () => setState(() => _step = _steps.length - 1),
-                  child: const Text('Skip to sign-in'),
+                child: Icon(step.icon, size: 28, color: p.accent),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              step.title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              step.body,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+            ),
+            if (_step == 1) ...[
+              const SizedBox(height: 18),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: p.cream.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: p.border),
                 ),
-              ],
-              TextButton(
-                onPressed: widget.onOpenNotificationSettings,
-                child: const Text('Notification settings'),
+                child: Text(
+                  _isDesktop
+                      ? 'Use your org Google account. After Google, this window '
+                          'comes back via bevel://auth/complete.'
+                      : 'Use your org Google account (not a personal alias if '
+                          'SSO is required). After Google, you return via '
+                          'bevel://auth/complete.',
+                  style: TextStyle(color: p.muted, height: 1.45, fontSize: 12),
+                ),
               ),
             ],
-          ),
+            const SizedBox(height: 28),
+            FilledButton(
+              onPressed: _busy ? null : _next,
+              child: _busy
+                  ? SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: p.cream,
+                      ),
+                    )
+                  : Text(isLast ? 'Continue with Google' : 'Next'),
+            ),
+            const SizedBox(height: 8),
+            if (isLast)
+              TextButton(
+                onPressed: _busy ? null : widget.onSkipToWorkspace,
+                child: Text(
+                  'I already signed in — open ${Uri.parse(BevelConfig.workspaceUrl).host}',
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              TextButton(
+                onPressed: () => setState(() => _step = steps.length - 1),
+                child: const Text('Skip to sign-in'),
+              ),
+            TextButton(
+              onPressed: widget.onOpenNotificationSettings,
+              child: Text(
+                'Notification settings',
+                style: TextStyle(color: p.subtle, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../config.dart';
+import '../../theme/theme.dart';
 
 /// Native left rail for expanded layouts (iPad Pro, Fold inner, tablets).
 class WorkspaceRail extends StatelessWidget {
@@ -38,49 +39,20 @@ class WorkspaceRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final p = context.bevel;
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 12, 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'B',
-                    style: TextStyle(
-                      color: scheme.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'BEVEL',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFF4F7F5),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 12, 8),
+            child: BevelBrandTitle(),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Text(
               Uri.parse(BevelConfig.workspaceUrl).host,
-              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+              style: TextStyle(fontSize: 10, color: p.subtle),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -98,15 +70,15 @@ class WorkspaceRail extends StatelessWidget {
               }
             },
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
             child: Text(
               'CHANNELS',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-                color: Color(0xFF64748B),
+                letterSpacing: 1.0,
+                color: p.subtle,
               ),
             ),
           ),
@@ -128,15 +100,15 @@ class WorkspaceRail extends StatelessWidget {
                     escalated: escalatedSlugs.contains(slug),
                     onTap: () => onNavigate('/~$slug'),
                   ),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(8, 14, 8, 6),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 14, 8, 6),
                   child: Text(
                     'AGENTS',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                      color: Color(0xFF64748B),
+                      letterSpacing: 1.0,
+                      color: p.subtle,
                     ),
                   ),
                 ),
@@ -199,13 +171,11 @@ class _NavTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final p = context.bevel;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
-        color: selected
-            ? scheme.primary.withValues(alpha: 0.12)
-            : Colors.transparent,
+        color: selected ? p.accent.withValues(alpha: 0.12) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
@@ -218,10 +188,10 @@ class _NavTile extends StatelessWidget {
                   icon,
                   size: 18,
                   color: escalated
-                      ? const Color(0xFFFBBF24)
+                      ? p.accent
                       : selected
-                          ? scheme.primary
-                          : const Color(0xFF94A3B8),
+                          ? p.accent
+                          : p.muted,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -231,22 +201,18 @@ class _NavTile extends StatelessWidget {
                       Text(
                         label,
                         style: TextStyle(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           fontSize: 13,
-                          color: escalated
-                              ? const Color(0xFFFBBF24)
-                              : const Color(0xFFF4F7F5),
-                          fontFamily: label.startsWith('~') || label.startsWith('^')
+                          color: escalated ? p.accent : p.ink,
+                          fontFamily: label.startsWith('~') ||
+                                  label.startsWith('^')
                               ? 'monospace'
                               : null,
                         ),
                       ),
                       Text(
                         subtitle,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF64748B),
-                        ),
+                        style: TextStyle(fontSize: 11, color: p.subtle),
                       ),
                     ],
                   ),

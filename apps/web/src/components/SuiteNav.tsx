@@ -1,8 +1,7 @@
 'use client'
 
 /**
- * Right-side suite chips (Slack / Phoenix density).
- * Bevel mark → apex (bevel.is). Optional product chip when on an org host.
+ * Bevel mark → apex (bevel.is). Workspace switching lives in ChatHeaderTools.
  */
 import Link from 'next/link'
 import { BevelNavMark } from '@/components/BevelNavMark'
@@ -14,15 +13,10 @@ const APEX = platformPublicUrl()
 
 export function SuiteNav({
   className,
-  productLabel,
-  productHref,
   showLabel = true,
   size = 'md',
 }: {
   className?: string
-  /** Active workspace product name (e.g. 2x4m) */
-  productLabel?: string | null
-  productHref?: string | null
   showLabel?: boolean
   size?: 'sm' | 'md'
 }) {
@@ -41,7 +35,6 @@ export function SuiteNav({
         )}
         title="BEVEL — platform home"
       >
-        {/* Magenta geometry + daypart palette (crease tracks atmosphere) */}
         <BevelNavMark className={mark} />
         {showLabel ? (
           <span className="tracking-wide">BEVEL</span>
@@ -49,32 +42,6 @@ export function SuiteNav({
           <span className="sr-only">BEVEL</span>
         )}
       </Link>
-      {productLabel ? (
-        productHref ? (
-          <Link
-            href={productHref}
-            className={cn(
-              'inline-flex max-w-[10rem] items-center truncate rounded-full',
-              'border border-white/10 bg-white/[0.04] px-3 font-medium text-muted',
-              'transition hover:border-white/15 hover:text-foreground',
-              size === 'sm' ? 'h-8 text-xs' : 'h-9 text-sm',
-            )}
-            title={productLabel}
-          >
-            {productLabel}
-          </Link>
-        ) : (
-          <span
-            className={cn(
-              'inline-flex max-w-[10rem] items-center truncate rounded-full',
-              'border border-accent/30 bg-accent/10 px-3 font-medium text-accent',
-              size === 'sm' ? 'h-8 text-xs' : 'h-9 text-sm',
-            )}
-          >
-            {productLabel}
-          </span>
-        )
-      ) : null}
     </div>
   )
 }

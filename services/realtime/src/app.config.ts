@@ -6,10 +6,13 @@ import { listSessionSummaries, readRecording, summarizeRecording } from './recor
 import { AgentSession } from './rooms/AgentSession.js'
 import { FleetChannel } from './rooms/FleetChannel.js'
 import { FleetLobby } from './rooms/FleetLobby.js'
+import { summarizeRooms } from './health-snapshot.js'
 import {
   conversationSearchIndex,
   rebuildConversationSearchIndex,
 } from './search-index.js'
+
+const PROCESS_STARTED_AT = Date.now()
 
 function programEventsAuthorized(req: express.Request): boolean {
   const key = process.env.FLEET_INTERNAL_API_KEY
@@ -32,11 +35,19 @@ console.log(
   `[search-index] ready — ${bootIndex.documents} messages across ${bootIndex.sessions} sessions`,
 )
 
+function publicAddress(): string | undefined {
+  const explicit = process.env.COLYSEUS_PUBLIC_ADDRESS?.trim()
+  if (explicit) return explicit.replace(/^https?:\/\//, '')
+  if (process.env.NODE_ENV === 'production') return 'realtime.bevel.is'
+  return undefined
+}
+
 export const server = defineServer({
+  publicAddress: publicAddress(),
   rooms: {
     fleet_lobby: defineRoom(FleetLobby),
     agent_session: defineRoom(AgentSession).filterBy(['sessionId']),
-    fleet_channel: defineRoom(FleetChannel).filterBy(['channelSlug']),
+    fleet_channel: defineRoom(FleetChannel).filterBy(['channelSlug', 'tenantSlug']),
   },
   express: (app) => {
     // Reflect Origin so credentialed Colyseus matchmake (credentials:include)
@@ -58,15 +69,26 @@ export const server = defineServer({
     )
     app.use(express.json())
 
-    app.get('/health', (_req, res) => {
+    app.get('/health', async (_req, res) => {
+      let listings: Array<{ name?: string; clients?: number }> = []
+      try {
+        listings = await matchMaker.query({})
+      } catch {
+        listings = []
+      }
       res.json({
         status: 'ok',
         service: 'agents-realtime',
         colyseus: true,
+        publicAddress: publicAddress() ?? null,
+        startedAt: new Date(PROCESS_STARTED_AT).toISOString(),
+        uptimeSec: Math.round(process.uptime()),
         searchIndex: {
           ready: conversationSearchIndex.isReady(),
           documents: conversationSearchIndex.size,
+          sessions: conversationSearchIndex.sessionCount,
         },
+        rooms: summarizeRooms(listings),
       })
     })
 

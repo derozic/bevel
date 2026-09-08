@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  Bot,
   Globe,
   LayoutDashboard,
   Megaphone,
@@ -18,6 +19,7 @@ const nav = [
   { name: 'Domains', href: '/dashboard/domains', icon: Globe },
   { name: 'Announcements', href: '/dashboard/announcements', icon: Megaphone },
   { name: 'Realtime', href: '/dashboard/realtime', icon: Radio },
+  { name: 'Agent settings', href: '/dashboard/agent-settings', icon: Bot },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 

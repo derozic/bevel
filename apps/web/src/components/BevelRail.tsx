@@ -3,10 +3,10 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  ArrowLeftIcon,
+  BookmarkIcon,
   ClockIcon,
-  Cog6ToothIcon,
   ExclamationTriangleIcon,
+  TagIcon,
 } from '@heroicons/react/24/outline'
 import type { MouseEvent, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -27,6 +27,7 @@ import {
   bevelConversationPath,
   bevelTalkPath,
   channelTag,
+  isRedundantChannelName,
   sortChannelsByEscalation,
 } from '@/lib/bevel'
 import { FeatureFlagsBar } from '@/components/FeatureFlagsBar'
@@ -43,14 +44,25 @@ import {
 } from '@/lib/channel-list'
 import { DEFAULT_CHANNELS, type FleetChannelSummary } from '@/lib/fleet-channels'
 import type { SessionSummary } from '@/lib/realtime'
-import { BevelMark } from './BevelMark'
-import { SuiteNav } from './SuiteNav'
+import {
+  pinKey,
+  resolvePins,
+  togglePin,
+  type ConversationPin,
+} from '@/lib/conversation-pins'
+import {
+  countUnreadTimeline,
+  formatTimelineTeaser,
+  latestConversationPreview,
+  pickTimelineTeaser,
+  type TimelineTeaserItem,
+} from '@/lib/timeline-teaser'
 import { WorkspaceBrand } from './WorkspaceBrand'
 import { FolksonomyChips } from './FolksonomyChips'
 import { ConversationRoster } from './ConversationRoster'
 import { ConversationSearch } from './ConversationSearch'
 import { CreateChannelModal } from './CreateChannelModal'
-import { DaypartControl } from './DaypartControl'
+import { BrandSquare, BrandSquareGrid } from './BrandSquare'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 
 function BevelRailFooter({
@@ -62,32 +74,15 @@ function BevelRailFooter({
   featureAccess?: FeatureAccess | string
   featureSet?: ResolvedFeatureSet | null
 }) {
-  const prefs = usePreferencesOptional()
   return (
     <div className="flex flex-col gap-1.5">
-      <DaypartControl />
-      <button
-        type="button"
-        className="bevel-rail-footer-link w-full text-left"
-        onClick={() => prefs?.openSection('appearance')}
+      <Link
+        href={BEVEL_TAGS_PATH}
+        className="bevel-rail-footer-link inline-flex"
+        title="Tags"
       >
-        <Cog6ToothIcon className="h-3.5 w-3.5" />
-        Appearance
-      </button>
-      <button
-        type="button"
-        className="bevel-rail-footer-link w-full text-left"
-        onClick={() => prefs?.openSection('ai')}
-      >
-        <Cog6ToothIcon className="h-3.5 w-3.5" />
-        Preferences
-      </button>
-      <Link href={BEVEL_TAGS_PATH} className="bevel-rail-footer-link">
+        <TagIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
         Tags
-      </Link>
-      <Link href="/" className="bevel-rail-footer-link">
-        <ArrowLeftIcon className="h-3.5 w-3.5" />
-        Home
       </Link>
       {plan || featureAccess || featureSet ? (
         <FeatureFlagsBar
@@ -110,6 +105,12 @@ function conversationLabel(summary: SessionSummary): string {
   if (names.length === 2) return `${names[0]} & ${names[1]}`
   if (names.length > 2) return `${names[0]} +${names.length - 1}`
   return 'Conversation'
+}
+
+function pinHref(pin: ConversationPin): string {
+  if (pin.kind === 'channel') return bevelChannelPath(pin.id)
+  if (pin.kind === 'talk') return bevelTalkPath(pin.id)
+  return bevelConversationPath({ sessionId: pin.id })
 }
 
 export function BevelRail({
@@ -155,6 +156,15 @@ export function BevelRail({
     return new Set(list.map((s) => s.trim().toLowerCase()).filter(Boolean))
   }, [prefs?.prefs.home.escalatedChannels])
   const [propertiesSlug, setPropertiesSlug] = useState<string | null>(null)
+  const [brandMarkUrl, setBrandMarkUrl] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    const root = document.documentElement
+    const read = () =>
+      root.getAttribute('data-tenant-logo') ||
+      getComputedStyle(root).getPropertyValue('--brand-icon-url').trim() ||
+      undefined
+    setBrandMarkUrl(read() || undefined)
+  }, [])
   // SSR-safe initial state only — localStorage is applied in useEffect (React #418).
   const [channels, setChannels] = useState<FleetChannelSummary[]>(() => {
     if (privateAgentsOnly) return []
@@ -174,6 +184,7 @@ export function BevelRail({
   const [conversationsError, setConversationsError] = useState<string | null>(null)
   const conversationsFetchedRef = useRef(false)
   const channelsBootstrappedRef = useRef(false)
+  const [timelineItems, setTimelineItems] = useState<TimelineTeaserItem[]>([])
 
   const initialChannelsKey = useMemo(
     () =>
@@ -200,6 +211,19 @@ export function BevelRail({
     if (!initialSessions?.length) return
     setConversations((prev) => syncConversationData(prev, initialSessions))
   }, [initialSessionsKey, initialSessions])
+
+  const loadTimeline = useCallback(async () => {
+    try {
+      const res = await fetch('/api/timeline?limit=20', {
+        credentials: 'include',
+      })
+      if (!res.ok) return
+      const data = (await res.json()) as { items?: TimelineTeaserItem[] }
+      setTimelineItems(Array.isArray(data.items) ? data.items : [])
+    } catch {
+      /* keep last teaser */
+    }
+  }, [])
 
   const loadConversations = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setConversationsLoading(true)
@@ -277,10 +301,12 @@ export function BevelRail({
           void loadConversations({ silent: true })
         }
       }
+      void loadTimeline()
     }
   }, [
     load,
     loadConversations,
+    loadTimeline,
     status,
     initialSessions?.length,
     privateAgentsOnly,
@@ -288,11 +314,13 @@ export function BevelRail({
 
   useEffect(() => {
     if (status !== 'authenticated') return
+    void loadTimeline()
     const interval = window.setInterval(() => {
       void loadConversations({ silent: true })
+      void loadTimeline()
     }, 30_000)
     return () => window.clearInterval(interval)
-  }, [loadConversations, status])
+  }, [loadConversations, loadTimeline, status])
 
   const visible = useMemo(
     () =>
@@ -303,6 +331,8 @@ export function BevelRail({
     [channels, prefs?.prefs.home.escalatedChannels],
   )
   const visibleConversations = conversations.slice(0, 24)
+  const propertiesChannel =
+    visible.find((ch) => ch.slug === propertiesSlug) ?? null
 
   const toggleEscalated = useCallback(
     (slug: string) => {
@@ -318,61 +348,123 @@ export function BevelRail({
     [prefs],
   )
 
+  const fallbackPinSlugs = useMemo(
+    () => (privateAgentsOnly ? [] : visible.map((ch) => ch.slug)),
+    [privateAgentsOnly, visible],
+  )
+  const { pins: pinned } = useMemo(
+    () =>
+      resolvePins(prefs?.prefs.home.pinnedConversations, fallbackPinSlugs),
+    [prefs?.prefs.home.pinnedConversations, fallbackPinSlugs],
+  )
+  const pinnedKeys = useMemo(
+    () => new Set(pinned.map((p) => `${p.kind}:${p.id}`)),
+    [pinned],
+  )
+
+  const togglePinned = useCallback(
+    (pin: ConversationPin) => {
+      if (!prefs) return
+      const current =
+        prefs.prefs.home.pinnedConversations ??
+        resolvePins(undefined, fallbackPinSlugs).pins
+      prefs.updatePrefs({
+        home: { pinnedConversations: togglePin(current, pin) },
+      })
+    },
+    [prefs, fallbackPinSlugs],
+  )
+
   const onChannelClick = useCallback(
     (e: MouseEvent<HTMLAnchorElement>, slug: string) => {
-      // Ctrl/Cmd+click toggles high-priority (^) without navigating
       if (e.metaKey || e.ctrlKey) {
         e.preventDefault()
         e.stopPropagation()
-        toggleEscalated(slug)
+        togglePinned({ kind: 'channel', id: slug })
         return
       }
       onNavigate?.()
     },
-    [onNavigate, toggleEscalated],
+    [onNavigate, togglePinned],
   )
+
+  const onPinClick = useCallback(
+    (e: MouseEvent<HTMLAnchorElement>, pin: ConversationPin) => {
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        togglePinned(pin)
+        return
+      }
+      onNavigate?.()
+    },
+    [onNavigate, togglePinned],
+  )
+
+  const unpinnedChannels = useMemo(
+    () =>
+      visible.filter(
+        (ch) => !pinnedKeys.has(`channel:${ch.slug.toLowerCase()}`),
+      ),
+    [visible, pinnedKeys],
+  )
+
+  const feedTeaser = useMemo(
+    () => pickTimelineTeaser(timelineItems),
+    [timelineItems],
+  )
+  const feedUnread = useMemo(
+    () => countUnreadTimeline(timelineItems),
+    [timelineItems],
+  )
+  const feedPreview = useMemo(() => {
+    if (feedTeaser) return formatTimelineTeaser(feedTeaser)
+    return (
+      latestConversationPreview(
+        conversations.map((row) => ({
+          title: conversationLabel(row),
+          preview: row.preview,
+          updatedAt: row.updatedAt,
+        })),
+      ) || BEVEL_COPY.feedEmpty
+    )
+  }, [feedTeaser, conversations])
 
   return (
     <div className="bevel-rail">
       <div className="bevel-rail-header">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <WorkspaceBrand productName={productName} />
-            {platformHomeHref ? (
-              <a
-                href={platformHomeHref}
-                className="bevel-rail-platform-back"
-                title={`Back to ${platformHomeLabel || productName || 'home'}`}
-              >
-                ← {platformHomeLabel || productName || 'home'}
-              </a>
-            ) : null}
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {/* Right-half suite chip → apex bevel.is */}
-            <SuiteNav
-              size="sm"
-              showLabel={false}
-              productLabel={productName}
-            />
-            {!privateAgentsOnly ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setCreatedSlug(null)
-                  setShowCreate(true)
-                }}
-                className="bevel-rail-new-channel"
-              >
-                {BEVEL_COPY.newChannel}
-              </button>
-            ) : null}
-            {headerAction}
-          </div>
+        <div className="bevel-rail-header-brand">
+          <WorkspaceBrand productName={productName} />
+          {platformHomeHref ? (
+            <a
+              href={platformHomeHref}
+              className="bevel-rail-platform-back"
+              title={`Back to ${platformHomeLabel || productName || 'home'}`}
+            >
+              ← {platformHomeLabel || productName || 'home'}
+            </a>
+          ) : null}
+          {headerAction ? (
+            <div className="bevel-rail-header-actions">{headerAction}</div>
+          ) : null}
         </div>
-        <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
-          {privateAgentsOnly ? 'Private agents' : BEVEL_COPY.channelsLabel}
-        </p>
+        <div className="bevel-rail-tracks-head">
+          <p className="bevel-rail-tracks-label">
+            {privateAgentsOnly ? 'Private agents' : BEVEL_COPY.channelsLabel}
+          </p>
+          {!privateAgentsOnly ? (
+            <button
+              type="button"
+              onClick={() => {
+                setCreatedSlug(null)
+                setShowCreate(true)
+              }}
+              className="bevel-rail-new-channel"
+            >
+              {BEVEL_COPY.newChannel}
+            </button>
+          ) : null}
+        </div>
         {status === 'authenticated' ? (
           <div className="mt-2">
             <ConversationSearch />
@@ -402,130 +494,204 @@ export function BevelRail({
           <Link
             href="/timeline"
             onClick={onNavigate}
-            className="bevel-rail-channel"
+            className="bevel-rail-conversation bevel-rail-feed"
             data-active={timelineActive ? 'true' : 'false'}
+            data-unread={feedUnread > 0 ? 'true' : 'false'}
+            title={feedPreview}
           >
-            <span className="bevel-rail-channel-slug flex items-center gap-1">
-              <ClockIcon className="h-3 w-3" aria-hidden />
-              feed
+            <span className="bevel-rail-conversation-title flex items-center gap-1">
+              <ClockIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              {BEVEL_COPY.feedLabel}
+              {feedUnread > 0 ? (
+                <span className="bevel-rail-feed-count">{feedUnread}</span>
+              ) : null}
             </span>
-            <span className="bevel-rail-channel-name">Timeline</span>
+            <span className="bevel-rail-conversation-preview">{feedPreview}</span>
           </Link>
         </nav>
-        <nav aria-label={BEVEL_COPY.channelsLabel}>
-          {privateAgentsOnly
-            ? null
-            : visible.map((ch) => {
-            const escalated = escalatedSet.has(ch.slug.toLowerCase())
-            const propsOpen = propertiesSlug === ch.slug
-            return (
-              <div key={ch.slug} className="bevel-rail-channel-wrap">
-                <Link
-                  href={bevelChannelPath(ch.slug)}
-                  onClick={(e) => onChannelClick(e, ch.slug)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setPropertiesSlug((s) => (s === ch.slug ? null : ch.slug))
-                  }}
-                  data-active={activeSlug === ch.slug ? 'true' : 'false'}
-                  data-escalated={escalated ? 'true' : 'false'}
-                  className="bevel-rail-channel"
-                  aria-busy={loading ? true : undefined}
-                  title={
-                    escalated
-                      ? `${channelTag(ch.slug, { escalated: true })} — high priority. Ctrl/Cmd+click to remove.`
-                      : `${channelTag(ch.slug)} — Ctrl/Cmd+click to escalate (^)`
-                  }
-                >
-                  <span className="bevel-rail-channel-slug">
-                    {channelTag(ch.slug, { escalated })}
-                  </span>
-                  <span className="bevel-rail-channel-name">
-                    {ch.name || '\u00a0'}
-                  </span>
-                  {ch.tags?.length ? (
-                    <span className="mt-0.5 flex flex-wrap gap-1">
-                      {ch.tags.slice(0, 3).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-black/5 px-1.5 text-[9px] font-medium uppercase tracking-wide text-muted"
+        <nav aria-label={BEVEL_COPY.pinnedLabel}>
+          <p className="bevel-rail-section-label">
+            {BEVEL_COPY.pinnedLabel}
+          </p>
+          {pinned.length === 0 ? (
+            <p className="bevel-rail-empty px-1">{BEVEL_COPY.pinnedEmpty}</p>
+          ) : (
+            <BrandSquareGrid label={BEVEL_COPY.pinnedLabel}>
+              {pinned.map((pin) => {
+                const agent =
+                  pin.kind === 'talk'
+                    ? agents.find((a) => a.id === pin.id)
+                    : undefined
+                const session =
+                  pin.kind === 'session'
+                    ? conversations.find((c) => c.sessionId === pin.id)
+                    : undefined
+                const escalated =
+                  pin.kind === 'channel' && escalatedSet.has(pin.id)
+                const label =
+                  pin.kind === 'talk'
+                    ? agent?.name ?? pin.id
+                    : pin.kind === 'session'
+                      ? session
+                        ? conversationLabel(session)
+                        : pin.id.slice(0, 8)
+                      : channelTag(pin.id, { escalated })
+                const active =
+                  pin.kind === 'channel'
+                    ? activeSlug === pin.id
+                    : pin.kind === 'talk'
+                      ? Boolean(
+                          activeSessionId &&
+                            (activeSessionId === `talk:${pin.id}` ||
+                              activeSessionId.endsWith(`-${pin.id}`)),
+                        )
+                      : activeSessionId === pin.id
+                return (
+                  <BrandSquare
+                    key={pinKey(pin)}
+                    href={pinHref(pin)}
+                    label={label}
+                    logoUrl={
+                      pin.kind === 'talk'
+                        ? agent?.avatarUrl
+                        : pin.kind === 'channel'
+                          ? brandMarkUrl
+                          : undefined
+                    }
+                    processKey={pin.id}
+                    active={active}
+                    escalated={escalated}
+                    busy={pin.kind === 'channel' ? loading : false}
+                    onClick={(e) => onPinClick(e, pin)}
+                    onContextMenu={
+                      pin.kind === 'channel'
+                        ? (e) => {
+                            e.preventDefault()
+                            setPropertiesSlug((s) =>
+                              s === pin.id ? null : pin.id,
+                            )
+                          }
+                        : undefined
+                    }
+                    title={`${label} — pin. Ctrl/Cmd+click to unpin.`}
+                  />
+                )
+              })}
+            </BrandSquareGrid>
+          )}
+        </nav>
+
+        <nav aria-label={BEVEL_COPY.channelsLabel} className="mt-3">
+          {privateAgentsOnly ? null : (
+            <>
+              {unpinnedChannels.length > 0 ? (
+                <div className="mb-2">
+                  {unpinnedChannels.map((ch) => {
+                    const escalated = escalatedSet.has(ch.slug.toLowerCase())
+                    const distinctName = !isRedundantChannelName(ch.slug, ch.name)
+                    return (
+                      <div key={ch.slug} className="bevel-rail-conversation-row">
+                        <Link
+                          href={bevelChannelPath(ch.slug)}
+                          onClick={(e) => onChannelClick(e, ch.slug)}
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            setPropertiesSlug((s) =>
+                              s === ch.slug ? null : ch.slug,
+                            )
+                          }}
+                          className="bevel-rail-channel"
+                          data-active={activeSlug === ch.slug ? 'true' : 'false'}
+                          data-escalated={escalated ? 'true' : 'false'}
+                          title={channelTag(ch.slug, { escalated })}
                         >
-                          {tag}
-                        </span>
-                      ))}
-                    </span>
-                  ) : null}
-                </Link>
-                <button
-                  type="button"
-                  className="bevel-rail-channel-props"
-                  aria-label={`Channel properties for ${ch.slug}`}
-                  aria-expanded={propsOpen}
-                  title="Channel properties"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setPropertiesSlug((s) => (s === ch.slug ? null : ch.slug))
-                  }}
+                          <span className="bevel-rail-channel-slug">
+                            {channelTag(ch.slug, { escalated })}
+                          </span>
+                          {distinctName ? (
+                            <span className="bevel-rail-channel-name">{ch.name}</span>
+                          ) : null}
+                        </Link>
+                        <button
+                          type="button"
+                          className="bevel-rail-pin-btn"
+                          aria-label={`Pin ${channelTag(ch.slug)}`}
+                          title="Pin"
+                          onClick={() =>
+                            togglePinned({ kind: 'channel', id: ch.slug })
+                          }
+                        >
+                          <BookmarkIcon className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : null}
+              {propertiesChannel ? (
+                <div
+                  className="bevel-rail-channel-panel"
+                  role="dialog"
+                  aria-label={`${propertiesChannel.name || propertiesChannel.slug} properties`}
                 >
-                  <Cog6ToothIcon className="h-3 w-3" />
-                </button>
-                {propsOpen ? (
-                  <div
-                    className="bevel-rail-channel-panel"
-                    role="dialog"
-                    aria-label={`${ch.name || ch.slug} properties`}
-                  >
-                    <p className="bevel-rail-channel-panel-title">
-                      {channelTag(ch.slug, { escalated })} · properties
-                    </p>
-                    <p className="bevel-rail-channel-panel-hint">
-                      Tracks show as ~slug. Escalated tracks pin to the top as
-                      ^slug. Tags are folksonomy — anyone can add one.
-                    </p>
-                    <div className="mt-2 px-1">
-                      <FolksonomyChips
-                        kind="track"
-                        id={ch.slug}
-                        initialTags={ch.tags}
-                      />
-                    </div>
-                    <p className="bevel-rail-channel-panel-hint mt-2">
-                      Workflows land here via webhooks.{' '}
-                      <a href="/console/workflows#webhooks" className="underline">
-                        Mint an inbound URL
-                      </a>{' '}
-                      for ~{ch.slug}.
-                    </p>
-                    <button
-                      type="button"
-                      className="bevel-rail-channel-panel-action"
-                      data-escalated={escalated ? 'true' : 'false'}
-                      onClick={() => {
-                        toggleEscalated(ch.slug)
-                      }}
-                    >
-                      <ExclamationTriangleIcon className="h-3.5 w-3.5" />
-                      {escalated
-                        ? 'Remove high priority'
-                        : 'Escalate channel (^)'}
-                    </button>
-                    <p className="bevel-rail-channel-panel-meta">
-                      Tip: Ctrl/Cmd+click the channel, or right-click for this
-                      panel.
-                    </p>
-                    <button
-                      type="button"
-                      className="bevel-rail-channel-panel-close"
-                      onClick={() => setPropertiesSlug(null)}
-                    >
-                      Close
-                    </button>
+                  <p className="bevel-rail-channel-panel-title">
+                    {channelTag(propertiesChannel.slug, {
+                      escalated: escalatedSet.has(
+                        propertiesChannel.slug.toLowerCase(),
+                      ),
+                    })}{' '}
+                    · properties
+                  </p>
+                  <p className="bevel-rail-channel-panel-hint">
+                    Tracks show as ~slug. Escalated tracks pin to the top as
+                    ^slug. Tags are folksonomy — anyone can add one.
+                  </p>
+                  <div className="mt-2 px-1">
+                    <FolksonomyChips
+                      kind="track"
+                      id={propertiesChannel.slug}
+                      initialTags={propertiesChannel.tags}
+                    />
                   </div>
-                ) : null}
-              </div>
-            )
-          })}
+                  <p className="bevel-rail-channel-panel-hint mt-2">
+                    Workflows land here via webhooks.{' '}
+                    <a href="/console/workflows#webhooks" className="underline">
+                      Mint an inbound URL
+                    </a>{' '}
+                    for ~{propertiesChannel.slug}.
+                  </p>
+                  <button
+                    type="button"
+                    className="bevel-rail-channel-panel-action"
+                    data-escalated={
+                      escalatedSet.has(propertiesChannel.slug.toLowerCase())
+                        ? 'true'
+                        : 'false'
+                    }
+                    onClick={() => {
+                      toggleEscalated(propertiesChannel.slug)
+                    }}
+                  >
+                    <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                    {escalatedSet.has(propertiesChannel.slug.toLowerCase())
+                      ? 'Remove high priority'
+                      : 'Escalate channel (^)'}
+                  </button>
+                  <p className="bevel-rail-channel-panel-meta">
+                    Tip: Ctrl/Cmd+click the channel, or right-click for this
+                    panel.
+                  </p>
+                  <button
+                    type="button"
+                    className="bevel-rail-channel-panel-close"
+                    onClick={() => setPropertiesSlug(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )}
         </nav>
 
         <div className="bevel-rail-section">
@@ -553,33 +719,49 @@ export function BevelRail({
                   activeSessionId.endsWith(`-${agent.id}`) ||
                   activeSessionId.includes(`-${agent.id}`) ||
                   activeSessionId.endsWith(`-${agent.id.toLowerCase()}`))
+              const pin = { kind: 'talk' as const, id: agent.id }
+              const isPinned = pinnedKeys.has(pinKey(pin))
               return (
-                <Link
-                  key={agent.id}
-                  href={href}
-                  onClick={onNavigate}
-                  data-active={active ? 'true' : 'false'}
-                  className="bevel-rail-conversation"
-                  title={`Message ${agent.name}`}
-                >
-                  <span className="bevel-rail-conversation-title">
-                    {agent.name}
-                  </span>
-                  <span className="bevel-rail-conversation-preview">
-                    {live?.preview?.trim() ||
-                      agent.tagline ||
-                      agent.role ||
-                      'Direct thread'}
-                  </span>
-                </Link>
+                <div key={agent.id} className="bevel-rail-conversation-row">
+                  <Link
+                    href={href}
+                    onClick={onNavigate}
+                    data-active={active ? 'true' : 'false'}
+                    className="bevel-rail-conversation"
+                    title={`Message ${agent.name}`}
+                  >
+                    <span className="bevel-rail-conversation-title">
+                      {agent.name}
+                    </span>
+                    <span className="bevel-rail-conversation-preview">
+                      {live?.preview?.trim() ||
+                        agent.tagline ||
+                        agent.role ||
+                        'Direct thread'}
+                    </span>
+                  </Link>
+                  <button
+                    type="button"
+                    className="bevel-rail-pin-btn"
+                    data-pinned={isPinned ? 'true' : 'false'}
+                    aria-label={isPinned ? `Unpin ${agent.name}` : `Pin ${agent.name}`}
+                    title={isPinned ? 'Unpin' : 'Pin'}
+                    onClick={() => togglePinned(pin)}
+                  >
+                    <BookmarkIcon className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
               )
             })}
             {/* Multi-agent or historical sessions not covered by single-agent rows */}
             {visibleConversations
               .filter((c) => (c.agentIds ?? []).length !== 1)
-              .map((conv) => (
+              .map((conv) => {
+                const pin = { kind: 'session' as const, id: conv.sessionId }
+                const isPinned = pinnedKeys.has(pinKey(pin))
+                return (
+                <div key={conv.sessionId} className="bevel-rail-conversation-row">
                 <Link
-                  key={conv.sessionId}
                   href={bevelConversationPath(conv)}
                   onClick={onNavigate}
                   data-active={
@@ -602,7 +784,19 @@ export function BevelRail({
                         : '\u00a0')}
                   </span>
                 </Link>
-              ))}
+                  <button
+                    type="button"
+                    className="bevel-rail-pin-btn"
+                    data-pinned={isPinned ? 'true' : 'false'}
+                    aria-label={isPinned ? 'Unpin conversation' : 'Pin conversation'}
+                    title={isPinned ? 'Unpin' : 'Pin'}
+                    onClick={() => togglePinned(pin)}
+                  >
+                    <BookmarkIcon className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+                )
+              })}
             {conversationsLoading && visibleConversations.length === 0 ? (
               <p className="bevel-rail-empty" aria-busy>
                 {BEVEL_COPY.loadingConversations}
@@ -621,6 +815,7 @@ export function BevelRail({
         </div>
       </div>
 
+      {createdSlug || error ? (
       <div className="bevel-rail-notices" aria-live="polite">
         {createdSlug ? (
           <div className="bevel-rail-notice bevel-rail-notice--success">
@@ -636,7 +831,7 @@ export function BevelRail({
               — open when you are ready.
             </p>
           </div>
-        ) : error ? (
+        ) : (
           <div className="bevel-rail-notice bevel-rail-notice--error">
             <p className="font-medium">{error}</p>
             <button
@@ -647,10 +842,9 @@ export function BevelRail({
               Retry
             </button>
           </div>
-        ) : (
-          <span className="bevel-rail-notices-placeholder" aria-hidden />
         )}
       </div>
+      ) : null}
 
       <div className="bevel-rail-footer">
         <BevelRailFooter

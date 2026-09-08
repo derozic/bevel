@@ -44,6 +44,8 @@ export {
   resolveHomeTenantForEmail,
   emailIsMemberOfWorkspace,
   publicTenantUrl,
+  tenantPublicHost,
+  isPreviewHost,
   registrableDomain,
   needsAuthHandoff,
   isPlatformHost,
@@ -75,6 +77,21 @@ export {
 } from './loader'
 export { runDoctor, formatDoctorReport, type DoctorOptions } from './doctor'
 export { tenantThemeCssVars } from './theme-vars'
+export {
+  DEFAULT_CMYK_HOST,
+  DEFAULT_CMYK_PROCESS,
+  brandMarkFromKit,
+  cmykBrandKitHost,
+  fetchCmykBrandKitTheme,
+  mergeBrandKitIntoTheme,
+  processColorForKey,
+  processFromKit,
+  resolveCmykKitId,
+  resolveTenantWithBrandKit,
+  stripCssUrl,
+  type CmykBrandKitTheme,
+  type CmykProcess,
+} from './cmyk-brandkit'
 export {
   provisionTenant,
   slugifyOrgName,

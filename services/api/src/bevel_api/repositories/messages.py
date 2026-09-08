@@ -210,6 +210,7 @@ async def list_for_channel(
     q = select(Message).where(
         Message.tenant_id == tenant_id,
         Message.channel_id == channel_id,
+        _visible_in_thread(),
     )
     if before is not None:
         if before_id:
@@ -259,6 +260,7 @@ async def list_for_channel_slug(
     q = select(Message).where(
         Message.tenant_id == tenant_id,
         Message.channel_slug == key,
+        _visible_in_thread(),
     )
     if before is not None:
         if before_id:
@@ -289,6 +291,41 @@ def pagination_cursors(msgs: list[Message]) -> dict[str, Any]:
         "nextBefore": oldest.created_at.isoformat() if oldest.created_at else None,
         "nextBeforeId": oldest.id,
     }
+
+
+def _visible_in_thread():
+    """Exclude operator-deleted / archived rows from the live thread."""
+    return and_(
+        ~Message.metadata_.contains({"deleted": True}),
+        ~Message.metadata_.contains({"archived": True}),
+    )
+
+
+async def set_lifecycle(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    message_id: str,
+    action: str,
+) -> Message | None:
+    """Mark a message deleted or archived. Returns the row, or None if missing."""
+    kind = (action or "").strip().lower()
+    if kind not in {"delete", "archive"}:
+        raise ValueError(f"unknown lifecycle action: {action}")
+    row = await get_by_id(session, message_id)
+    if row is None or row.tenant_id != tenant_id:
+        return None
+    meta = dict(row.metadata_ or {})
+    if kind == "delete":
+        meta["deleted"] = True
+        meta.pop("archived", None)
+    else:
+        meta["archived"] = True
+        meta.pop("deleted", None)
+    row.metadata_ = meta
+    await session.commit()
+    await session.refresh(row)
+    return row
 
 
 async def get_by_id(session: AsyncSession, message_id: str) -> Message | None:

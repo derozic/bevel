@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/theme.dart';
 import 'bevel_breakpoints.dart';
 
 /// Wraps app content with [BevelLayoutScope] and optional split shell.
@@ -22,6 +23,7 @@ class AdaptiveScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final info = BevelLayoutInfo.of(context);
+    final p = context.bevel;
 
     Widget content = body;
     if (info.prefersSplit && rail != null) {
@@ -30,11 +32,11 @@ class AdaptiveScaffold extends StatelessWidget {
           SizedBox(
             width: info.isFoldInner ? 280 : 300,
             child: Material(
-              color: const Color(0xFF0F1419),
+              color: p.railWash,
               child: rail,
             ),
           ),
-          const VerticalDivider(width: 1, thickness: 1, color: Color(0xFF243040)),
+          VerticalDivider(width: 1, thickness: 1, color: p.border),
           Expanded(child: body),
         ],
       );
@@ -43,7 +45,7 @@ class AdaptiveScaffold extends StatelessWidget {
     return BevelLayoutScope(
       info: info,
       child: Scaffold(
-        backgroundColor: backgroundColor ?? const Color(0xFF0A0E12),
+        backgroundColor: backgroundColor ?? p.cream,
         appBar: appBar,
         floatingActionButton: floatingActionButton,
         body: SafeArea(

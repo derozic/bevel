@@ -239,6 +239,7 @@ export function AgentChip({
                 <a
                   href={messageHref}
                   className="fleet-chat-agent-card__btn fleet-chat-agent-card__btn--primary"
+                  onClick={() => closeCard()}
                 >
                   Message
                 </a>

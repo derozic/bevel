@@ -12,6 +12,8 @@ feature_access: beta
 brand:
   theme: ./theme.json
   product_name: Decli
+  cmyk:
+    kit_id: decli
 
 features:
   async_streams: true

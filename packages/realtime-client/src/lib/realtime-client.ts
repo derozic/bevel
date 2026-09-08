@@ -56,3 +56,25 @@ export function resolveRealtimeUrl(explicit?: string): string {
 
   return env.replace(':41008', ':43208')
 }
+
+/**
+ * Colyseus `urlBuilder` is used for both matchmake HTTP and the seat
+ * WebSocket. Only rewrite ws/wss onto the Caddy host — forcing wss on
+ * https matchmake makes `fetch` throw "URL scheme wss is not supported".
+ */
+export function pinRealtimeEndpoint(realtimeUrl: string, url: URL): string {
+  try {
+    const base = new URL(realtimeUrl)
+    const isWs = url.protocol === 'ws:' || url.protocol === 'wss:'
+    if (isWs) {
+      url.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
+    } else if (url.protocol === 'http:' || url.protocol === 'https:') {
+      url.protocol = base.protocol === 'https:' ? 'https:' : 'http:'
+    }
+    url.hostname = base.hostname
+    url.port = base.port
+  } catch {
+    /* keep advertised URL */
+  }
+  return url.toString()
+}

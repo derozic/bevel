@@ -25,6 +25,8 @@ brand:
     midday: ./logos/logo-midday.svg
     afternoon: ./logos/logo-afternoon.svg
     night: ./logos/logo-night.svg
+  cmyk:
+    kit_id: 2x4m
 
 features:
   async_streams: true
@@ -36,6 +38,7 @@ features:
   work_mode: true
   custom_branding: true
   sms: true
+  imessage: true
   # Matrix fabric (requires feature_access: beta — already set above)
   matrix: true
   matrix_federation: false

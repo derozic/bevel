@@ -19,12 +19,20 @@ people:
       role: admin
     - workspace: demo
       role: admin
+    - workspace: olimbic
+      role: admin
+    - workspace: 2ndbrain
+      role: admin
   s@derozic.com:
     - workspace: 2x4m
       role: admin
     - workspace: decli
       role: admin
     - workspace: demo
+      role: admin
+    - workspace: olimbic
+      role: admin
+    - workspace: 2ndbrain
       role: admin
   sderozic@gmail.com:
     - workspace: preso

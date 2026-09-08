@@ -1,9 +1,13 @@
 import type { Tenant } from '@bevel/schema'
+import { DEFAULT_CMYK_PROCESS, type CmykProcess } from './cmyk-brandkit'
 
 type CssVarMap = Record<string, string>
 
 /** Map tenant theme → CSS variables for BEVEL + 2x4m-compatible chat tokens (--cream, --ink). */
-export function tenantThemeCssVars(tenant: Tenant | null): CssVarMap {
+export function tenantThemeCssVars(
+  tenant: Tenant | null,
+  process: CmykProcess = DEFAULT_CMYK_PROCESS,
+): CssVarMap {
   if (!tenant) return {}
 
   const t = tenant.theme
@@ -38,5 +42,10 @@ export function tenantThemeCssVars(tenant: Tenant | null): CssVarMap {
     '--sticker-muted': textMuted,
     '--sticker-subtle': `color-mix(in srgb, ${textMuted} 88%, ${text})`,
     '--command-accent': accent,
+    '--cmyk-cyan': process.cyan,
+    '--cmyk-magenta': process.magenta,
+    '--cmyk-yellow': process.yellow,
+    '--cmyk-key': process.key,
+    '--brand-icon-url': t.brandIconUrl || t.markUrl || t.logoUrl || '',
   }
 }

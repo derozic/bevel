@@ -38,6 +38,7 @@ import {
   Sunrise,
   Terminal,
   TimerReset,
+  Users,
   Zap,
 } from "lucide-react";
 
@@ -306,6 +307,14 @@ function CommandPalette() {
         icon: GitBranch,
         keywords: "pipeline automation",
         run: () => go("/console/workflows"),
+      },
+      {
+        id: "fleet",
+        label: "Agent fleet",
+        group: "Workspace",
+        icon: Users,
+        keywords: "org chart hierarchy diamond fleet agents",
+        run: () => go("/console/fleet"),
       },
       {
         id: "status",

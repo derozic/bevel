@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../config.dart';
+import '../../theme/theme.dart';
 
 class EscalationItem {
   EscalationItem({
@@ -131,12 +132,13 @@ class EscalationInboxSheet extends StatelessWidget {
     required void Function(EscalationItem item) onOpen,
   }) async {
     if (items.isEmpty || !context.mounted) return;
+    final p = context.bevel;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
-      backgroundColor: const Color(0xFF0F1419),
+      backgroundColor: p.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -151,6 +153,7 @@ class EscalationInboxSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.bevel;
     final height = MediaQuery.sizeOf(context).height * 0.72;
     return SafeArea(
       child: SizedBox(
@@ -162,18 +165,7 @@ class EscalationInboxSheet extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.priority_high_rounded,
-                      color: Color(0xFFFBBF24),
-                      size: 22,
-                    ),
-                  ),
+                  BevelMark(size: 28, palette: p),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -181,20 +173,11 @@ class EscalationInboxSheet extends StatelessWidget {
                       children: [
                         Text(
                           'Escalations',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFFF4F7F5),
-                              ),
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                         Text(
-                          '${items.length} need your attention — more than a normal notification',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF94A3B8),
-                          ),
+                          '${items.length} need you — louder than a soft mention',
+                          style: TextStyle(fontSize: 12, color: p.muted),
                         ),
                       ],
                     ),
@@ -206,7 +189,7 @@ class EscalationInboxSheet extends StatelessWidget {
                 ],
               ),
             ),
-            const Divider(height: 1, color: Color(0xFF243040)),
+            Divider(height: 1, color: p.border),
             Expanded(
               child: ListView.separated(
                 padding: const EdgeInsets.all(16),
@@ -217,11 +200,9 @@ class EscalationInboxSheet extends StatelessWidget {
                   return Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF141A21),
+                      color: p.surfaceRaised,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
-                      ),
+                      border: Border.all(color: p.accent.withValues(alpha: 0.35)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -230,9 +211,9 @@ class EscalationInboxSheet extends StatelessWidget {
                           children: [
                             Text(
                               item.actorLabel,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFFF4F7F5),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: p.ink,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -240,10 +221,10 @@ class EscalationInboxSheet extends StatelessWidget {
                               item.channelSlug != null
                                   ? '~${item.channelSlug}'
                                   : '^escalation',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
                                 fontFamily: 'monospace',
-                                color: Color(0xFFFBBF24),
+                                color: p.accent,
                               ),
                             ),
                           ],
@@ -253,20 +234,16 @@ class EscalationInboxSheet extends StatelessWidget {
                           item.bodyPreview,
                           maxLines: 4,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             height: 1.35,
-                            color: Color(0xFFCBD5E1),
+                            color: p.muted,
                           ),
                         ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
                             FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFFF59E0B),
-                                foregroundColor: const Color(0xFF1C1917),
-                              ),
                               onPressed: () => onOpen(item),
                               child: const Text('Open'),
                             ),

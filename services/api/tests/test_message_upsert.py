@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from datetime import datetime, timezone
 
 from bevel_api.repositories.messages import (
+    apply_gesture,
     extract_mentioned_agent_ids,
     _build_metadata,
     page_limit,
@@ -55,3 +56,14 @@ def test_pagination_cursors_from_oldest() -> None:
     assert cursors["nextBeforeId"] == "msg_old"
     assert cursors["nextBefore"] == ts.isoformat()
     assert pagination_cursors([]) == {"nextBefore": None, "nextBeforeId": None}
+
+
+def test_apply_gesture_toggles_and_pairs() -> None:
+    first = apply_gesture([], kind="up", user_id="scott", user_name="Scott")
+    assert first[0]["kind"] == "up"
+    swapped = apply_gesture(first, kind="down", user_id="scott")
+    assert [g["kind"] for g in swapped] == ["down"]
+    off = apply_gesture(swapped, kind="down", user_id="scott")
+    assert off == []
+    starred = apply_gesture(first, kind="star", user_id="scott")
+    assert {g["kind"] for g in starred} == {"up", "star"}

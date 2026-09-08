@@ -122,12 +122,19 @@ Realtime env (`/opt/bevel/services/realtime/.env`):
 
 ```ini
 REALTIME_PORT=43208
+COLYSEUS_PUBLIC_ADDRESS=realtime.bevel.is
 API_INTERNAL_URL=http://127.0.0.1:43203
 FLEET_INTERNAL_API_KEY=SECRET
 AUTH_SECRET=same-as-web
-AGENTS_REPO_ROOT=/opt/bevel
+AGENTS_REPO_ROOT=/opt/bevel/agents
 AGENTS_SESSIONS_DIR=/opt/bevel/data/sessions
+OPENROUTER_API_KEY=SECRET
+OPENAI_API_KEY=SECRET
+ANTHROPIC_API_KEY=SECRET
+GROK_API_KEY=SECRET
 ```
+
+Hermes and the fleet runner use `OPENROUTER_API_KEY`. ChatGPT / Claude / Grok prefer their native keys and fall back to OpenRouter when a native key is missing. The OpenRouter key itself has a per-key credit cap (`limit`); raising workspace credits does not lift that cap.
 
 Build before start: `cd /opt/bevel/services/realtime && pnpm run build`.
 
@@ -135,7 +142,16 @@ Caddy:
 
 ```caddy
 realtime.bevel.is {
-	reverse_proxy 127.0.0.1:43208
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+	reverse_proxy 127.0.0.1:43208 {
+		flush_interval -1
+	}
 }
 ```
 

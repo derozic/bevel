@@ -31,6 +31,7 @@ export const PLATFORM_HOSTS = new Set([
   'realtime.bevel.is',
   'docs.bevel.is',
   'status.bevel.is',
+  'status.bevel.lvh.me',
   'cname.bevel.is',
   'bevel.com',
   'www.bevel.com',

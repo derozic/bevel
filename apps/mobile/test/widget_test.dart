@@ -5,6 +5,9 @@ import 'package:bevel_app/config.dart';
 import 'package:bevel_app/main.dart';
 import 'package:bevel_app/native/deep_links.dart';
 import 'package:bevel_app/native/media_device_discovery.dart';
+import 'package:bevel_app/native/macos_plugin_gaps.dart';
+import 'package:bevel_app/native/native_login_gate.dart';
+import 'package:bevel_app/ui/workspace_shell.dart';
 
 void main() {
   testWidgets('BEVEL home shows workspace entry', (tester) async {
@@ -64,7 +67,13 @@ void main() {
       BevelConfig.isOAuthNavigation(
         Uri.parse('https://bevel.2x4m.lvh.me/api/auth/signin/google'),
       ),
-      isTrue,
+      isFalse,
+    );
+    expect(
+      BevelConfig.isOAuthNavigation(
+        Uri.parse('https://bevel.is/api/auth/native-complete'),
+      ),
+      isFalse,
     );
     expect(
       BevelConfig.isOAuthNavigation(
@@ -87,6 +96,32 @@ void main() {
     expect(BevelConfig.isAllowedInAppHost('bevel.2x4m.cc'), isTrue);
     expect(BevelConfig.isAllowedInAppHost('realtime.bevel.is'), isTrue);
     expect(BevelConfig.isAllowedInAppHost('evil.example.com'), isFalse);
+  });
+
+  test('WebView background color is skipped on macOS', () {
+    expect(webViewSupportsBackgroundColor(TargetPlatform.macOS), isFalse);
+    expect(webViewSupportsBackgroundColor(TargetPlatform.windows), isFalse);
+    expect(webViewSupportsBackgroundColor(TargetPlatform.iOS), isTrue);
+    expect(webViewSupportsBackgroundColor(TargetPlatform.android), isTrue);
+  });
+
+  test('native login gate allows only one browser hop', () {
+    NativeLoginGate.reset();
+    expect(NativeLoginGate.tryBegin(), isTrue);
+    expect(NativeLoginGate.tryBegin(), isFalse);
+    NativeLoginGate.markComplete();
+    expect(NativeLoginGate.tryBegin(), isFalse);
+    NativeLoginGate.reset();
+    expect(NativeLoginGate.tryBegin(), isTrue);
+    NativeLoginGate.reset();
+  });
+
+  test('macOS WebKit opaque gap is recognized', () {
+    expect(
+      isMacosWebKitGap(UnimplementedError('opaque is not implemented on macOS')),
+      isTrue,
+    );
+    expect(isMacosWebKitGap(StateError('nope')), isFalse);
   });
 
   test('media device models parse inventory maps', () {

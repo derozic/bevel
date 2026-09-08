@@ -281,6 +281,10 @@ class GestureBody(BaseModel):
     userName: str = ""
 
 
+class LifecycleBody(BaseModel):
+    action: str = Field(min_length=3, max_length=16)
+
+
 @router.post("/channels/{slug}/messages/{message_id}/gestures")
 async def post_message_gesture(
     slug: str,
@@ -329,6 +333,36 @@ async def post_message_gesture(
     except Exception:
         pass
     return {"ok": True, "message": messages_repo.to_api_dict(record)}
+
+
+@router.post("/channels/{slug}/messages/{message_id}/lifecycle")
+async def post_message_lifecycle(
+    slug: str,
+    message_id: str,
+    payload: LifecycleBody,
+    _auth: InternalAuth,
+    session: SessionDep,
+    tenant: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Archive or delete a channel message (operator / customer cleanup)."""
+    action = payload.action.strip().lower()
+    if action not in {"delete", "archive"}:
+        raise HTTPException(400, f"unknown action: {payload.action}")
+    row = await _resolve_tenant(session, tenant)
+    try:
+        record = await messages_repo.set_lifecycle(
+            session,
+            tenant_id=row.id,
+            message_id=message_id,
+            action=action,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if record is None:
+        raise HTTPException(404, "message not found")
+    if record.channel_slug != slug.lower().strip():
+        raise HTTPException(404, "message not found")
+    return {"ok": True, "action": action, "messageId": record.id}
 
 
 @router.get("/channels/{slug}/messages/in-progress")

@@ -15,7 +15,8 @@
     "./transport": "./src/transport.ts",
     "./declarative-tenant": "./src/declarative-tenant.ts",
     "./doctor": "./src/doctor.ts",
-    "./preferences": "./src/preferences.ts"
+    "./preferences": "./src/preferences.ts",
+    "./platform-agents": "./src/platform-agents.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

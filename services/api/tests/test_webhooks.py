@@ -2,6 +2,7 @@
 
 from bevel_api.db.models.webhook import Webhook
 from bevel_api.repositories.webhooks import (
+    SIGNATURE_MAX_AGE_SECONDS,
     hook_wants_event,
     is_safe_outbound_url,
     matches_room,
@@ -30,11 +31,21 @@ def _hook(**kwargs) -> Webhook:
 
 
 def test_sign_and_verify_roundtrip() -> None:
+    import time
+
     raw = '{"ok":true}'
-    header = sign_body("sekrit", raw, 1700000000)
+    header = sign_body("sekrit", raw, int(time.time()))
     assert verify_request("sekrit", raw, signature=header, bearer=None)
     assert not verify_request("nope", raw, signature=header, bearer=None)
     assert verify_request("sekrit", raw, signature=None, bearer="sekrit")
+
+
+def test_rejects_stale_timestamped_signature() -> None:
+    raw = '{"ok":true}'
+    stale = 1_700_000_000
+    header = sign_body("sekrit", raw, stale)
+    assert abs(int(__import__("time").time()) - stale) > SIGNATURE_MAX_AGE_SECONDS
+    assert not verify_request("sekrit", raw, signature=header, bearer=None)
 
 
 def test_sha256_body_signature() -> None:
@@ -95,7 +106,16 @@ def test_event_families_include_ftue() -> None:
     assert hook_wants_event(_hook(events=[]), "user.created")
 
 
-def test_blocks_ssrf_hosts() -> None:
+def test_blocks_ssrf_hosts(monkeypatch) -> None:
+    monkeypatch.setenv("BEVEL_ALLOW_LOOPBACK_WEBHOOKS", "0")
     assert is_safe_outbound_url("https://hooks.n8n.io/bevel")
     assert not is_safe_outbound_url("https://169.254.169.254/latest")
     assert not is_safe_outbound_url("file:///etc/passwd")
+    assert not is_safe_outbound_url("http://127.0.0.1/secret")
+    assert not is_safe_outbound_url("http://localhost:3000/hook")
+
+
+def test_loopback_allowed_when_opted_in(monkeypatch) -> None:
+    monkeypatch.setenv("BEVEL_ALLOW_LOOPBACK_WEBHOOKS", "1")
+    assert is_safe_outbound_url("http://127.0.0.1:5678/webhook")
+    assert is_safe_outbound_url("http://localhost/hook")

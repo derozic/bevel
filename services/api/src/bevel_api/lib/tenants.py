@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -80,16 +81,51 @@ def tenant_channels(slug: str) -> list[dict[str, Any]]:
     ]
 
 
+def _registry_path() -> Path:
+    """Locate the synced ~/dev/agents registry (repo root, or one level up)."""
+    roots = [settings.bevel_repo_root, settings.bevel_repo_root.parent]
+    here = Path(__file__).resolve()
+    roots.extend(here.parents[n] for n in range(3, 6) if n < len(here.parents))
+    for root in roots:
+        candidate = root / "registry.json"
+        if candidate.is_file():
+            return candidate
+    return settings.bevel_repo_root / "registry.json"
+
+
 def catalog_agents() -> list[dict[str, Any]]:
-    """Static fleet catalog aligned with web agent-catalog ids."""
+    """Fleet catalog aligned with the synced agents registry."""
+    path = _registry_path()
+    if path.is_file():
+        try:
+            parsed = json.loads(path.read_text(encoding="utf-8"))
+            rows = parsed.get("agents") if isinstance(parsed, dict) else None
+            if isinstance(rows, list) and rows:
+                out: list[dict[str, Any]] = []
+                for raw in rows:
+                    if not isinstance(raw, dict) or not raw.get("id"):
+                        continue
+                    out.append(
+                        {
+                            "id": str(raw["id"]),
+                            "name": str(raw.get("name") or raw["id"]),
+                            "role": str(raw.get("role") or raw.get("name") or raw["id"]),
+                            "category": raw.get("category"),
+                            "accent": raw.get("accent"),
+                            "avatar": f"/avatars/{raw['id']}.svg",
+                        }
+                    )
+                if out:
+                    return out
+        except (OSError, ValueError, TypeError):
+            pass
     return [
-        {"id": "loom", "name": "Loom", "role": "Fleet brain"},
-        {"id": "northstar", "name": "Northstar", "role": "Thread weaver"},
-        {"id": "lego", "name": "Lego", "role": "Signal scout"},
-        {"id": "tegan", "name": "Tegan", "role": "Surface craft"},
-        {"id": "mildred", "name": "Mildred", "role": "Token & cost books"},
-        {"id": "johnny", "name": "Johnny", "role": "Night shift"},
-        {"id": "hermes", "name": "Hermes", "role": "Co-founder"},
-        {"id": "terry", "name": "Terry", "role": "Ops"},
-        {"id": "forge", "name": "Forge", "role": "Builder"},
+        {
+            "id": "hermes",
+            "name": "Hermes",
+            "role": "Co-Founder & COO",
+            "category": "Leadership",
+            "accent": "#0d9488",
+            "avatar": "/avatars/hermes.svg",
+        }
     ]

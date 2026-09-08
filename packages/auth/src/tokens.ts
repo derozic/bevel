@@ -51,6 +51,7 @@ export async function mintRealtimeToken(payload: {
     role: payload.role,
     type: 'realtime',
     tenantId: payload.tenantId,
+    tenantSlug: payload.namespace,
     namespace: payload.namespace,
   }
   if (payload.name) claims.name = payload.name
@@ -63,6 +64,6 @@ export async function mintRealtimeToken(payload: {
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject(payload.sub)
     .setIssuedAt()
-    .setExpirationTime('30m')
+    .setExpirationTime('12h')
     .sign(jwtSecret())
 }

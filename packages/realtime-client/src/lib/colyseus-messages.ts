@@ -1,13 +1,22 @@
+import {
+  parseGestures,
+  parseVotePrompt,
+  type MessageGesture,
+} from '@bevel/schema'
+
 export type SchemaMessage = {
   id: string
-  speaker: string
+  speaker?: string
   speakerId?: string
   speakerAvatar?: string
-  speakerType: string
+  speakerType?: string
   agentId?: string
-  body: string
-  status: string
-  ts: number
+  body?: string
+  status?: string
+  ts?: number
+  reactionsJson?: string
+  reactions?: MessageGesture[]
+  votePrompt?: string
 }
 
 export type ChatMsg = {
@@ -20,6 +29,8 @@ export type ChatMsg = {
   body: string
   status: string
   ts: number
+  reactions?: MessageGesture[]
+  votePrompt?: string
 }
 
 export type HumanParticipant = {
@@ -48,7 +59,7 @@ export function dedupeMessagesById(messages: ChatMsg[]): ChatMsg[] {
 }
 
 export function readSchemaMessages(
-  messages?: { length: number; [index: number]: SchemaMessage } | null
+  messages?: { length: number; [index: number]: SchemaMessage | undefined } | null
 ): ChatMsg[] {
   if (!messages || typeof messages.length !== 'number') return []
   const list: ChatMsg[] = []
@@ -66,11 +77,16 @@ export function toChatMsg(m: SchemaMessage): ChatMsg {
     speaker: typeof m.speaker === 'string' ? m.speaker : String(m.speaker ?? ''),
     speakerId: m.speakerId || undefined,
     speakerAvatar: m.speakerAvatar || undefined,
-    speakerType: m.speakerType,
+    speakerType: m.speakerType || 'human',
     agentId: m.agentId || undefined,
     body: typeof m.body === 'string' ? m.body : String(m.body ?? ''),
-    status: m.status,
+    status: m.status || 'final',
     ts: typeof m.ts === 'number' && Number.isFinite(m.ts) ? m.ts : Date.now(),
+    reactions: parseGestures(m.reactions ?? m.reactionsJson),
+    votePrompt: parseVotePrompt(
+      typeof m.body === 'string' ? m.body : String(m.body ?? ''),
+      { votePrompt: m.votePrompt },
+    ) ?? undefined,
   }
 }
 
