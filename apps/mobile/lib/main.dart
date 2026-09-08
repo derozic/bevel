@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:magenta_flutter/magenta_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'config.dart';
@@ -37,6 +38,20 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installMacosPluginGuards();
   await bootstrapDesktopWindow();
+  try {
+    await MagentaAnalytics.configure(
+      siteId: 'bevel',
+      apiBase: BevelConfig.magentaApiBase,
+      product: 'bevel_mobile',
+      enableScreenTracking: true,
+      enableLifecycleTracking: true,
+      enableDeviceContext: true,
+      debug: kDebugMode,
+    );
+    unawaited(MagentaAnalytics.loadExtensions(path: '/'));
+  } catch (e, st) {
+    debugPrint('Magenta analytics skipped: $e\n$st');
+  }
   runApp(const BevelApp());
 }
 
@@ -73,6 +88,10 @@ class _BevelAppState extends State<BevelApp> {
             title: BevelConfig.appName,
             debugShowCheckedModeBanner: false,
             theme: buildBevelTheme(_daypart.palette),
+            navigatorObservers: [
+              if (MagentaAnalytics.isConfigured)
+                MagentaAnalytics.navigatorObserver,
+            ],
             home: const BevelHomePage(),
           );
         },

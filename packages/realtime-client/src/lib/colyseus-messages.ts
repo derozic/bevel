@@ -33,11 +33,17 @@ export type ChatMsg = {
   votePrompt?: string
 }
 
+export type PresenceStatus = 'here' | 'idle' | 'reconnecting'
+
 export type HumanParticipant = {
   clientId: string
   userId: string
   name: string
   avatar?: string
+  status?: PresenceStatus
+  lastSeenAt?: number
+  lastInputAt?: number
+  seats?: number
 }
 
 export function isValidSchemaMessage(m: unknown): m is SchemaMessage {
@@ -118,11 +124,19 @@ export function readHumanParticipants(
   for (let i = 0; i < humans.length; i++) {
     const h = humans[i]
     if (!h?.clientId) continue
+    const status =
+      h.status === 'idle' || h.status === 'reconnecting' || h.status === 'here'
+        ? h.status
+        : 'here'
     list.push({
       clientId: h.clientId,
       userId: h.userId,
       name: h.name,
       avatar: h.avatar || undefined,
+      status,
+      lastSeenAt: h.lastSeenAt,
+      lastInputAt: h.lastInputAt,
+      seats: h.seats,
     })
   }
   return dedupeHumanParticipantsByUser(list)

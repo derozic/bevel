@@ -1,6 +1,10 @@
 'use client'
 
 import { cn } from '../lib/utils'
+import {
+  presenceTooltip,
+  type PresenceStatus,
+} from '../lib/channel-lamp'
 
 function initials(name: string, email?: string): string {
   const parts = name.trim().split(/\s+/)
@@ -17,31 +21,33 @@ export function HumanAvatar({
   avatarUrl,
   email,
   size = 'md',
+  presence,
   className,
 }: {
   name: string
   avatarUrl?: string
   email?: string
   size?: 'sm' | 'md' | 'lg'
+  presence?: PresenceStatus
   className?: string
 }) {
   const shared = cn('fleet-human-avatar', className)
-
-  if (avatarUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={avatarUrl}
-        alt=""
-        data-size={size}
-        className={shared}
-      />
-    )
-  }
-
-  return (
+  const label = presenceTooltip(name, presence)
+  const face = avatarUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={avatarUrl} alt="" data-size={size} className={shared} />
+  ) : (
     <span data-size={size} className={shared} aria-hidden>
       {initials(name, email)}
+    </span>
+  )
+
+  return (
+    <span className="fleet-human-avatar-wrap" title={label} aria-label={label}>
+      {face}
+      {presence ? (
+        <span className="fleet-presence-pip" data-presence={presence} aria-hidden />
+      ) : null}
     </span>
   )
 }
