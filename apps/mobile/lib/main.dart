@@ -38,16 +38,20 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installMacosPluginGuards();
   await bootstrapDesktopWindow();
-  await MagentaAnalytics.configure(
-    siteId: 'bevel',
-    apiBase: BevelConfig.magentaApiBase,
-    product: 'bevel_mobile',
-    enableScreenTracking: true,
-    enableLifecycleTracking: true,
-    enableDeviceContext: true,
-    debug: kDebugMode,
-  );
-  unawaited(MagentaAnalytics.loadExtensions(path: '/'));
+  try {
+    await MagentaAnalytics.configure(
+      siteId: 'bevel',
+      apiBase: BevelConfig.magentaApiBase,
+      product: 'bevel_mobile',
+      enableScreenTracking: true,
+      enableLifecycleTracking: true,
+      enableDeviceContext: true,
+      debug: kDebugMode,
+    );
+    unawaited(MagentaAnalytics.loadExtensions(path: '/'));
+  } catch (e, st) {
+    debugPrint('Magenta analytics skipped: $e\n$st');
+  }
   runApp(const BevelApp());
 }
 
