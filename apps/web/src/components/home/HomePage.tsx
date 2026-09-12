@@ -159,9 +159,11 @@ export function HomePage({
               <Button
                 asChild
                 size="lg"
-                className="shadow-[0_0_0_1px_color-mix(in_srgb,var(--bevel-accent)_40%,transparent),0_12px_40px_-12px_var(--bevel-accent)]"
+                className="bg-[var(--bevel-ink)] text-[var(--bevel-cream)] hover:opacity-90 shadow-[0_0_0_1px_color-mix(in_srgb,var(--bevel-accent)_40%,transparent),0_12px_40px_-12px_var(--bevel-accent)]"
               >
-                <Link href={primaryHref}>{primaryLabel}</Link>
+                <Link href={primaryHref} data-testid="hero-claim">
+                  {primaryLabel}
+                </Link>
               </Button>
               {signedIn ? (
                 <Button asChild variant="secondary" size="lg">

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Crucible">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #b45309)"/>
+  <path d="M36 28h48v12H36z" fill="var(--agent-highlight, #ffffff)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <path d="M40 40c2 28 8 40 20 48 12-8 18-20 20-48" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <path d="M50 62c4 8 16 8 20 0" stroke="var(--agent-ink, #b45309)" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="60" cy="54" r="5" fill="var(--agent-ink, #b45309)"/>
+</svg>

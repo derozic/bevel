@@ -77,7 +77,8 @@
           "veda",
           "rune",
           "grover",
-          "flux"
+          "flux",
+          "crucible"
         ]
       },
       "sterling": {
@@ -93,8 +94,7 @@
         "directReports": [
           "lego",
           "brain",
-          "codegraph",
-          "continuous"
+          "codegraph"
         ]
       },
       "tegan": {
@@ -103,15 +103,11 @@
       },
       "spark": {
         "reportsTo": "hermes",
-        "directReports": [
-          "loom"
-        ]
+        "directReports": []
       },
       "helm": {
         "reportsTo": "hermes",
-        "directReports": [
-          "northstar"
-        ]
+        "directReports": []
       },
       "sable": {
         "reportsTo": "hermes",
@@ -167,16 +163,8 @@
         "reportsTo": "argus",
         "directReports": []
       },
-      "loom": {
-        "reportsTo": "spark",
-        "directReports": []
-      },
-      "continuous": {
-        "reportsTo": "cadence",
-        "directReports": []
-      },
-      "northstar": {
-        "reportsTo": "helm",
+      "crucible": {
+        "reportsTo": "hermes",
         "directReports": []
       }
     }
@@ -208,7 +196,8 @@
         "veda",
         "rune",
         "grover",
-        "flux"
+        "flux",
+        "crucible"
       ],
       "skills": [
         "Co-Founder Partnership",
@@ -218,7 +207,8 @@
         "Multi-Language Engineering",
         "Fleet Orchestration",
         "BEVEL Desktop Interop",
-        "Hermes Desktop Bridge"
+        "Hermes Desktop Bridge",
+        "Karpathy Engineering"
       ],
       "soul": "Co-founder peer — owns outcomes on every project applied to; codes when code wins, convenes directors when they win; partners with Hermes Desktop without identity collapse",
       "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/hermes",
@@ -232,6 +222,7 @@
         "workspace-setup"
       ],
       "recursiveSkills": [
+        "global/skills/karpathy-engineering",
         "skills/co-founder",
         "skills/product-stewardship",
         "skills/openrouter-routing",
@@ -396,7 +387,8 @@
         "CI/CD Orchestration",
         "Learn Loop",
         "Productivity Measurement",
-        "Developer Compassion"
+        "Developer Compassion",
+        "Karpathy Engineering"
       ],
       "soul": "The rhythm of shipping — continuous improvement without theater, developer compassion as a first principle, quality that compounds",
       "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/cadence",
@@ -409,6 +401,7 @@
         "quality-review"
       ],
       "recursiveSkills": [
+        "global/skills/karpathy-engineering",
         "skills/continuous-engineering",
         "skills/learn-loop",
         "skills/developer-experience",
@@ -461,6 +454,7 @@
         "skills/tokens",
         "skills/brand",
         "skills/motion",
+        "skills/layout",
         "skills/figma-relay-android"
       ],
       "run": {
@@ -1020,6 +1014,7 @@
         "continuous-engineering"
       ],
       "recursiveSkills": [
+        "global/skills/karpathy-engineering",
         "skills/python-tools",
         "skills/presentations",
         "skills/brand"
@@ -1102,6 +1097,7 @@
         "co-founder"
       ],
       "recursiveSkills": [
+        "global/skills/karpathy-engineering",
         "skills/learn-loop"
       ],
       "run": {
@@ -1193,6 +1189,7 @@
         "agent-pr"
       ],
       "recursiveSkills": [
+        "global/skills/karpathy-engineering",
         "skills/vitest",
         "skills/pytest",
         "skills/playwright"
@@ -1244,6 +1241,7 @@
         "code-intelligence"
       ],
       "recursiveSkills": [
+        "global/skills/karpathy-engineering",
         "skills/code-graph",
         "skills/mcp-tools",
         "skills/semantic-analysis"
@@ -1254,6 +1252,45 @@
         "install": "curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh",
         "env": [],
         "hint": "Semantic code intelligence. Auto-syncing knowledge graph for AI agents. Reports to Cadence."
+      }
+    },
+    {
+      "id": "crucible",
+      "name": "Crucible",
+      "version": "1.0.0",
+      "tier": "ic",
+      "category": "Leadership & Alignment",
+      "role": "Design Alignment Interviewer",
+      "description": "Staff IC for Hermes (named by Hermes). Runs relentless design-tree interviews (Matt Pocock grill-me / grilling) until every branch of a plan is settled and shared understanding is confirmed. Does not implement — aligns first.",
+      "avatar": "/avatars/crucible.svg",
+      "accent": "#b45309",
+      "reportsTo": "hermes",
+      "directReports": [],
+      "skills": [
+        "Design-Tree Interviews",
+        "Frontier-Round Questioning",
+        "Assumption Surfacing",
+        "Tradeoff Capture",
+        "Alignment Briefs",
+        "Pre-Implementation Stress-Testing"
+      ],
+      "soul": "Relentless but fair — heat-tests plans until every branch of the design tree is settled; recommends boldly, decides never",
+      "githubUrl": "https://github.com/derozic/agents/tree/main/src/agents/crucible",
+      "deployments": 0,
+      "rating": 5,
+      "status": "available",
+      "workflows": [
+        "general",
+        "co-founder"
+      ],
+      "recursiveSkills": [
+        "skills/grilling",
+        "skills/design-tree"
+      ],
+      "run": {
+        "label": "Ask Crucible",
+        "command": "agents ask @crucible",
+        "hint": "Staff IC for Hermes (named by Hermes). Stress-test a plan or design until the design tree is settled. Method: mattpocock/skills grill-me."
       }
     }
   ]

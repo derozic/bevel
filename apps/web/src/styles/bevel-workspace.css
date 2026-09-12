@@ -629,7 +629,7 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
 
 .bevel-brand-square-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(3.35rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.35rem 0.28rem;
   padding: 0.15rem 0.1rem 0.35rem;
 }
@@ -638,6 +638,10 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
   gap: 0.75rem;
   padding: 0;
+}
+
+.bevel-brand-square-grid--wide .bevel-brand-square-face {
+  max-width: none;
 }
 
 .bevel-brand-square {
@@ -657,6 +661,9 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   display: grid;
   place-items: center;
   aspect-ratio: 1;
+  width: 100%;
+  max-width: 3rem;
+  margin-inline: auto;
   overflow: hidden;
   border-radius: 0.5rem;
   border: 1px solid color-mix(in srgb, var(--tile-process, var(--bevel-accent)) 28%, transparent);
@@ -735,8 +742,8 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
     max-height: 3.25rem;
   }
 
-  .bevel-brand-square-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .bevel-brand-square-face {
+    max-width: 2.75rem;
   }
 }
 
@@ -1290,4 +1297,252 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
 
 .bevel-roster-start:not(:disabled):hover {
   filter: brightness(1.05);
+}
+
+/* ── Fleet sticker-glyph avatars (day-part vars live in daypart.css) ── */
+.fleet-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 28%;
+  background: var(--agent-plate);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bevel-text) 12%, transparent);
+  --agent-plate: var(--agent-accent, #64748b);
+  --agent-face: color-mix(in srgb, #fff 86%, var(--agent-accent, #64748b));
+  --agent-ink: var(--agent-accent, #64748b);
+  --agent-stroke: #ffffff;
+  --agent-highlight: color-mix(in srgb, #fff 52%, var(--agent-accent, #64748b));
+  --agent-glyph: #ffffff;
+}
+
+.fleet-avatar-svg,
+.fleet-avatar-svg svg,
+.fleet-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bevel-rail-agent-mark {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  flex-shrink: 0;
+  margin-left: 0.35rem;
+  border-radius: 28%;
+  line-height: 0;
+}
+
+.bevel-rail-agent-mark:focus-visible {
+  outline: 2px solid var(--bevel-accent);
+  outline-offset: 2px;
+}
+
+.bevel-rail-conversation-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.agent-dossier {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow: auto;
+  padding: 1.25rem 1.5rem 2.5rem;
+}
+
+.agent-dossier-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.agent-dossier-caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-dossier-caps li {
+  border: 1px solid var(--bevel-border);
+  border-radius: 999px;
+  background: var(--bevel-surface);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.agent-dossier-grid {
+  display: grid;
+  grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr);
+  gap: 1rem;
+  min-height: 0;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .agent-dossier-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.agent-dossier-tree {
+  border: 1px solid var(--bevel-border);
+  border-radius: 1rem;
+  background: var(--bevel-surface);
+  padding: 0.75rem;
+}
+
+.agent-dossier-tree-label {
+  margin: 0 0 0.5rem;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bevel-text-muted);
+}
+
+.agent-dossier-tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-dossier-tree-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--bevel-text);
+  cursor: pointer;
+  padding: 0.4rem 0.45rem;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.agent-dossier-tree-item--nested {
+  padding-left: 1.1rem;
+  color: var(--bevel-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+}
+
+.agent-dossier-tree-item[data-active='true'] {
+  background: color-mix(in srgb, var(--bevel-accent) 12%, var(--bevel-surface));
+  color: var(--bevel-text);
+}
+
+.agent-dossier-doc {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--bevel-border);
+  border-radius: 1rem;
+  background: var(--bevel-surface);
+}
+
+.agent-dossier-doc-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--bevel-border);
+  padding: 0.65rem 0.9rem;
+}
+
+.agent-dossier-editor {
+  display: block;
+  width: 100%;
+  min-height: 28rem;
+  border: 0;
+  background: var(--bevel-bg);
+  color: var(--bevel-text);
+  padding: 1rem 1.1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.agent-doc-prose {
+  padding: 1.1rem 1.25rem 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--bevel-text);
+}
+
+.agent-doc-prose h1,
+.agent-doc-prose h2,
+.agent-doc-prose h3,
+.agent-doc-prose h4 {
+  margin: 1.1rem 0 0.45rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.agent-doc-prose h1 { font-size: 1.35rem; }
+.agent-doc-prose h2 { font-size: 1.1rem; }
+.agent-doc-prose h3 { font-size: 0.98rem; }
+
+.agent-doc-prose p { margin: 0.55rem 0; }
+
+.agent-doc-prose ul,
+.agent-doc-prose ol {
+  margin: 0.4rem 0 0.7rem 1.1rem;
+}
+
+.agent-doc-prose li { margin: 0.2rem 0; }
+
+.agent-doc-prose table {
+  width: 100%;
+  margin: 0.75rem 0;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.agent-doc-prose th,
+.agent-doc-prose td {
+  border: 1px solid var(--bevel-border);
+  padding: 0.4rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.agent-doc-prose th {
+  background: color-mix(in srgb, var(--bevel-text) 4%, var(--bevel-surface));
+}
+
+.agent-doc-prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82em;
+  background: color-mix(in srgb, var(--bevel-text) 6%, transparent);
+  border-radius: 0.3rem;
+  padding: 0.05rem 0.3rem;
+}
+
+.agent-doc-prose pre {
+  overflow: auto;
+  margin: 0.75rem 0;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--bevel-text) 6%, var(--bevel-bg));
+  padding: 0.85rem 1rem;
+}
+
+.agent-doc-prose pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.agent-doc-prose a {
+  color: var(--bevel-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

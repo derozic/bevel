@@ -126,6 +126,56 @@ export function mergeBrandKitIntoTheme(
   }
 }
 
+async function getJson(
+  url: string,
+  headers: Record<string, string>,
+  timeoutMs: number,
+): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const localTls =
+    process.env.NODE_ENV !== 'production' &&
+    /lvh\.me|localhost|127\.0\.0\.1/.test(url)
+
+  if (!localTls) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+    try {
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        headers,
+        cache: 'no-store',
+      })
+      const body = await res.json().catch(() => null)
+      return { ok: res.ok, status: res.status, body }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  // Caddy local_certs are trusted by the browser after `caddy trust`, not by Node fetch.
+  const https = await import('node:https')
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { rejectUnauthorized: false, headers }, (res) => {
+      const chunks: Buffer[] = []
+      res.on('data', (c) => chunks.push(c as Buffer))
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8')
+        let parsed: unknown = text
+        try {
+          parsed = JSON.parse(text)
+        } catch {
+          /* keep string */
+        }
+        const status = res.statusCode || 0
+        resolve({ ok: status >= 200 && status < 300, status, body: parsed })
+      })
+    })
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error('timeout'))
+    })
+    req.on('error', reject)
+  })
+}
+
 export async function fetchCmykBrandKitTheme(opts: {
   kitId: string | number
   host?: string | null
@@ -138,28 +188,21 @@ export async function fetchCmykBrandKitTheme(opts: {
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.theme
 
   const url = `${host}/brandkits/api/brand-kits/${id}/theme/`
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 2500)
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  const key = process.env.CMYK_BRANDKIT_API_KEY?.trim()
+  if (key) headers['X-API-Key'] = key
   try {
-    const headers: Record<string, string> = { Accept: 'application/json' }
-    const key = process.env.CMYK_BRANDKIT_API_KEY?.trim()
-    if (key) headers['X-API-Key'] = key
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      headers,
-    })
-    if (!res.ok) {
+    const res = await getJson(url, headers, opts.timeoutMs ?? 2500)
+    if (!res.ok || !res.body || typeof res.body !== 'object') {
       cache.set(cacheKey, { at: Date.now(), theme: null })
       return null
     }
-    const data = (await res.json()) as CmykBrandKitTheme
+    const data = res.body as CmykBrandKitTheme
     cache.set(cacheKey, { at: Date.now(), theme: data })
     return data
   } catch {
     cache.set(cacheKey, { at: Date.now(), theme: null })
     return null
-  } finally {
-    clearTimeout(timer)
   }
 }
 

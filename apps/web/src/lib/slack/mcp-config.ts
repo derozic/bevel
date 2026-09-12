@@ -57,6 +57,13 @@ export function buildMcpServersConfig(opts?: {
         url: SLACK_MCP_URL,
         transport: 'http',
       },
+      magenta: {
+        url:
+          process.env.MAGENTA_MCP_URL ||
+          process.env.NEXT_PUBLIC_MAGENTA_MCP_URL ||
+          'https://api.magenta.ac/api/v2/mcp',
+        transport: 'http',
+      },
     },
   }
 }

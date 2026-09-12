@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
+import { FleetAvatar } from '@/components/avatars/FleetAvatar'
 import {
   agentTalkHref,
   getChildren,
   getOrgNode,
   type OrgNode,
 } from '@/lib/org-graph'
+import { bevelAgentProfilePath } from '@/lib/bevel'
 
 const TIER_LABEL: Record<OrgNode['tier'], string> = {
   founder: 'Founder',
@@ -42,29 +43,16 @@ function exampleLabel(slug: string): string {
 }
 
 function ProfileAvatar({ node }: { node: OrgNode }) {
-  const [failed, setFailed] = useState(false)
-  const initial = (node.name.trim()[0] || '?').toUpperCase()
-  if (failed) {
-    return (
-      <span
-        className="flex h-24 w-24 items-center justify-center rounded-3xl text-3xl font-bold text-white shadow-sm"
-        style={{ background: node.accent }}
-      >
-        {initial}
-      </span>
-    )
-  }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={node.avatarUrl}
-      alt=""
-      width={96}
-      height={96}
-      className="h-24 w-24 rounded-3xl object-cover shadow-sm"
-      style={{ boxShadow: `0 0 0 3px color-mix(in srgb, ${node.accent} 45%, transparent)` }}
-      onError={() => setFailed(true)}
-    />
+    <Link href={bevelAgentProfilePath(node.id)} title={`${node.name} profile`}>
+      <FleetAvatar
+        agentId={node.id}
+        name={node.name}
+        accent={node.accent}
+        size={96}
+        className="rounded-3xl shadow-sm"
+      />
+    </Link>
   )
 }
 
@@ -166,14 +154,22 @@ export function AgentProfile({ node }: { node: OrgNode }) {
         <p className="mt-4 text-xs text-muted">Reports to {manager.name}</p>
       ) : null}
 
-      <div className="mt-auto pt-5">
+      <div className="mt-auto flex flex-col gap-2 pt-5">
         {node.id !== 'scott' ? (
-          <Link
-            href={agentTalkHref(node.id)}
-            className="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-cta px-4 text-sm font-semibold text-cta-fg"
-          >
-            Talk to {node.name}
-          </Link>
+          <>
+            <Link
+              href={agentTalkHref(node.id)}
+              className="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-cta px-4 text-sm font-semibold text-cta-fg"
+            >
+              Talk to {node.name}
+            </Link>
+            <Link
+              href={bevelAgentProfilePath(node.id)}
+              className="inline-flex min-h-10 w-full items-center justify-center rounded-full border border-border px-4 text-sm font-semibold text-foreground"
+            >
+              Open dossier
+            </Link>
+          </>
         ) : (
           <p className="text-xs text-muted">Talk to the fleet through Hermes.</p>
         )}

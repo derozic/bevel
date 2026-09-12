@@ -27,7 +27,7 @@ const EXPECTED_DIRECTORS = [
 describe('agent catalog (synced from ~/dev/agents)', () => {
   it('loads the current Entity org from the registry', () => {
     expect(fleetRegistryMeta.version).toBe('2.0.0')
-    expect(getAvailableAgents().length).toBe(26)
+    expect(getAvailableAgents().length).toBe(27)
     expect(agents.slice(0, 3).map((a) => a.id)).toEqual([
       'openai',
       'claude',

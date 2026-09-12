@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#f59e0b"/>
-  <circle cx="60" cy="58" r="26" fill="#fffbeb" stroke="#fff" stroke-width="3"/>
-  <path d="M44 54h32M44 64h24" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
-  <path d="M34 82h52" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="78" cy="34" r="10" fill="#22c55e" stroke="#fff" stroke-width="3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Johnny">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #f59e0b)"/>
+  <path d="M44 78c0-18 7-32 16-32s16 14 16 32" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <rect x="42" y="76" width="36" height="10" rx="4" fill="var(--agent-highlight, #ffffff)" stroke="var(--agent-stroke, #ffffff)" stroke-width="2"/>
+  <circle cx="60" cy="40" r="10" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <circle cx="82" cy="34" r="10" fill="#22c55e" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
 </svg>

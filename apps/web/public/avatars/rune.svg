@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#4c1d95"/>
-  <text x="60" y="72" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="700" fill="#ffffff">R</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Rune">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #4c1d95)"/>
+  <rect x="24" y="38" width="28" height="44" rx="6" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <rect x="68" y="38" width="28" height="44" rx="6" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <path d="M52 60h16" stroke="var(--agent-highlight, #ffffff)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M32 50l6 10-6 10M88 50l-6 10 6 10" stroke="var(--agent-ink, #4c1d95)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

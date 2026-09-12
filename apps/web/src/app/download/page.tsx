@@ -8,7 +8,9 @@ import {
   GlobeAltIcon,
   InformationCircleIcon,
 } from '@heroicons/react/24/outline'
-import { BEVEL_NAME, BEVEL_HOME_PATH } from '@/lib/bevel'
+import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
+import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { BEVEL_NAME, BEVEL_PRIVATE_PATH } from '@/lib/bevel'
 
 export const metadata: Metadata = {
   title: `Download · ${BEVEL_NAME}`,
@@ -29,7 +31,13 @@ const DOWNLOADS = {
 
 export default function DownloadPage() {
   return (
-    <main className="mx-auto flex min-h-[70vh] max-w-3xl flex-col gap-8 px-6 py-14">
+    <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
+      <div className="bevel-home-atmosphere" aria-hidden="true">
+        <div className="bevel-home-mesh" />
+        <div className="bevel-home-grid" />
+      </div>
+      <MarketingSiteHeader actions="marketing" />
+    <main className="relative z-10 mx-auto flex min-h-[70vh] max-w-3xl flex-col gap-8 px-6 py-14">
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
           Install
@@ -85,7 +93,7 @@ export default function DownloadPage() {
             Download IPA
           </a>
           <Link
-            href={BEVEL_HOME_PATH}
+            href="/login?callbackUrl=%2Fwelcome"
             className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-5 py-3 text-sm font-medium text-muted hover:bg-surface hover:text-foreground"
           >
             Use web app instead
@@ -179,7 +187,7 @@ export default function DownloadPage() {
               shell. Add to Home Screen for a dock icon (PWA).
             </p>
             <Link
-              href={BEVEL_HOME_PATH}
+              href="/login?callbackUrl=%2Fwelcome"
               className="mt-3 inline-flex rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface"
             >
               Open workspace
@@ -198,7 +206,13 @@ export default function DownloadPage() {
         <Link href="/console" className="text-accent hover:underline">
           Console
         </Link>
+        {' · '}
+        <Link href={BEVEL_PRIVATE_PATH} className="text-accent hover:underline">
+          Private
+        </Link>
       </p>
     </main>
+      <SiteFooter />
+    </div>
   )
 }

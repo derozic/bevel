@@ -1,3 +1,5 @@
+@import './nuggets.css';
+
 /* Fleet chat — conversational thread, theme-aware (day-part tokens) */
 
 .fleet-chat {
@@ -652,10 +654,16 @@
     background 0.2s ease;
 }
 
-.fleet-chat-chip-avatar {
+.fleet-chat-mention-pill .fleet-avatar,
+.fleet-chat-agent-card__head .fleet-avatar {
+  flex-shrink: 0;
+}
+
+.fleet-chat-chip-avatar,
+.fleet-chat-chip .fleet-avatar {
   width: 1.25rem;
   height: 1.25rem;
-  border-radius: 9999px;
+  border-radius: 0.35rem;
   object-fit: cover;
   flex-shrink: 0;
   border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);

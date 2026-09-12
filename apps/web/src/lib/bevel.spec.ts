@@ -7,6 +7,7 @@ import {
   bevelDirectPersistSlug,
   bevelDirectSessionId,
   bevelTagPath,
+  bevelAgentProfilePath,
   bevelTalkPath,
   isRedundantChannelName,
   normalizeBevelChannelSlug,
@@ -17,6 +18,7 @@ describe('workspace URLs', () => {
     expect(BEVEL_PRIVATE_PATH).toBe('/me')
     expect(bevelTalkPath('Hermes')).toBe('/talk/hermes')
     expect(bevelTalkPath('hermes', 'johnny')).toBe('/talk/hermes?agents=johnny')
+    expect(bevelAgentProfilePath('Hermes')).toBe('/talk/hermes/profile')
     expect(bevelTagPath('On Call')).toBe('/tags/on-call')
   })
 

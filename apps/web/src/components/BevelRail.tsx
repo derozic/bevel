@@ -23,6 +23,7 @@ import {
   BEVEL_PRIVATE_PATH,
   BEVEL_TAGS_PATH,
   BEVEL_TRADEMARK_NOTICE,
+  bevelAgentProfilePath,
   bevelChannelPath,
   bevelConversationPath,
   bevelTalkPath,
@@ -63,6 +64,7 @@ import { ConversationRoster } from './ConversationRoster'
 import { ConversationSearch } from './ConversationSearch'
 import { CreateChannelModal } from './CreateChannelModal'
 import { BrandSquare, BrandSquareGrid } from './BrandSquare'
+import { FleetAvatar } from '@/components/avatars/FleetAvatar'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 
 function BevelRailFooter({
@@ -723,6 +725,20 @@ export function BevelRail({
               const isPinned = pinnedKeys.has(pinKey(pin))
               return (
                 <div key={agent.id} className="bevel-rail-conversation-row">
+                  <Link
+                    href={bevelAgentProfilePath(agent.id)}
+                    onClick={onNavigate}
+                    className="bevel-rail-agent-mark"
+                    title={`${agent.name} profile`}
+                    aria-label={`${agent.name} profile`}
+                  >
+                    <FleetAvatar
+                      agentId={agent.id}
+                      name={agent.name}
+                      accent={agent.accent}
+                      size={28}
+                    />
+                  </Link>
                   <Link
                     href={href}
                     onClick={onNavigate}

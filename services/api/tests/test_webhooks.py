@@ -83,9 +83,10 @@ def test_resolve_inbound_slug() -> None:
 
 
 def test_ingest_url_is_stable() -> None:
-    from bevel_api.routers.ingest import INGEST_URL
+    from bevel_api.routers.ingest import INGEST_URL, NUGGET_INGEST_URL
 
     assert INGEST_URL == "/api/v1/ingest/notifications"
+    assert NUGGET_INGEST_URL == "/api/v1/ingest/nuggets"
 
 
 def test_catalog_uses_bevel_labels() -> None:

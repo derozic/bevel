@@ -31,6 +31,7 @@ const PUBLIC_PATHS = [
   '/sw.js',
   '/manifest.webmanifest',
   '/icons',
+  '/',
   '/login',
   '/welcome',
   '/workspaces',

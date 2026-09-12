@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#c084fc"/>
-  <text x="60" y="72" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="700" fill="#ffffff">H</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Haven">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #c084fc)"/>
+  <path d="M28 86V58c0-18 14-32 32-32s32 14 32 32v28" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <rect x="52" y="64" width="16" height="22" rx="3" fill="var(--agent-ink, #c084fc)"/>
+  <path d="M24 86h72" stroke="var(--agent-highlight, #ffffff)" stroke-width="6" stroke-linecap="round"/>
 </svg>

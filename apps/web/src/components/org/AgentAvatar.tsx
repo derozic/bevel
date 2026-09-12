@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { FleetAvatar } from '@/components/avatars/FleetAvatar'
 import type { OrgNode } from '@/lib/org-graph'
 
 export function StatusDot({ status }: { status: OrgNode['status'] }) {
@@ -25,37 +25,13 @@ export function AgentAvatar({
   node: OrgNode
   size?: number
 }) {
-  const [failed, setFailed] = useState(false)
-  const initial = (node.name.trim()[0] || '?').toUpperCase()
-  if (failed) {
-    return (
-      <span
-        className="inline-flex shrink-0 items-center justify-center rounded-lg font-bold text-white"
-        style={{
-          width: size,
-          height: size,
-          background: node.accent,
-          fontSize: size * 0.42,
-        }}
-      >
-        {initial}
-      </span>
-    )
-  }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <FleetAvatar
+      agentId={node.id}
+      name={node.name}
+      accent={node.accent}
+      size={size}
       src={node.avatarUrl}
-      alt=""
-      width={size}
-      height={size}
-      className="shrink-0 rounded-lg object-cover"
-      style={{
-        width: size,
-        height: size,
-        boxShadow: `inset 0 0 0 2px ${node.accent}`,
-      }}
-      onError={() => setFailed(true)}
     />
   )
 }

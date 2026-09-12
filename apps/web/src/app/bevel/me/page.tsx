@@ -6,13 +6,16 @@ import {
 } from '@bevel/tenant-config'
 import { Button } from '@bevel/ui'
 import { BevelDaypartMark } from '@/components/BevelDaypartMark'
+import { FleetAvatar } from '@/components/avatars/FleetAvatar'
 import { agents } from '@/lib/agent-catalog'
 import { auth } from '@/auth'
 import { FolksonomyChips } from '@/components/FolksonomyChips'
+import { FirstRunPanel } from '@/components/onboarding/FirstRunPanel'
 import {
   BEVEL_PRIVATE_PATH,
   BEVEL_TAGS_PATH,
   BEVEL_TIMELINE_PATH,
+  bevelAgentProfilePath,
   bevelTalkPath,
 } from '@/lib/bevel'
 import {
@@ -61,6 +64,8 @@ export default async function PrivateMePage() {
           </div>
         </header>
 
+        {isApex ? <FirstRunPanel mode="private" /> : null}
+
         <section className="rounded-2xl border border-accent/25 bg-accent/5 p-5 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">
             Primary agent
@@ -92,26 +97,23 @@ export default async function PrivateMePage() {
                 key={agent.id}
                 className="rounded-xl border border-border bg-surface/60 px-4 py-3"
               >
-                <Link
-                  href={bevelTalkPath(agent.id)}
-                  className="flex items-center gap-3 transition hover:opacity-90"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {agent.avatarUrl ? (
-                    <img
-                      src={agent.avatarUrl}
-                      alt=""
-                      className="size-9 rounded-lg"
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={bevelAgentProfilePath(agent.id)}
+                    className="shrink-0"
+                    title={`${agent.name} profile`}
+                  >
+                    <FleetAvatar
+                      agentId={agent.id}
+                      name={agent.name}
+                      accent={agent.accent}
+                      size={36}
                     />
-                  ) : (
-                    <span
-                      className="flex size-9 items-center justify-center rounded-lg text-xs font-bold text-white"
-                      style={{ background: agent.accent ?? '#7c5cff' }}
-                    >
-                      {agent.name.slice(0, 1)}
-                    </span>
-                  )}
-                  <div className="min-w-0">
+                  </Link>
+                  <Link
+                    href={bevelTalkPath(agent.id)}
+                    className="min-w-0 flex-1 transition hover:opacity-90"
+                  >
                     <p className="truncate font-medium text-foreground">
                       {agent.name}
                       {agent.id === personalId ? (
@@ -123,8 +125,8 @@ export default async function PrivateMePage() {
                     <p className="truncate text-xs text-muted">
                       {agent.tagline ?? agent.role}
                     </p>
-                  </div>
-                </Link>
+                  </Link>
+                </div>
                 <div className="mt-2 pl-12">
                   <FolksonomyChips kind="agent" id={agent.id} compact />
                 </div>

@@ -1,6 +1,23 @@
 /** Production control-plane URLs for status probes and docs. */
-import { BEVEL_HOME_PATH } from '@/lib/bevel'
+import { BEVEL_HOME_PATH, BEVEL_PRIVATE_PATH } from '@/lib/bevel'
 import { BEVEL_APEX_URL, platformPublicUrl } from '@/lib/platform'
+
+const APEX_HOSTS = new Set([
+  'bevel.is',
+  'www.bevel.is',
+  'app.bevel.is',
+  'bevel.lvh.me',
+])
+
+function isApexHost(host: string): boolean {
+  const h = host.toLowerCase().split(':')[0] || ''
+  return (
+    APEX_HOSTS.has(h) ||
+    h === 'localhost' ||
+    h === '127.0.0.1' ||
+    h.startsWith('127.')
+  )
+}
 
 export const bevelUrls = {
   api: () =>
@@ -39,28 +56,16 @@ export const bevelUrls = {
    * Live fleet chat home (~general). Absolute when the console runs on the
    * platform apex (bevel.is); same-origin path when already on a workspace host.
    */
-  workspaceChat: () => {
-    const home = BEVEL_HOME_PATH
-    const workspaceBase = (
-      process.env.NEXT_PUBLIC_WORKSPACE_URL ||
-      process.env.NEXT_PUBLIC_WEB_URL ||
-      'https://bevel.2x4m.cc'
-    ).replace(/\/$/, '')
-    if (typeof window === 'undefined') {
-      return `${workspaceBase}${home}`
-    }
-    const host = window.location.hostname.toLowerCase()
-    const apexHosts = new Set([
-      'bevel.is',
-      'www.bevel.is',
-      'app.bevel.is',
-      'bevel.lvh.me',
-    ])
-    // Stay on the current product host when the console is already there.
-    if (!apexHosts.has(host) && host !== 'localhost' && !host.startsWith('127.')) {
-      return home
-    }
-    return `${workspaceBase}${home}`
+  /**
+   * Leave console for product chat.
+   * Apex / local → Private (`/me`). Org workspace host → `~general`.
+   */
+  workspaceChat: (host?: string) => {
+    const resolved =
+      host ||
+      (typeof window !== 'undefined' ? window.location.hostname : '')
+    if (isApexHost(resolved) || !resolved) return BEVEL_PRIVATE_PATH
+    return BEVEL_HOME_PATH
   },
 }
 

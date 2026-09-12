@@ -1,5 +1,7 @@
 /** Shared marketing / launch content for BEVEL platform surfaces. */
 
+export const BEVEL_CONTACT_EMAIL = 'hello@bevel.is'
+
 export const BEVEL_SOCIAL = {
   x: 'https://x.com/bevel',
   github: 'https://github.com/derozic',
@@ -12,7 +14,21 @@ export const MARKETING_NAV = [
   { href: '/#how', label: 'How it works' },
   { href: '/story', label: 'Story' },
   { href: '/about', label: 'About' },
-  { href: '/security', label: 'Security' },
+  { href: '/download', label: 'Download' },
+] as const
+
+/** Signed-out public pages that must 200 on the platform entry host. */
+export const PUBLIC_MARKETING_PATHS = [
+  '/',
+  '/story',
+  '/about',
+  '/security',
+  '/privacy',
+  '/terms',
+  '/claim',
+  '/download',
+  '/login',
+  '/status',
 ] as const
 
 export const FOOTER_COLUMNS = [
@@ -32,7 +48,8 @@ export const FOOTER_COLUMNS = [
       { href: '/about', label: 'About' },
       { href: '/story', label: 'Story' },
       { href: '/security', label: 'Security' },
-      { href: 'mailto:hello@bevel.com', label: 'Contact' },
+      { href: '/status', label: 'Status' },
+      { href: `mailto:${BEVEL_CONTACT_EMAIL}`, label: 'Contact' },
     ],
   },
   {

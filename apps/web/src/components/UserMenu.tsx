@@ -4,6 +4,8 @@ import { signIn, signOut, useSession } from 'next-auth/react'
 import {
   ArrowRightEndOnRectangleIcon,
   Cog6ToothIcon,
+  CommandLineIcon,
+  CubeTransparentIcon,
   IdentificationIcon,
   LinkIcon,
   PaintBrushIcon,
@@ -176,6 +178,23 @@ export function UserMenu({
         <DropdownMenuItem onSelect={() => prefs?.openSection('integrations')}>
           <LinkIcon className="size-4 shrink-0 opacity-80" aria-hidden />
           Integrations
+        </DropdownMenuItem>
+
+        <DropdownMenuItem asChild>
+          <a href="/console">
+            <CommandLineIcon className="size-4 shrink-0 opacity-80" aria-hidden />
+            Console
+          </a>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem asChild>
+          <a href="/console/integrations">
+            <CubeTransparentIcon
+              className="size-4 shrink-0 opacity-80"
+              aria-hidden
+            />
+            Extensions
+          </a>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

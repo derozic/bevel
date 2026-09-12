@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#2563eb"/>
-  <text x="60" y="72" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="700" fill="#ffffff">H</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Helm">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #2563eb)"/>
+  <circle cx="60" cy="60" r="30" fill="none" stroke="var(--agent-stroke, #ffffff)" stroke-width="6"/>
+  <circle cx="60" cy="60" r="12" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <path d="M60 22v16M60 82v16M22 60h16M82 60h16M34 34l12 12M74 74l12 12M86 34L74 46M46 74L34 86" stroke="var(--agent-highlight, #ffffff)" stroke-width="5" stroke-linecap="round"/>
 </svg>

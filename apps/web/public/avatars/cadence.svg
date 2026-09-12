@@ -1,4 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#6366f1"/>
-  <text x="60" y="72" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="700" fill="#ffffff">C</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Cadence">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #6366f1)"/>
+  <path d="M60 22v16" stroke="var(--agent-stroke, #ffffff)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M48 28l24 8" stroke="var(--agent-highlight, #ffffff)" stroke-width="3.5" stroke-linecap="round"/>
+  <rect x="36" y="42" width="10" height="52" rx="5" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <rect x="55" y="54" width="10" height="40" rx="5" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <rect x="74" y="34" width="10" height="60" rx="5" fill="var(--agent-highlight, #ffffff)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
 </svg>

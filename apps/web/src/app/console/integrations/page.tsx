@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { NuggetCatalog } from "@/components/console/NuggetCatalog";
 import { 
   Github, Slack, Search, Check, Trash2, Loader2, Key, RefreshCw, 
   ExternalLink, Lock, Settings, Activity, Info, X, SlidersHorizontal, 
   CheckSquare, Kanban, Cpu, MessageSquare, BookOpen, Cloud, Sparkles, 
-  ArrowRight, ShieldAlert, AlertCircle
+  ArrowRight, ShieldAlert, AlertCircle, Palette, Figma
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -31,7 +34,23 @@ interface Toast {
   type: "success" | "error" | "info";
 }
 
+const MCP_IDS = new Set(["magenta", "slack", "github"]);
+const INBOUND_IDS = new Set([
+  "magenta",
+  "clickup",
+  "linear",
+  "github",
+  "slack",
+  "sendgrid",
+  "cmyk",
+]);
+
 export default function IntegrationsPage() {
+  const searchParams = useSearchParams();
+  const laneParam = searchParams.get("lane");
+  const lane: "all" | "mcp" | "inbound" =
+    laneParam === "mcp" || laneParam === "inbound" ? laneParam : "all";
+
   // Integrations state
   const [integrations, setIntegrations] = useState<Integration[]>([
     {
@@ -73,6 +92,39 @@ export default function IntegrationsPage() {
       connected: true,
       color: "from-amber-500/10 to-orange-500/10 hover:border-amber-500/40",
       stats: { primary: "12 active workflows", secondary: "Last sync: 15m ago" }
+    },
+    {
+      id: "cmyk-brandkit",
+      name: "CMYK BrandKit",
+      category: "Design",
+      description:
+        "Living brand books — 2x4m and Comma. Kitchen sink, hex/P3 tokens, Tokens Studio JSON, stdio MCP (@cmyk/mcp).",
+      icon: Palette,
+      connected: false,
+      color: "from-cyan-500/10 to-sky-500/10 hover:border-cyan-500/40",
+      stats: null
+    },
+    {
+      id: "figma",
+      name: "Figma",
+      category: "Design",
+      description:
+        "Design systems generated from BrandKits. Jump to Color, Type, Grid, CTAs, Atoms, Molecules, Organisms.",
+      icon: Figma,
+      connected: false,
+      color: "from-violet-500/10 to-purple-500/10 hover:border-violet-500/40",
+      stats: null
+    },
+    {
+      id: "magenta",
+      name: "Magenta",
+      category: "Analytics",
+      description:
+        "First-party analytics MCP — traffic vs uptime probes, fleet reliability, site registry. Public tools; magenta_ask is staff-only.",
+      icon: Activity,
+      connected: false,
+      color: "from-fuchsia-500/10 to-pink-500/10 hover:border-fuchsia-500/40",
+      stats: null
     },
     {
       id: "slack",
@@ -147,11 +199,34 @@ export default function IntegrationsPage() {
   const [slackMcpEndpoint, setSlackMcpEndpoint] = useState(
     "https://mcp.slack.com/mcp"
   );
+  const [magentaMcp, setMagentaMcp] = useState<{
+    endpoint: string;
+    tools: string[];
+    claude: string;
+    mcpJson: string;
+    live: boolean;
+  } | null>(null);
+  const [brandKitCatalog, setBrandKitCatalog] = useState<{
+    live: boolean;
+    claude: string;
+    mcpJson: string;
+    tools: string[];
+    kits: {
+      slug: string;
+      name: string;
+      live: boolean;
+      figmaReady: boolean;
+      kitchenSink: string;
+      tokensUrl: string;
+      figmaUrl: string;
+      organismsUrl: string;
+    }[];
+  } | null>(null);
 
   // Category tags list
-  const categories = ["All", "Development", "Project Management", "Automation", "Communication", "Productivity"];
+  const categories = ["All", "Development", "Design", "Project Management", "Automation", "Communication", "Productivity", "Analytics"];
 
-  // Live Slack status from Extensions API
+  // Live Slack + Magenta status from Extensions API
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -198,6 +273,151 @@ export default function IntegrationsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/integrations/magenta/status", {
+          credentials: "include",
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          live?: boolean;
+          mcp?: { endpoint?: string; tools?: string[] };
+          install?: {
+            claude?: string;
+            mcpJson?: { mcpServers?: { magenta?: { url?: string } } };
+          };
+        };
+        const endpoint =
+          data.mcp?.endpoint || "https://api.magenta.ac/api/v2/mcp";
+        const tools = data.mcp?.tools ?? [];
+        const claude =
+          data.install?.claude ||
+          `claude mcp add magenta --transport http ${endpoint}`;
+        const mcpJson = JSON.stringify(
+          data.install?.mcpJson || {
+            mcpServers: { magenta: { url: endpoint, transport: "http" } },
+          },
+          null,
+          2,
+        );
+        if (cancelled) return;
+        setMagentaMcp({
+          endpoint,
+          tools,
+          claude,
+          mcpJson,
+          live: Boolean(data.live),
+        });
+        setIntegrations((prev) =>
+          prev.map((item) =>
+            item.id === "magenta"
+              ? {
+                  ...item,
+                  connected: Boolean(data.live),
+                  stats: {
+                    primary: data.live ? "MCP live" : "MCP unreachable",
+                    secondary: endpoint.replace(/^https?:\/\//, ""),
+                  },
+                }
+              : item,
+          ),
+        );
+      } catch {
+        /* offline */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/integrations/cmyk-brandkit/status", {
+          credentials: "include",
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          live?: boolean;
+          kits?: {
+            slug: string;
+            name: string;
+            live?: boolean;
+            figmaReady?: boolean;
+            kitchenSink?: string;
+            tokensUrl?: string;
+            figmaUrl?: string;
+            organismsUrl?: string;
+          }[];
+          mcp?: { tools?: string[] };
+          install?: {
+            claude?: string;
+            mcpJson?: unknown;
+          };
+        };
+        const kits = (data.kits || []).map((k) => ({
+          slug: k.slug,
+          name: k.name,
+          live: Boolean(k.live),
+          figmaReady: Boolean(k.figmaReady),
+          kitchenSink: k.kitchenSink || "",
+          tokensUrl: k.tokensUrl || "",
+          figmaUrl: k.figmaUrl || "",
+          organismsUrl: k.organismsUrl || "",
+        }));
+        const liveCount = kits.filter((k) => k.live).length;
+        const figmaCount = kits.filter((k) => k.figmaReady).length;
+        if (cancelled) return;
+        setBrandKitCatalog({
+          live: Boolean(data.live),
+          claude: data.install?.claude || "pnpm --filter @cmyk/mcp start",
+          mcpJson: JSON.stringify(data.install?.mcpJson || {}, null, 2),
+          tools: data.mcp?.tools ?? [],
+          kits,
+        });
+        setIntegrations((prev) =>
+          prev.map((item) => {
+            if (item.id === "cmyk-brandkit") {
+              return {
+                ...item,
+                connected: Boolean(data.live),
+                stats: {
+                  primary: data.live
+                    ? `${liveCount} kit${liveCount === 1 ? "" : "s"} live`
+                    : "Kits unreachable",
+                  secondary: kits.map((k) => k.slug).join(" · ") || "2x4m · comma",
+                },
+              };
+            }
+            if (item.id === "figma") {
+              return {
+                ...item,
+                connected: figmaCount > 0,
+                stats: {
+                  primary:
+                    figmaCount > 0
+                      ? `${figmaCount} design system${figmaCount === 1 ? "" : "s"}`
+                      : "No Figma files",
+                  secondary: "Jump to organisms from kitchen sink",
+                },
+              };
+            }
+            return item;
+          }),
+        );
+      } catch {
+        /* offline */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Push custom toast notification
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -212,7 +432,11 @@ export default function IntegrationsPage() {
     const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           integration.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "All" || integration.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesLane =
+      lane === "all" ||
+      (lane === "mcp" && MCP_IDS.has(integration.id)) ||
+      (lane === "inbound" && INBOUND_IDS.has(integration.id));
+    return matchesSearch && matchesCategory && matchesLane;
   });
 
   // Calculate stats
@@ -261,6 +485,16 @@ export default function IntegrationsPage() {
 
   // Disconnect active integration
   const handleDisconnect = async (id: string) => {
+    if (id === "magenta" || id === "cmyk-brandkit" || id === "figma") {
+      showToast(
+        id === "figma"
+          ? "Figma files live in drafts. Duplicate from the BrandKit kitchen sink or Figma URL."
+          : "Catalogued MCP — remove it from your client mcp.json to disconnect.",
+        "info",
+      );
+      setActiveModalIntegration(null);
+      return;
+    }
     if (id === "slack") {
       try {
         const res = await fetch("/api/integrations/slack/disconnect", {
@@ -291,6 +525,32 @@ export default function IntegrationsPage() {
 
   // Step-by-step setup connection handler
   const handleConnect = (id: string) => {
+    if (id === "magenta") {
+      if (magentaMcp?.claude) {
+        void navigator.clipboard.writeText(magentaMcp.claude).catch(() => {});
+      }
+      showToast(
+        "Magenta is an HTTP MCP — paste the snippet into Claude / Cursor / Hermes. Nothing to OAuth in Bevel.",
+        "info",
+      );
+      return;
+    }
+    if (id === "cmyk-brandkit") {
+      if (brandKitCatalog?.claude) {
+        void navigator.clipboard.writeText(brandKitCatalog.claude).catch(() => {});
+      }
+      showToast(
+        "BrandKit MCP is stdio (@cmyk/mcp). Paste the snippet into Claude / Cursor / Hermes.",
+        "info",
+      );
+      return;
+    }
+    if (id === "figma") {
+      const url = brandKitCatalog?.kits.find((k) => k.figmaUrl)?.figmaUrl;
+      if (url) window.open(url, "_blank", "noopener");
+      showToast("Opened Figma design system. Organism jumps are on the kitchen sink.", "info");
+      return;
+    }
     if (id === "slack") {
       if (!slackOauthReady) {
         showToast(
@@ -344,7 +604,14 @@ export default function IntegrationsPage() {
     setActiveModalIntegration(integration);
     setSetupStep(1);
     // Slack prefers OAuth (Extensions); others still token-first mock
-    setAuthMethod(integration.id === "slack" ? "oauth" : "token");
+    setAuthMethod(
+      integration.id === "slack" ||
+        integration.id === "magenta" ||
+        integration.id === "cmyk-brandkit" ||
+        integration.id === "figma"
+        ? "oauth"
+        : "token",
+    );
     setApiToken("");
   };
 
@@ -373,7 +640,10 @@ export default function IntegrationsPage() {
             Integrations
           </h1>
           <p className="text-text-muted mt-1 max-w-2xl text-sm leading-relaxed">
-            Configure third-party service connections, sync credentials, and manage webhooks.
+            Services connect once. <strong className="text-text">Inbound</strong> posts
+            atom / molecule / organism nuggets into a channel.{" "}
+            <strong className="text-text">MCP</strong> is the agent-facing lane of the
+            same catalog — not a separate product.
             Slack uses OAuth +{" "}
             <a
               className="text-primary-400 underline-offset-2 hover:underline"
@@ -384,6 +654,11 @@ export default function IntegrationsPage() {
               Slack MCP
             </a>{" "}
             (<code className="text-xs">{slackMcpEndpoint}</code>) for agents.
+            Magenta MCP:{" "}
+            <code className="text-xs">
+              {magentaMcp?.endpoint || "https://api.magenta.ac/api/v2/mcp"}
+            </code>
+            . BrandKit + Figma: 2x4m and Comma design systems, tokens JSON, organism jumps.
             Redirect:{" "}
             <code className="text-xs break-all">
               /api/integrations/slack/oauth/callback
@@ -405,6 +680,30 @@ export default function IntegrationsPage() {
           </div>
         </div>
       </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["all", "All services"],
+            ["inbound", "Inbound nuggets"],
+            ["mcp", "MCP servers"],
+          ] as const
+        ).map(([id, label]) => (
+          <Link
+            key={id}
+            href={id === "all" ? "/console/integrations" : `/console/integrations?lane=${id}`}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+              lane === id
+                ? "border-primary-500/40 bg-primary-500/10 text-text"
+                : "border-border/40 text-text-muted hover:text-text"
+            }`}
+          >
+            {label}
+          </Link>
+        ))}
+      </div>
+
+      <NuggetCatalog lane={lane} />
 
       {/* Filter and Search Bar Section */}
       <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-surface/20 p-4 rounded-xl border border-border/30">
@@ -631,7 +930,191 @@ export default function IntegrationsPage() {
 
               {/* MAIN BODY CONFIGURATION PANELS */}
               <div className="flex-grow">
-                {activeModalIntegration.connected ? (
+                {activeModalIntegration.id === "cmyk-brandkit" ||
+                activeModalIntegration.id === "figma" ? (
+                  <div className="space-y-4">
+                    {(brandKitCatalog?.kits || []).map((kit) => (
+                      <div
+                        key={kit.slug}
+                        className="glass p-4 rounded-xl border border-border/50 space-y-2 bg-surface/20 text-xs"
+                      >
+                        <div className="flex items-center justify-between font-mono">
+                          <span className="font-semibold text-text">{kit.name}</span>
+                          <span className={kit.live ? "text-success" : "text-text-muted"}>
+                            {kit.live ? "Live" : "Unreachable"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            className="text-primary-400 underline-offset-2 hover:underline"
+                            href={kit.kitchenSink}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Kitchen sink
+                          </a>
+                          <a
+                            className="text-primary-400 underline-offset-2 hover:underline"
+                            href={kit.tokensUrl}
+                          >
+                            Tokens JSON
+                          </a>
+                          <a
+                            className="text-primary-400 underline-offset-2 hover:underline"
+                            href={kit.figmaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Figma file
+                          </a>
+                          <a
+                            className="text-primary-400 underline-offset-2 hover:underline"
+                            href={kit.organismsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Organisms
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                    {activeModalIntegration.id === "cmyk-brandkit" ? (
+                      <>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1">
+                            MCP
+                          </p>
+                          <pre className="text-[11px] bg-background border border-border rounded-lg p-3 overflow-x-auto text-text">
+                            {brandKitCatalog?.claude ||
+                              "pnpm --filter @cmyk/mcp start"}
+                          </pre>
+                          <button
+                            type="button"
+                            className="mt-2 text-xs font-semibold text-primary-400"
+                            onClick={() => {
+                              const text =
+                                brandKitCatalog?.claude ||
+                                "pnpm --filter @cmyk/mcp start";
+                              void navigator.clipboard
+                                .writeText(text)
+                                .then(() => showToast("Copied MCP command", "success"))
+                                .catch(() => showToast("Copy failed", "error"));
+                            }}
+                          >
+                            Copy command
+                          </button>
+                        </div>
+                        <pre className="text-[11px] bg-background border border-border rounded-lg p-3 overflow-x-auto text-text">
+                          {brandKitCatalog?.mcpJson || "{}"}
+                        </pre>
+                        <p className="text-[11px] text-text-muted">
+                          Tools:{" "}
+                          {(brandKitCatalog?.tools || []).join(", ") ||
+                            "list_brand_kits, get_brand_kit_theme, get_design_tokens, get_code_snippet"}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-text-muted">
+                        Starter Figma is three pages. Kitchen-sink pills deep-link into Color, Type, Grid, CTAs, Atoms, Molecules, and Organisms frames.
+                      </p>
+                    )}
+                  </div>
+                ) : activeModalIntegration.id === "magenta" ? (
+                  <div className="space-y-4">
+                    <div className="glass p-4 rounded-xl border border-border/50 space-y-2 bg-surface/20 text-xs font-mono">
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-muted">MCP</span>
+                        <span className="text-text break-all text-right">
+                          {magentaMcp?.endpoint ||
+                            "https://api.magenta.ac/api/v2/mcp"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-muted">Status</span>
+                        <span
+                          className={
+                            magentaMcp?.live ? "text-success" : "text-text-muted"
+                          }
+                        >
+                          {magentaMcp?.live ? "Live" : "Unreachable"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-text-muted">Tools</span>
+                        <p className="mt-1 text-text break-words">
+                          {(magentaMcp?.tools || []).join(", ") ||
+                            "magenta_traffic, magenta_reliability, magenta_sites, magenta_health, magenta_ask"}
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1">
+                        Claude Code
+                      </p>
+                      <pre className="text-[11px] bg-background border border-border rounded-lg p-3 overflow-x-auto text-text">
+                        {magentaMcp?.claude ||
+                          "claude mcp add magenta --transport http https://api.magenta.ac/api/v2/mcp"}
+                      </pre>
+                      <button
+                        type="button"
+                        className="mt-2 text-xs font-semibold text-primary-400"
+                        onClick={() => {
+                          const text =
+                            magentaMcp?.claude ||
+                            "claude mcp add magenta --transport http https://api.magenta.ac/api/v2/mcp";
+                          void navigator.clipboard
+                            .writeText(text)
+                            .then(() => showToast("Copied Claude install", "success"))
+                            .catch(() => showToast("Copy failed", "error"));
+                        }}
+                      >
+                        Copy command
+                      </button>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1">
+                        mcp.json
+                      </p>
+                      <pre className="text-[11px] bg-background border border-border rounded-lg p-3 overflow-x-auto text-text">
+                        {magentaMcp?.mcpJson ||
+                          `{
+  "mcpServers": {
+    "magenta": { "url": "https://api.magenta.ac/api/v2/mcp", "transport": "http" }
+  }
+}`}
+                      </pre>
+                      <button
+                        type="button"
+                        className="mt-2 text-xs font-semibold text-primary-400"
+                        onClick={() => {
+                          const text =
+                            magentaMcp?.mcpJson ||
+                            '{"mcpServers":{"magenta":{"url":"https://api.magenta.ac/api/v2/mcp","transport":"http"}}}';
+                          void navigator.clipboard
+                            .writeText(text)
+                            .then(() => showToast("Copied mcp.json", "success"))
+                            .catch(() => showToast("Copy failed", "error"));
+                        }}
+                      >
+                        Copy JSON
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-text-muted">
+                      Site id <code className="font-mono">bevel</code>.{" "}
+                      <code className="font-mono">uptime_check</code> events are
+                      Magenta probes, not visitors. Docs:{" "}
+                      <a
+                        className="text-primary-400 underline-offset-2 hover:underline"
+                        href="https://api.magenta.ac/.well-known/mcp.json"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        manifest
+                      </a>
+                      .
+                    </p>
+                  </div>
+                ) : activeModalIntegration.connected ? (
                   /* ALREADY CONNECTED - MANAGE CONFIGURATION */
                   <div className="space-y-6">
                     {/* Connection Health */}

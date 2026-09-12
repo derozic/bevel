@@ -156,6 +156,28 @@ export function bevelTalkPath(agentId: string, agents?: string): string {
   return `${base}?agents=${encodeURIComponent(agents)}`
 }
 
+/** Rich dossier: SOUL.md, SKILL.md, nested skills. */
+export function bevelAgentProfilePath(agentId: string): string {
+  return `${bevelTalkPath(agentId)}/profile`
+}
+
+export function bevelAgentSoulPath(agentId: string): string {
+  return `${bevelTalkPath(agentId)}/soul`
+}
+
+export function bevelAgentSkillPath(agentId: string, skill?: string): string {
+  const base = `${bevelTalkPath(agentId)}/skills`
+  if (!skill?.trim()) return base
+  const parts = skill
+    .trim()
+    .replace(/^skills\//, '')
+    .replace(/\.md$/i, '')
+    .split('/')
+    .filter(Boolean)
+    .map((p) => encodeURIComponent(p))
+  return `${base}/${parts.join('/')}`
+}
+
 export function bevelSessionPath(sessionId: string): string {
   return `${BEVEL_SESSION_PATH}/${encodeURIComponent(sessionId)}`
 }

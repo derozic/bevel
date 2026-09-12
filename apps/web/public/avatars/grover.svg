@@ -1,4 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#166534"/>
-  <text x="60" y="72" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="700" fill="#ffffff">G</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Grover">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #166534)"/>
+  <path d="M60 88V42" stroke="var(--agent-stroke, #ffffff)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M60 58c-14-4-22-16-22-28M60 50c14-2 24-12 26-24" stroke="var(--agent-highlight, #ffffff)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="38" cy="28" r="10" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <circle cx="86" cy="24" r="9" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <circle cx="60" cy="36" r="8" fill="var(--agent-highlight, #ffffff)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
 </svg>

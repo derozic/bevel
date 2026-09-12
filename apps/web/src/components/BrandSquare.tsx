@@ -2,6 +2,8 @@
 
 import type { CSSProperties, MouseEvent, ReactNode } from 'react'
 import Link from 'next/link'
+import { FleetAvatar } from '@/components/avatars/FleetAvatar'
+import { getAgentById } from '@/lib/agent-catalog'
 import { processColorForKey } from '@/lib/cmyk-process'
 import { rewriteLocalWorkspaceHref } from '@/lib/local-workspace-href'
 
@@ -35,6 +37,8 @@ export function BrandSquare({
   const wash = process || processColorForKey(processKey || label)
   const style = { '--tile-process': wash } as CSSProperties
   const mark = logoUrl?.trim()
+  const agentId = mark?.match(/\/avatars\/([a-z0-9-]+)\.(?:svg|jpg)$/)?.[1]
+  const agent = agentId ? getAgentById(agentId) : undefined
   const initial = (label.replace(/^[~^#]/, '').trim()[0] || '?').toUpperCase()
   const crossHost = /^https?:\/\//i.test(href)
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
@@ -61,7 +65,14 @@ export function BrandSquare({
   const body = (
     <>
       <span className="bevel-brand-square-face" aria-hidden>
-        {mark ? (
+        {agent ? (
+          <FleetAvatar
+            agentId={agent.id}
+            name={agent.name}
+            accent={agent.accent}
+            size={28}
+          />
+        ) : mark ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={mark} alt="" className="bevel-brand-square-logo" />
         ) : (

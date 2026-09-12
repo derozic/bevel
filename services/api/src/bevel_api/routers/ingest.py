@@ -10,6 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bevel_api.deps import get_session
 from bevel_api.lib.internal_auth import require_internal
+from bevel_api.lib.nuggets import (
+    NUGGET_INGEST_URL,
+    lint_nugget,
+    nugget_message,
+    parse_nugget_payload,
+)
+
+__all__ = ["INGEST_URL", "NUGGET_INGEST_URL"]
 from bevel_api.repositories import channels as channels_repo
 from bevel_api.repositories import messages as messages_repo
 from bevel_api.repositories import tenants as tenants_repo
@@ -310,4 +318,150 @@ async def ingest_notification(
         "message": persisted,
         "push": push_result,
         "timeline": timeline_item,
+    }
+
+
+class NuggetIngestBody(BaseModel):
+    """Inbound integration / agent post — Brad Frost nugget into a track."""
+
+    nugget: dict[str, Any] | str
+    track: str = ""
+    conversation: str = ""
+    tenant: str | None = None
+    persist: bool = True
+    timeline: bool = False
+    userId: str = ""
+    email: str = ""
+    handle: str = ""
+    agentId: str = ""
+
+
+@router.get("/nuggets")
+async def nugget_ingest_contract() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "ingest": NUGGET_INGEST_URL,
+        "method": "POST",
+        "auth": "X-Fleet-Internal-Key",
+        "prefix": "bevel-nugget:v1",
+        "scales": ["atom", "molecule", "organism", "template", "page"],
+        "example": {
+            "track": "ops",
+            "nugget": {
+                "v": 1,
+                "scale": "organism",
+                "source": "clickup",
+                "title": "Ship Magenta MCP card",
+                "atoms": [
+                    {"kind": "chip", "label": "status", "value": "in review"},
+                    {"kind": "person", "label": "assignee", "value": "Scott"},
+                ],
+            },
+        },
+        "effects": ["persist bevel-nugget:v1 JSON into the track"],
+    }
+
+
+@router.post("/nuggets")
+async def ingest_nugget(
+    body: NuggetIngestBody,
+    request: Request,
+    _auth: InternalAuth,
+    session: SessionDep,
+) -> dict[str, Any]:
+    payload = parse_nugget_payload(body.nugget)
+    if payload is None:
+        raise HTTPException(400, "nugget must be an object or bevel-nugget:v1 JSON")
+    issues = [row for row in lint_nugget(payload) if row.get("level") == "error"]
+    if issues:
+        raise HTTPException(400, {"ok": False, "lint": issues})
+
+    tenant_slug = (body.tenant or DEFAULT_TENANT).strip().lower()
+    tenant = await tenants_repo.get_by_slug(session, tenant_slug)
+    if tenant is None:
+        raise HTTPException(404, f"tenant not found: {tenant_slug}")
+
+    slug = (
+        body.conversation.strip().lower()
+        or body.track.strip().lower().lstrip("~^#")
+        or None
+    )
+    if not slug:
+        raise HTTPException(400, "track or conversation is required")
+
+    msg = nugget_message(payload, agent_id=body.agentId)
+    scale = str(msg.get("nuggetScale") or "organism")
+    source = str(msg.get("nuggetSource") or "bevel")
+    title = str(payload.get("title") or source).strip()
+
+    persisted = None
+    if body.persist:
+        ch = await channels_repo.ensure_channel(
+            session,
+            tenant.id,
+            slug,
+            name=slug,
+            tags=["nugget", "ingest", source],
+        )
+        record = await messages_repo.append(
+            session,
+            tenant_id=tenant.id,
+            channel_id=ch.id,
+            channel_slug=ch.slug,
+            msg=msg,
+        )
+        persisted = messages_repo.to_api_dict(record)
+        try:
+            from bevel_api.routers.webhooks import dispatch_message_created
+
+            await dispatch_message_created(
+                session,
+                tenant_id=tenant.id,
+                tenant_slug=tenant.slug,
+                channel_slug=ch.slug,
+                message=persisted,
+            )
+        except Exception:
+            pass
+
+    timeline_item = None
+    if body.timeline:
+        user = await _resolve_user(
+            session,
+            NotificationIngestBody(
+                title=title,
+                body=title,
+                userId=body.userId,
+                email=body.email,
+                handle=body.handle,
+                tenant=tenant_slug,
+            ),
+        )
+        if user:
+            item = await timeline_repo.upsert_item(
+                session,
+                tenant_id=tenant.id,
+                recipient_user_id=user.id,
+                kind="nugget",
+                priority="normal",
+                actor_user_id=None,
+                actor_label=title,
+                source_type="nugget",
+                source_id=f"nugget:{persisted['id'] if persisted else source}",
+                channel_slug=slug,
+                body_preview=title[:500],
+                payload={"scale": scale, "source": source, "title": title},
+            )
+            timeline_item = {"id": item.id, "kind": item.kind}
+
+    return {
+        "ok": True,
+        "ingest": NUGGET_INGEST_URL,
+        "track": None if slug.startswith("dm-") else slug,
+        "conversation": slug if slug.startswith("dm-") else None,
+        "scale": scale,
+        "source": source,
+        "message": persisted,
+        "timeline": timeline_item,
+        "bodyPrefix": "bevel-nugget:v1",
     }

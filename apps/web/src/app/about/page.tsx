@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { MarketingPage } from '@/components/marketing/MarketingPage'
 import { BEVEL_NAME } from '@/lib/bevel'
+import { BEVEL_CONTACT_EMAIL } from '@/lib/marketing'
 
 export const metadata: Metadata = {
   title: `About · ${BEVEL_NAME}`,
@@ -27,8 +28,8 @@ export default function AboutPage() {
       </p>
       <p>
         Questions or partnerships:{' '}
-        <a className="text-accent underline-offset-2 hover:underline" href="mailto:hello@bevel.com">
-          hello@bevel.com
+        <a className="text-accent underline-offset-2 hover:underline" href={`mailto:${BEVEL_CONTACT_EMAIL}`}>
+          {BEVEL_CONTACT_EMAIL}
         </a>
         .
       </p>

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
 import { accentStripeColor } from '../lib/accent'
@@ -23,8 +24,12 @@ export type AgentChipProps = {
    * exposes a primary Message action.
    */
   messageHref?: string
+  /** Dossier / SOUL.md profile URL */
+  profileHref?: string
   /** Optional role line under the name */
   role?: string
+  /** Host-rendered sticker glyph (day-part contrast). */
+  renderAvatar?: (size: number) => ReactNode
   /**
    * Composer currently @mentions this agent — light up the chip and
    * surface that the mention resolved.
@@ -53,8 +58,10 @@ export function AgentChip({
   active,
   onToggle,
   messageHref,
+  profileHref,
   role,
   mentioned = false,
+  renderAvatar,
 }: AgentChipProps) {
   const stripe = accentStripeColor(agent.accent)
   const cardId = useId()
@@ -198,21 +205,22 @@ export function AgentChip({
             onMouseLeave={scheduleClose}
           >
             <div className="fleet-chat-agent-card__head">
-              {agent.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={agent.avatar}
-                  alt=""
-                  className="fleet-chat-agent-card__avatar"
-                />
-              ) : (
-                <span
-                  className="fleet-chat-agent-card__avatar fleet-chat-agent-card__avatar--fallback"
-                  aria-hidden
-                >
-                  {agent.name.slice(0, 1).toUpperCase()}
-                </span>
-              )}
+              {renderAvatar?.(56) ??
+                (agent.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={agent.avatar}
+                    alt=""
+                    className="fleet-chat-agent-card__avatar"
+                  />
+                ) : (
+                  <span
+                    className="fleet-chat-agent-card__avatar fleet-chat-agent-card__avatar--fallback"
+                    aria-hidden
+                  >
+                    {agent.name.slice(0, 1).toUpperCase()}
+                  </span>
+                ))}
               <div className="fleet-chat-agent-card__titles">
                 <p className="fleet-chat-agent-card__name">{agent.name}</p>
                 {roleLine ? (
@@ -242,6 +250,15 @@ export function AgentChip({
                   onClick={() => closeCard()}
                 >
                   Message
+                </a>
+              ) : null}
+              {profileHref ? (
+                <a
+                  href={profileHref}
+                  className="fleet-chat-agent-card__btn"
+                  onClick={() => closeCard()}
+                >
+                  Profile
                 </a>
               ) : null}
               <button
@@ -311,23 +328,24 @@ export function AgentChip({
               : undefined
           }
         >
-          {agent.avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={agent.avatar}
-              alt=""
-              className="fleet-chat-chip-avatar"
-              data-mentioned={mentioned ? 'true' : 'false'}
-            />
-          ) : (
-            <span
-              className="fleet-chat-chip-avatar fleet-chat-chip-avatar--fallback"
-              data-mentioned={mentioned ? 'true' : 'false'}
-              aria-hidden
-            >
-              {agent.name.slice(0, 1).toUpperCase()}
-            </span>
-          )}
+          {renderAvatar?.(20) ??
+            (agent.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={agent.avatar}
+                alt=""
+                className="fleet-chat-chip-avatar"
+                data-mentioned={mentioned ? 'true' : 'false'}
+              />
+            ) : (
+              <span
+                className="fleet-chat-chip-avatar fleet-chat-chip-avatar--fallback"
+                data-mentioned={mentioned ? 'true' : 'false'}
+                aria-hidden
+              >
+                {agent.name.slice(0, 1).toUpperCase()}
+              </span>
+            ))}
           <span className="fleet-chat-chip-label">{agent.name}</span>
         </button>
       </span>

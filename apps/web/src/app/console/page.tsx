@@ -27,7 +27,13 @@ const CARDS = [
   {
     href: '/console/integrations',
     title: 'Integrations',
-    body: 'n8n, GitHub, Linear, Slack, and partner services connected to your workspace.',
+    body: 'Connect services. Inbound nuggets post to channels; MCP is the agent lane of the same catalog.',
+    icon: Package,
+  },
+  {
+    href: '/console/integrations?lane=mcp',
+    title: 'MCP servers',
+    body: 'Agent-facing Streamable HTTP: Magenta, Slack, Bevel. Same Integrations catalog.',
     icon: Package,
   },
   {

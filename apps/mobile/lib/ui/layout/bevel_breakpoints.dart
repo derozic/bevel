@@ -141,14 +141,14 @@ class BevelLayoutInfo {
     if (surface == BevelSurfaceMode.foldCover) {
       return BevelLayoutClass.compact;
     }
-    // Material-ish: compact < 600 shortest, medium < 840, else expanded
-    // Pro Max class phones still compact/medium by width
+    // compact: phones + fold cover (S26 Ultra, 17 Pro Max, Pixel Fold outer)
+    // medium: large phone landscape / small tablet
+    // expanded: iPad Pro 11/13, Pixel Tablet, Pixel Fold inner, dual-pane Duo
     if (shortest < 600) {
-      // Large phones in landscape can feel medium
       if (width >= 700) return BevelLayoutClass.medium;
       return BevelLayoutClass.compact;
     }
-    if (shortest < 840) return BevelLayoutClass.medium;
+    if (shortest < 800) return BevelLayoutClass.medium;
     return BevelLayoutClass.expanded;
   }
 }

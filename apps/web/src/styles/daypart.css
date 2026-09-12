@@ -483,3 +483,45 @@ html[data-bevel-contrast='high'] [data-bevel-prefs-panel] {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Fleet avatars — restyle sticker glyphs per atmosphere */
+html[data-daypart='morning'] .fleet-avatar {
+  --agent-face: color-mix(in srgb, oklch(99% 0.015 70) 88%, var(--agent-accent));
+  --agent-stroke: oklch(99% 0.01 70);
+  --agent-glyph: oklch(99% 0.01 70);
+  --agent-highlight: color-mix(in srgb, oklch(96% 0.04 55) 55%, var(--agent-accent));
+}
+
+html[data-daypart='midday'] .fleet-avatar {
+  --agent-face: color-mix(in srgb, oklch(100% 0.004 210) 88%, var(--agent-accent));
+  --agent-stroke: #ffffff;
+  --agent-glyph: #ffffff;
+  --agent-highlight: color-mix(in srgb, oklch(96% 0.03 210) 50%, var(--agent-accent));
+}
+
+html[data-daypart='afternoon'] .fleet-avatar {
+  --agent-face: color-mix(in srgb, oklch(99% 0.02 75) 86%, var(--agent-accent));
+  --agent-stroke: oklch(99% 0.015 75);
+  --agent-glyph: oklch(99% 0.015 75);
+  --agent-highlight: color-mix(in srgb, oklch(94% 0.06 55) 48%, var(--agent-accent));
+}
+
+html[data-daypart='night'] .fleet-avatar {
+  --agent-plate: color-mix(in srgb, var(--agent-accent) 70%, oklch(24% 0.035 235));
+  --agent-face: oklch(86% 0.025 230);
+  --agent-ink: oklch(22% 0.04 234);
+  --agent-stroke: oklch(94% 0.012 230);
+  --agent-highlight: color-mix(in srgb, oklch(78% 0.04 230) 45%, var(--agent-accent));
+  --agent-glyph: oklch(94% 0.012 230);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bevel-text) 24%, transparent);
+}
+
+/* Near-black plates (ChatGPT / Grok / Sable / Veda) invert on night navy */
+html[data-daypart='night'] .fleet-avatar[data-dark-plate='true'] {
+  --agent-plate: oklch(90% 0.018 230);
+  --agent-face: oklch(22% 0.03 234);
+  --agent-ink: oklch(16% 0.025 232);
+  --agent-stroke: oklch(16% 0.025 232);
+  --agent-highlight: oklch(78% 0.03 230);
+  --agent-glyph: oklch(16% 0.025 232);
+}

@@ -17,6 +17,8 @@ import 'channel_picker_sheet.dart';
 import 'gesture_haptics.dart';
 import 'layout/bevel_breakpoints.dart';
 import 'layout/workspace_rail.dart';
+import 'nugget/nugget.dart';
+import 'nugget/nugget_stage.dart';
 
 /// In-app workspace browser (WKWebView on macOS / iOS, WebView on Android).
 ///
@@ -90,6 +92,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   var _authRetryUsed = false;
   var _needsWorkspaceSignIn = false;
   var _browserLoginInFlight = false;
+  BevelNugget? _stagedNugget;
   List<(String, String)> _channels = const [
     ('general', 'General'),
     ('ops', 'Ops'),
@@ -143,6 +146,12 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
         'BevelHaptics',
         onMessageReceived: (msg) {
           unawaited(playGestureHaptic(msg.message));
+        },
+      )
+      ..addJavaScriptChannel(
+        'BevelNuggets',
+        onMessageReceived: (msg) {
+          _onNativeNugget(msg.message);
         },
       )
       ..setNavigationDelegate(
@@ -314,6 +323,24 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   }
 
   Future<void> _reload() => _controller.reload();
+
+  void _onNativeNugget(String raw) {
+    BevelNugget? nugget = BevelNugget.tryParseRaw(raw);
+    if (nugget == null) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) {
+          nugget = BevelNugget.tryParse(decoded);
+        } else if (decoded is Map) {
+          nugget = BevelNugget.tryParse(Map<String, dynamic>.from(decoded));
+        }
+      } catch (_) {
+        return;
+      }
+    }
+    if (nugget == null || !mounted) return;
+    setState(() => _stagedNugget = nugget);
+  }
 
   /// In-app Google Sign-In → handoff redeem on this host (no Safari).
   Future<void> _nativeGoogleThenReload() async {
@@ -694,9 +721,36 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                         color: p.border,
                       ),
                       Expanded(child: webBody),
+                      if (_stagedNugget != null) ...[
+                        VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: p.border,
+                        ),
+                        Expanded(
+                          flex: _stagedNugget!.resolvedPlacement ==
+                                  NuggetPlacement.page
+                              ? 3
+                              : 2,
+                          child: NuggetStage(
+                            nugget: _stagedNugget!,
+                            onClose: () =>
+                                setState(() => _stagedNugget = null),
+                            onOpenRelated: (child) =>
+                                setState(() => _stagedNugget = child),
+                          ),
+                        ),
+                      ],
                     ],
                   )
-                : webBody,
+                : (_stagedNugget != null
+                    ? NuggetStage(
+                        nugget: _stagedNugget!,
+                        onClose: () => setState(() => _stagedNugget = null),
+                        onOpenRelated: (child) =>
+                            setState(() => _stagedNugget = child),
+                      )
+                    : webBody),
           ),
         ],
       ),

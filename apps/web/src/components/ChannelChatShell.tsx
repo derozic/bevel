@@ -3,8 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { signIn, useSession } from 'next-auth/react'
 import { FleetChat, FleetProvider, type FleetWorkRepo } from '@bevel/realtime-client'
+import { FleetAvatar } from '@/components/avatars/FleetAvatar'
 import { agents } from '@/lib/agent-catalog'
-import { BEVEL_ARCHIVE_PATH, BEVEL_COPY, bevelTalkPath } from '@/lib/bevel'
+import {
+  BEVEL_ARCHIVE_PATH,
+  BEVEL_COPY,
+  bevelAgentProfilePath,
+  bevelTalkPath,
+} from '@/lib/bevel'
 import { UserMenu } from '@/components/UserMenu'
 import { ChatHeaderTools } from '@/components/ChatHeaderTools'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
@@ -244,6 +250,15 @@ export function ChannelChatShell({
           </>
         }
         agentMessageHref={(agentId) => bevelTalkPath(agentId)}
+        agentProfileHref={(agentId) => bevelAgentProfilePath(agentId)}
+        renderAgentAvatar={(agent, size) => (
+          <FleetAvatar
+            agentId={agent.id}
+            name={agent.name}
+            accent={agent.accent}
+            size={size}
+          />
+        )}
         peopleLookupPath="/api/users/lookup"
         channelEscalated={channelEscalated}
         showAvatars={prefs?.prefs.messages.showAvatars !== false}

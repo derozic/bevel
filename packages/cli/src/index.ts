@@ -181,6 +181,10 @@ async function cmdIntegrations(provider: string | undefined, action: string | un
                 url: 'https://mcp.slack.com/mcp',
                 transport: 'http',
               },
+              magenta: {
+                url: 'https://api.magenta.ac/api/v2/mcp',
+                transport: 'http',
+              },
             },
           },
           null,

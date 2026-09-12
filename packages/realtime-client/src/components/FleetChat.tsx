@@ -239,6 +239,8 @@ export type FleetChatProps = {
    * When provided, agent chips expose a Message action on their profile card.
    */
   agentMessageHref?: (agentId: string) => string
+  agentProfileHref?: (agentId: string) => string
+  renderAgentAvatar?: (agent: FleetAgent, size: number) => ReactNode
   /** Show speaker avatars in the thread (default true). */
   showAvatars?: boolean
   /** Name label style from preferences. */
@@ -581,6 +583,8 @@ export function FleetChat({
   highlightQuery,
   userMenu,
   agentMessageHref,
+  agentProfileHref,
+  renderAgentAvatar,
   showAvatars = true,
   nameStyle = 'full_and_display',
   clock24h = false,
@@ -1672,6 +1676,12 @@ export function FleetChat({
                 active={agentIds.some((id) => id.toLowerCase() === a.id.toLowerCase())}
                 mentioned={isMentioned}
                 messageHref={agentMessageHref?.(a.id)}
+                profileHref={agentProfileHref?.(a.id)}
+                renderAvatar={
+                  renderAgentAvatar
+                    ? (size) => renderAgentAvatar(a, size)
+                    : undefined
+                }
                 role={a.category}
                 onToggle={() => {
                   setAgentIds((prev) =>
@@ -1708,7 +1718,8 @@ export function FleetChat({
                       : undefined
                   }
                 >
-                  {agent.avatar ? (
+                  {renderAgentAvatar?.(agent, 20) ??
+                    (agent.avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={agent.avatar}
@@ -1722,7 +1733,7 @@ export function FleetChat({
                     >
                       {agent.name.slice(0, 1).toUpperCase()}
                     </span>
-                  )}
+                  ))}
                   <span className="fleet-chat-mention-pill-copy">
                     <span className="fleet-chat-mention-pill-at">@{agent.id}</span>
                     <span className="fleet-chat-mention-pill-name">

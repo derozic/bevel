@@ -42,8 +42,8 @@ import {
   Zap,
 } from "lucide-react";
 
-import { useDaypart } from "@/components/console/daypart-provider";
-import { daypartOrder, type Daypart } from "@/components/console/daypart";
+import { usePreferencesOptional } from "@/components/preferences/PreferencesProvider";
+import { DAYPART_META, DAYPART_ORDER, type DaypartId } from "@/lib/daypart";
 import { trackWebEvent } from "@/components/console/track";
 import { bevelUrls } from "@/components/console/bevel-urls";
 
@@ -147,16 +147,16 @@ function pushRecent(id: string) {
   }
 }
 
-const daypartIcons: Record<Daypart, typeof Sun> = {
-  dawn: Sunrise,
-  day: Sun,
-  dusk: Sparkles,
+const daypartIcons: Record<DaypartId, typeof Sun> = {
+  morning: Sunrise,
+  midday: Sun,
+  afternoon: Sparkles,
   night: Moon,
 };
 
 function CommandPalette() {
   const { open, setOpen } = useCommandPalette();
-  const { setDaypart, setUseAuto } = useDaypart();
+  const prefs = usePreferencesOptional();
   const router = useRouter();
   const { data: session, status } = useSession();
   const [query, setQuery] = useState("");
@@ -427,26 +427,26 @@ function CommandPalette() {
         keywords: "observability prometheus",
         run: () => openExternal("https://metrics.bevel.dev"),
       },
-      ...daypartOrder.map((part) => ({
+      ...DAYPART_ORDER.map((part) => ({
         id: `daypart-${part}`,
-        label: `Theme: ${part}`,
+        label: `Day part: ${DAYPART_META[part].label}`,
         group: "Appearance",
         icon: daypartIcons[part],
-        keywords: `daypart day night dusk dawn theme ${part}`,
+        keywords: `daypart day night morning midday afternoon theme ${part} ${DAYPART_META[part].shortLabel}`,
         run: () => {
           setOpen(false);
-          setDaypart(part);
+          prefs?.updatePrefs({ appearance: { daypart: part } });
         },
       })),
       {
         id: "daypart-auto",
-        label: "Theme: Auto (clock)",
+        label: "Day part: Auto (clock)",
         group: "Appearance",
         icon: TimerReset,
-        keywords: "daypart auto clock follow",
+        keywords: "daypart auto clock follow morning night",
         run: () => {
           setOpen(false);
-          setUseAuto(true);
+          prefs?.updatePrefs({ appearance: { daypart: "auto" } });
         },
       },
     ];
@@ -484,9 +484,8 @@ function CommandPalette() {
   }, [
     go,
     openExternal,
+    prefs,
     session?.user?.email,
-    setDaypart,
-    setUseAuto,
     setOpen,
     status,
   ]);

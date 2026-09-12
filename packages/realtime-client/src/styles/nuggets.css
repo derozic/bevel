@@ -1,0 +1,268 @@
+/* Atomic-design channel nuggets (inbound integrations) */
+
+.bevel-nugget {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  max-width: 28rem;
+  padding: 0.7rem 0.8rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 0.85rem;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.bevel-nugget--atom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: none;
+  padding: 0.25rem 0.45rem;
+  border-radius: 999px;
+}
+
+.bevel-nugget--atom .bevel-nugget-head {
+  gap: 0.35rem;
+}
+
+.bevel-nugget--atom .bevel-nugget-title,
+.bevel-nugget--atom .bevel-nugget-source,
+.bevel-nugget--atom .bevel-nugget-summary,
+.bevel-nugget--atom .bevel-nugget-actions {
+  display: none;
+}
+
+.bevel-nugget-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.bevel-nugget-logo {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.4rem;
+  flex-shrink: 0;
+}
+
+.bevel-nugget-source {
+  margin: 0;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sticker-muted, var(--bevel-text-muted));
+}
+
+.bevel-nugget-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.bevel-nugget-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.bevel-nugget-summary {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--sticker-muted, var(--bevel-text-muted));
+}
+
+.bevel-nugget-atoms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.bevel-nugget-atom {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  background: color-mix(in srgb, var(--ink) 4%, var(--surface));
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+}
+
+.bevel-nugget-k {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.58rem;
+  color: var(--sticker-muted, var(--bevel-text-muted));
+}
+
+.bevel-nugget-v {
+  font-weight: 650;
+}
+
+.bevel-nugget-atom[data-tone='accent'] {
+  border-color: color-mix(in srgb, var(--bevel-accent) 35%, transparent);
+  color: var(--bevel-accent);
+}
+
+.bevel-nugget-atom[data-tone='success'] {
+  border-color: color-mix(in srgb, #16a34a 40%, transparent);
+  color: #16a34a;
+}
+
+.bevel-nugget-atom[data-tone='warning'] {
+  border-color: color-mix(in srgb, #d97706 40%, transparent);
+  color: #d97706;
+}
+
+.bevel-nugget-atom[data-tone='critical'] {
+  border-color: color-mix(in srgb, #dc2626 40%, transparent);
+  color: #dc2626;
+}
+
+.bevel-nugget-chart {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.bevel-nugget-pie {
+  width: 4.5rem;
+  height: 4.5rem;
+  flex-shrink: 0;
+}
+
+.bevel-nugget-chart ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.7rem;
+}
+
+.bevel-nugget-chart li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.bevel-nugget-swatch {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+}
+
+.bevel-nugget-spark {
+  width: 100%;
+  height: 2.25rem;
+}
+
+.bevel-nugget-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.bevel-nugget-related-btn {
+  border: 1px dashed color-mix(in srgb, var(--bevel-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--bevel-accent) 8%, transparent);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.bevel-nugget--template,
+.bevel-nugget--page {
+  max-width: none;
+}
+
+.bevel-nugget-stage--pane .bevel-nugget-stage-body,
+.bevel-nugget-stage--page .bevel-nugget-stage-body {
+  max-width: 72rem;
+}
+
+.bevel-nugget-actions button,
+.bevel-nugget-stage-bar button {
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.7rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.bevel-nugget-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--bevel-bg, var(--cream));
+  color: var(--ink);
+}
+
+.bevel-nugget-stage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.bevel-nugget-stage-bar p {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sticker-muted, var(--bevel-text-muted));
+}
+
+.bevel-nugget-stage-bar div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.bevel-nugget-stage-body {
+  overflow: auto;
+  padding: 1.5rem;
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+.bevel-nugget-stage-body .bevel-nugget {
+  max-width: none;
+}
+
+.bevel-nugget-section {
+  margin-top: 1.1rem;
+}
+
+.bevel-nugget-section h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bevel-nugget-section p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.bevel-nugget-gallery {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .bevel-nugget-gallery {
+    grid-template-columns: 1fr 1fr;
+  }
+}

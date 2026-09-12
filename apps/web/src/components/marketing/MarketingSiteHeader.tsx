@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import { Button } from '@bevel/ui'
 import { BevelDaypartMark } from '@/components/BevelDaypartMark'
 import { BevelMark } from '@/components/BevelMark'
-import { SuiteNav } from '@/components/SuiteNav'
 import { BEVEL_HOME_PATH } from '@/lib/bevel'
 import { MARKETING_NAV } from '@/lib/marketing'
 
@@ -80,10 +79,10 @@ function HomeActions({
   }
   return (
     <>
-      <Button asChild variant="outline" size="md">
+      <Button asChild variant="outline" size="sm" className="shrink-0">
         <Link href="/login?callbackUrl=%2Fwelcome">Sign in</Link>
       </Button>
-      <Button asChild size="md">
+      <Button asChild size="sm" className="hidden shrink-0 sm:inline-flex">
         <Link href={primaryHref}>{primaryLabel}</Link>
       </Button>
     </>
@@ -122,10 +121,10 @@ function ClaimActions({
 function MarketingActions() {
   return (
     <>
-      <Button asChild variant="outline" size="sm">
+      <Button asChild variant="outline" size="sm" className="shrink-0">
         <Link href="/login?callbackUrl=%2Fwelcome">Sign in</Link>
       </Button>
-      <Button asChild size="sm">
+      <Button asChild size="sm" className="hidden shrink-0 sm:inline-flex">
         <Link href="/claim">Claim workspace</Link>
       </Button>
     </>
@@ -164,12 +163,10 @@ export function MarketingSiteHeader({
   }
 
   return (
-    <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
+    <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-5">
       <BrandLink />
-      <nav className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
+      <nav className="flex flex-nowrap items-center justify-end gap-1 sm:gap-2">
         <MarketingNavLinks hideOn={navHide} />
-        {/* Right-half suite chip (Slack / Phoenix density) */}
-        <SuiteNav className="hidden sm:flex" size="sm" showLabel />
         {trailing}
       </nav>
     </header>

@@ -2417,6 +2417,33 @@ export function IntegrationsSection() {
       </PrefGroup>
 
       <PrefGroup
+        title="Extensions catalog"
+        description="Slack MCP, Magenta analytics MCP, SendGrid, and other operator extensions."
+      >
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/50 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Magenta MCP</p>
+            <p className="text-xs text-muted">
+              First-party analytics for agents — traffic vs probes, fleet
+              reliability. Public tools; magenta_ask needs Magenta staff auth.
+            </p>
+          </div>
+          <Button asChild size="sm" variant="outline" className="shrink-0">
+            <a href="/console/integrations">Open catalog</a>
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted">
+          Full catalog (Slack MCP, SendGrid, n8n, Magenta):{' '}
+          <a
+            href="/console/integrations"
+            className="font-medium text-accent underline-offset-2 hover:underline"
+          >
+            /console/integrations
+          </a>
+        </p>
+      </PrefGroup>
+
+      <PrefGroup
         title="Work & CRM"
         description="Same integration surface as decli (ClickUp) plus Attio for relationship data."
       >

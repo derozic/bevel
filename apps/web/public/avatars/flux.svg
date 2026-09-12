@@ -1,4 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#0891b2"/>
-  <text x="60" y="72" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="700" fill="#ffffff">F</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Flux">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #0891b2)"/>
+  <path d="M28 44h28a16 16 0 0 1 16 16 16 16 0 0 0 16 16h20" stroke="var(--agent-stroke, #ffffff)" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <path d="M28 44h28a16 16 0 0 1 16 16 16 16 0 0 0 16 16h20" stroke="var(--agent-highlight, #ffffff)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <path d="M28 76h20a12 12 0 0 0 12-12 12 12 0 0 1 12-12h36" stroke="var(--agent-face, #faf8f5)" stroke-width="6" stroke-linecap="round" fill="none"/>
+  <circle cx="28" cy="44" r="6" fill="var(--agent-face, #faf8f5)"/>
+  <circle cx="92" cy="76" r="6" fill="var(--agent-face, #faf8f5)"/>
 </svg>

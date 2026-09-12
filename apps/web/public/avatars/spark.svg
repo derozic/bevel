@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#f97316"/>
-  <text x="60" y="72" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="700" fill="#ffffff">S</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Spark">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #f97316)"/>
+  <path d="M60 18l8 28 30 8-30 8-8 28-8-28-30-8 30-8z" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M38 38l44 44M82 38L38 82" stroke="var(--agent-ink, #f97316)" stroke-width="4" stroke-linecap="round"/>
 </svg>

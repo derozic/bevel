@@ -9,6 +9,7 @@ import {
   UserGroupIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
+import { FleetAvatar } from '@/components/avatars/FleetAvatar'
 import { agents, getAgentById, type Agent } from '@/lib/agent-catalog'
 import { bevelTalkPath } from '@/lib/bevel'
 import {
@@ -279,10 +280,12 @@ export function ConversationRoster({
                       onClick={() => toggleAgent(a.id)}
                       title="Remove"
                     >
-                      {a.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={a.avatarUrl} alt="" />
-                      ) : null}
+                      <FleetAvatar
+                        agentId={a.id}
+                        name={a.name}
+                        accent={a.accent}
+                        size={18}
+                      />
                       {a.name}
                       <XMarkIcon className="h-3 w-3 opacity-70" aria-hidden />
                     </button>
@@ -333,18 +336,13 @@ export function ConversationRoster({
                           data-selected={on ? 'true' : 'false'}
                           onClick={() => toggleAgent(a.id)}
                         >
-                          {a.avatarUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={a.avatarUrl}
-                              alt=""
-                              className="bevel-roster-avatar"
-                            />
-                          ) : (
-                            <span className="bevel-roster-avatar bevel-roster-avatar--fallback">
-                              {a.name.slice(0, 1)}
-                            </span>
-                          )}
+                          <FleetAvatar
+                            agentId={a.id}
+                            name={a.name}
+                            accent={a.accent}
+                            size={28}
+                            className="bevel-roster-avatar"
+                          />
                           <span className="bevel-roster-row-text">
                             <span className="bevel-roster-row-name">{a.name}</span>
                             <span className="bevel-roster-row-meta">

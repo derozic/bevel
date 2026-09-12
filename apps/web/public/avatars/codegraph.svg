@@ -1,4 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#3b82f6"/>
-  <text x="60" y="76" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="52" font-weight="700" fill="#ffffff">C</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Codegraph">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #3b82f6)"/>
+  <circle cx="32" cy="36" r="10" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <circle cx="88" cy="36" r="10" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <circle cx="60" cy="84" r="12" fill="var(--agent-highlight, #ffffff)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <circle cx="60" cy="52" r="8" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <path d="M40 40l14 8M80 40L66 48M60 60v12" stroke="var(--agent-stroke, #ffffff)" stroke-width="3" stroke-linecap="round"/>
 </svg>

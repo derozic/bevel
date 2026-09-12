@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getTenantFromRequest } from '@bevel/tenant-config'
 import {
+  cmykBrandKitHost,
   fetchCmykBrandKitTheme,
   processFromKit,
   resolveCmykKitId,
@@ -18,11 +19,13 @@ export async function GET(request: Request) {
   if (!kit) {
     return NextResponse.json({ error: 'missing_kit' }, { status: 400 })
   }
-  const host = url.searchParams.get('host') || tenant?.theme.cmykHost
+  const host = cmykBrandKitHost(
+    url.searchParams.get('host') || tenant?.theme.cmykHost,
+  )
   const theme = await fetchCmykBrandKitTheme({ kitId: kit, host })
   if (!theme) {
     return NextResponse.json(
-      { error: 'kit_unavailable', kit, host: host || null },
+      { error: 'kit_unavailable', kit, host },
       { status: 502 },
     )
   }

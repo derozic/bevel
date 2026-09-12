@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { parseNugget } from '@bevel/schema'
+import { NuggetCard } from '../components/NuggetCard'
 import { extractChatImages } from './chat-images'
 
 const FENCE_RE = /^```/
@@ -92,6 +94,8 @@ function ChatImageStrip({
 /** Lightweight chat markdown — lists, bold, code, @mentions, ^escalations, images. */
 export function ChatMessageBody({ text }: { text: string }) {
   const safe = typeof text === 'string' ? text : text == null ? '' : String(text)
+  const nugget = parseNugget(safe)
+  if (nugget) return <NuggetCard nugget={nugget} />
   const { body, images } = extractChatImages(safe)
   const lines = body.replace(/\r\n/g, '\n').split('\n')
   const nodes: ReactNode[] = []

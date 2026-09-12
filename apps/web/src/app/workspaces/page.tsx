@@ -19,6 +19,7 @@ import {
   BEVEL_TRADEMARK_NOTICE,
 } from '@/lib/bevel'
 import { BrandSquare } from '@/components/BrandSquare'
+import { FirstRunPanel } from '@/components/onboarding/FirstRunPanel'
 import { auth } from '@/auth'
 import { workspaceOpenHref } from '@/lib/workspace-spaces.server'
 import {
@@ -96,6 +97,8 @@ export default async function WorkspacesPage() {
         </div>
         <SuiteNav size="sm" showLabel={false} className="shrink-0" />
       </div>
+
+      <FirstRunPanel mode="private" />
 
       <div className="bevel-brand-square-grid bevel-brand-square-grid--wide">
         <BrandSquare

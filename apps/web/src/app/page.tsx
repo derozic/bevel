@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import {
   getTenantFromRequest,
   isPlatformEntryHost,
+  platformEntryTenant,
 } from '@bevel/tenant-config'
 import { HomePage } from '@/components/home/HomePage'
 import { auth } from '@/auth'
@@ -26,12 +27,25 @@ export default async function Page() {
     .toLowerCase()
     .split(':')[0]
 
-  // Apex platform entry (bevel.is) — welcome routes to picker or private.
-  // Require email so partial JWTs cannot loop login ↔ welcome.
+  // Apex platform entry (bevel.is / bevel.lvh.me): marketing home when signed
+  // out, workspace router when signed in. Never dump visitors onto /login.
   if (isPlatformEntryHost(host)) {
     const session = await auth()
     if (session?.user?.email) redirect('/welcome')
-    redirect('/login?callbackUrl=%2Fwelcome')
+    const platform = platformEntryTenant(host)
+    return (
+      <HomePage
+        tenantName={BEVEL_PRODUCT.name}
+        productName={BEVEL_PRODUCT.name}
+        tenantSlug={platform.slug}
+        namespace={platform.realtime.namespace}
+        plan={platform.plan}
+        featureAccess={platform.featureAccess}
+        featureSet={platform.featureSet}
+        signedIn={false}
+        userName={null}
+      />
+    )
   }
 
   const tenant = await getTenantFromRequest()

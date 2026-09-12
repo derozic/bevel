@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="28" fill="#1a1410"/>
-  <text x="60" y="72" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="700" fill="#ffffff">S</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" role="img" aria-label="Sable">
+  <rect width="120" height="120" rx="28" fill="var(--agent-plate, #1a1410)"/>
+  <rect x="28" y="32" width="64" height="44" rx="8" fill="var(--agent-face, #faf8f5)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <rect x="36" y="40" width="48" height="28" rx="4" fill="var(--agent-ink, #1a1410)"/>
+  <circle cx="60" cy="86" r="12" fill="var(--agent-highlight, #ffffff)" stroke="var(--agent-stroke, #ffffff)" stroke-width="3"/>
+  <circle cx="60" cy="86" r="5" fill="none" stroke="var(--agent-ink, #1a1410)" stroke-width="2.5"/>
 </svg>
