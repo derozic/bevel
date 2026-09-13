@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import { Bars3Icon } from '@heroicons/react/24/outline'
 import { Button } from '@bevel/ui'
 import { BevelDaypartMark } from '@/components/BevelDaypartMark'
 import { BevelMark } from '@/components/BevelMark'
-import { BEVEL_HOME_PATH } from '@/lib/bevel'
-import { MARKETING_NAV } from '@/lib/marketing'
+import { MARKETING_NAV, signedInProductHome } from '@/lib/marketing'
 
 export type MarketingSiteHeaderActions = 'home' | 'claim' | 'marketing'
 
@@ -17,6 +17,9 @@ export type MarketingSiteHeaderProps = {
   /** Home primary CTA (e.g. Claim workspace) when signed out */
   primaryHref?: string
   primaryLabel?: string
+  /** Signed-in product home. Apex defaults to Private (`/me`). */
+  productHref?: string
+  productLabel?: string
 }
 
 function BrandLink() {
@@ -57,13 +60,18 @@ function HomeActions({
   userLabel,
   primaryHref = '/claim',
   primaryLabel = 'Claim workspace',
+  productHref,
+  productLabel,
 }: {
   signedIn?: boolean
   userLabel?: string | null
   primaryHref?: string
   primaryLabel?: string
+  productHref?: string
+  productLabel?: string
 }) {
   if (signedIn) {
+    const home = signedInProductHome()
     return (
       <>
         {userLabel ? (
@@ -72,7 +80,7 @@ function HomeActions({
           </span>
         ) : null}
         <Button asChild size="md">
-          <Link href={BEVEL_HOME_PATH}>Open workspace</Link>
+          <Link href={productHref ?? home.href}>{productLabel ?? home.label}</Link>
         </Button>
       </>
     )
@@ -92,11 +100,16 @@ function HomeActions({
 function ClaimActions({
   signedIn,
   userLabel,
+  productHref,
+  productLabel,
 }: {
   signedIn?: boolean
   userLabel?: string | null
+  productHref?: string
+  productLabel?: string
 }) {
   if (signedIn) {
+    const home = signedInProductHome()
     return (
       <>
         {userLabel ? (
@@ -105,7 +118,7 @@ function ClaimActions({
           </span>
         ) : null}
         <Button asChild size="md">
-          <Link href={BEVEL_HOME_PATH}>Open workspace</Link>
+          <Link href={productHref ?? home.href}>{productLabel ?? home.label}</Link>
         </Button>
       </>
     )
@@ -118,7 +131,32 @@ function ClaimActions({
   )
 }
 
-function MarketingActions() {
+function MarketingActions({
+  signedIn,
+  userLabel,
+  productHref,
+  productLabel,
+}: {
+  signedIn?: boolean
+  userLabel?: string | null
+  productHref?: string
+  productLabel?: string
+}) {
+  if (signedIn) {
+    const home = signedInProductHome()
+    return (
+      <>
+        {userLabel ? (
+          <span className="hidden max-w-[10rem] truncate text-sm text-muted sm:inline">
+            {userLabel}
+          </span>
+        ) : null}
+        <Button asChild size="sm" className="shrink-0">
+          <Link href={productHref ?? home.href}>{productLabel ?? home.label}</Link>
+        </Button>
+      </>
+    )
+  }
   return (
     <>
       <Button asChild variant="outline" size="sm" className="shrink-0">
@@ -128,6 +166,29 @@ function MarketingActions() {
         <Link href="/claim">Claim workspace</Link>
       </Button>
     </>
+  )
+}
+
+function MobileNav({ hideOn = 'md' }: { hideOn?: 'sm' | 'md' }) {
+  const hideClass = hideOn === 'sm' ? 'sm:hidden' : 'md:hidden'
+  return (
+    <details className={`relative ${hideClass}`}>
+      <summary className="flex size-9 cursor-pointer list-none items-center justify-center rounded-lg border border-border bg-surface text-foreground [&::-webkit-details-marker]:hidden">
+        <Bars3Icon className="size-5" aria-hidden />
+        <span className="sr-only">Menu</span>
+      </summary>
+      <div className="absolute right-0 z-50 mt-2 w-48 rounded-xl border border-border bg-surface p-2 shadow-xl">
+        {MARKETING_NAV.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="block rounded-lg px-3 py-2 text-sm text-foreground hover:bg-surface"
+          >
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </details>
   )
 }
 
@@ -141,6 +202,8 @@ export function MarketingSiteHeader({
   userLabel = null,
   primaryHref = '/claim',
   primaryLabel = 'Claim workspace',
+  productHref,
+  productLabel,
 }: MarketingSiteHeaderProps) {
   const navHide = actions === 'marketing' ? 'sm' : 'md'
 
@@ -154,20 +217,37 @@ export function MarketingSiteHeader({
         userLabel={userLabel}
         primaryHref={primaryHref}
         primaryLabel={primaryLabel}
+        productHref={productHref}
+        productLabel={productLabel}
       />
     )
   } else if (actions === 'claim') {
-    trailing = <ClaimActions signedIn={signedIn} userLabel={userLabel} />
+    trailing = (
+      <ClaimActions
+        signedIn={signedIn}
+        userLabel={userLabel}
+        productHref={productHref}
+        productLabel={productLabel}
+      />
+    )
   } else {
-    trailing = <MarketingActions />
+    trailing = (
+      <MarketingActions
+        signedIn={signedIn}
+        userLabel={userLabel}
+        productHref={productHref}
+        productLabel={productLabel}
+      />
+    )
   }
 
   return (
-    <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-5">
+    <header className="relative z-30 mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-5">
       <BrandLink />
       <nav className="flex flex-nowrap items-center justify-end gap-1 sm:gap-2">
         <MarketingNavLinks hideOn={navHide} />
         {trailing}
+        <MobileNav hideOn={navHide} />
       </nav>
     </header>
   )

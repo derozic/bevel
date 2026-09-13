@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { MarketingPage } from '@/components/marketing/MarketingPage'
 import { BEVEL_NAME } from '@/lib/bevel'
+import { BEVEL_LEGAL_EMAIL } from '@/lib/marketing'
 
 export const metadata: Metadata = {
   title: `Terms · ${BEVEL_NAME}`,
@@ -11,7 +12,7 @@ export default function TermsPage() {
   return (
     <MarketingPage title="Terms of use" kicker="Legal">
       <p>
-        <strong className="text-foreground">Last updated:</strong> July 11, 2026
+        <strong className="text-foreground">Last updated:</strong> September 13, 2026
       </p>
       <p>
         By accessing {BEVEL_NAME}, you agree to these terms. If you use {BEVEL_NAME} on
@@ -49,8 +50,8 @@ export default function TermsPage() {
       </p>
       <h2 className="pt-4 text-xl font-semibold text-foreground">Contact</h2>
       <p>
-        <a className="text-accent hover:underline" href="mailto:legal@bevel.com">
-          legal@bevel.com
+        <a className="text-accent hover:underline" href={`mailto:${BEVEL_LEGAL_EMAIL}`}>
+          {BEVEL_LEGAL_EMAIL}
         </a>
       </p>
     </MarketingPage>

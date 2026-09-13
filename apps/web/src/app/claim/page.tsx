@@ -9,6 +9,7 @@ import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { GoogleSignInButton } from '@/app/login/GoogleSignInButton'
 import { BEVEL_NAME } from '@/lib/bevel'
+import { signedInProductHome } from '@/lib/marketing'
 
 function slugify(name: string): string {
   return name
@@ -132,6 +133,8 @@ export default function ClaimPage() {
         actions="claim"
         signedIn={status === 'authenticated'}
         userLabel={email || null}
+        productHref={signedInProductHome().href}
+        productLabel={signedInProductHome().label}
       />
 
       <main className="relative z-10 mx-auto max-w-xl px-6 pb-24 pt-8">

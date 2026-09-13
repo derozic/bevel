@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { headers } from 'next/headers'
 import type {
   FeatureAccess,
   ResolvedFeatureSet,
@@ -6,9 +7,11 @@ import type {
 } from '@bevel/schema'
 import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { auth } from '@/auth'
 import { BEVEL_NAME } from '@/lib/bevel'
+import { signedInProductHome } from '@/lib/marketing'
 
-export function MarketingPage({
+export async function MarketingPage({
   title,
   kicker,
   children,
@@ -27,6 +30,21 @@ export function MarketingPage({
   featureAccess?: FeatureAccess | string
   featureSet?: ResolvedFeatureSet | null
 }) {
+  const session = await auth()
+  const headerStore = await headers()
+  const host = (
+    headerStore.get('x-bevel-host') ??
+    headerStore.get('x-forwarded-host') ??
+    headerStore.get('host') ??
+    ''
+  )
+    .split(',')[0]
+    ?.trim()
+    .toLowerCase()
+    .split(':')[0] || ''
+  const signedIn = Boolean(session?.user?.email)
+  const productHome = signedInProductHome(host)
+
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       <div className="bevel-home-atmosphere" aria-hidden="true">
@@ -34,7 +52,13 @@ export function MarketingPage({
         <div className="bevel-home-grid" />
       </div>
 
-      <MarketingSiteHeader actions="marketing" />
+      <MarketingSiteHeader
+        actions="marketing"
+        signedIn={signedIn}
+        userLabel={session?.user?.name || session?.user?.email || null}
+        productHref={productHome.href}
+        productLabel={productHome.label}
+      />
 
       <main className="relative z-10 mx-auto max-w-3xl px-6 pb-20 pt-10">
         {kicker ? (

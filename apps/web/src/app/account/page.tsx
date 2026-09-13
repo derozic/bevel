@@ -21,7 +21,7 @@ export default async function AccountPage() {
   const { tenants } = resolveWorkspacesForEmail(email)
   const personalAgent =
     (session.user as { personalAgentId?: string } | undefined)?.personalAgentId ||
-    'antigravity (default intelligence)'
+    'hermes'
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-10 px-6 py-16">
@@ -64,8 +64,8 @@ export default async function AccountPage() {
             <dt className="text-muted">Primary agent / intelligence</dt>
             <dd className="font-medium text-foreground">{personalAgent}</dd>
             <p className="mt-1 text-xs text-muted">
-              Default onboard provider: Google Antigravity (LLM). Set personal
-              agent in workspace preferences after opening an org.
+              Default personal agent is Hermes. Change it in workspace
+              preferences after you open Private or an org.
             </p>
           </div>
         </dl>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { MarketingPage } from '@/components/marketing/MarketingPage'
 import { BEVEL_NAME } from '@/lib/bevel'
+import { BEVEL_PRIVACY_EMAIL } from '@/lib/marketing'
 
 export const metadata: Metadata = {
   title: `Privacy · ${BEVEL_NAME}`,
@@ -11,7 +12,7 @@ export default function PrivacyPage() {
   return (
     <MarketingPage title="Privacy" kicker="Legal">
       <p>
-        <strong className="text-foreground">Last updated:</strong> July 11, 2026
+        <strong className="text-foreground">Last updated:</strong> September 13, 2026
       </p>
       <p>
         {BEVEL_NAME} (“we”) provides multi-tenant workspace channels for humans and
@@ -45,8 +46,8 @@ export default function PrivacyPage() {
       <h2 className="pt-4 text-xl font-semibold text-foreground">Contact</h2>
       <p>
         Privacy questions:{' '}
-        <a className="text-accent hover:underline" href="mailto:privacy@bevel.com">
-          privacy@bevel.com
+        <a className="text-accent hover:underline" href={`mailto:${BEVEL_PRIVACY_EMAIL}`}>
+          {BEVEL_PRIVACY_EMAIL}
         </a>
         .
       </p>

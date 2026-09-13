@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import {
   ArrowDownTrayIcon,
   ComputerDesktopIcon,
@@ -10,7 +11,9 @@ import {
 } from '@heroicons/react/24/outline'
 import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
+import { auth } from '@/auth'
 import { BEVEL_NAME, BEVEL_PRIVATE_PATH } from '@/lib/bevel'
+import { signedInProductHome } from '@/lib/marketing'
 
 export const metadata: Metadata = {
   title: `Download · ${BEVEL_NAME}`,
@@ -29,14 +32,34 @@ const DOWNLOADS = {
   macosZip: '/downloads/BEVEL-macos-arm64.zip',
 } as const
 
-export default function DownloadPage() {
+export default async function DownloadPage() {
+  const session = await auth()
+  const headerStore = await headers()
+  const host = (
+    headerStore.get('x-bevel-host') ??
+    headerStore.get('x-forwarded-host') ??
+    headerStore.get('host') ??
+    ''
+  )
+    .split(',')[0]
+    ?.trim()
+    .toLowerCase()
+    .split(':')[0] || ''
+  const productHome = signedInProductHome(host)
+
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       <div className="bevel-home-atmosphere" aria-hidden="true">
         <div className="bevel-home-mesh" />
         <div className="bevel-home-grid" />
       </div>
-      <MarketingSiteHeader actions="marketing" />
+      <MarketingSiteHeader
+        actions="marketing"
+        signedIn={Boolean(session?.user?.email)}
+        userLabel={session?.user?.name || session?.user?.email || null}
+        productHref={productHome.href}
+        productLabel={productHome.label}
+      />
     <main className="relative z-10 mx-auto flex min-h-[70vh] max-w-3xl flex-col gap-8 px-6 py-14">
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
@@ -69,9 +92,11 @@ export default function DownloadPage() {
               BEVEL for iOS
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Install the Flutter client (v0.4.3). Open this page in{' '}
-              <strong className="font-medium text-foreground">Safari on your iPhone</strong>{' '}
-              and tap install. Registered development devices only until TestFlight
+              Install the Flutter client (v1.0.0) for iPhone and iPad —
+              dual-pane on iPad Pro 11 and 13, on-device brief on Apple
+              Intelligence hardware. Open this page in{' '}
+              <strong className="font-medium text-foreground">Safari on your iPhone or iPad</strong>{' '}
+              and tap install. Registered development devices until TestFlight
               is live.
             </p>
           </div>
@@ -115,10 +140,8 @@ export default function DownloadPage() {
               with Google (Workspace account).
             </li>
             <li>
-              If install fails, unlock the phone and use USB from a Mac:{' '}
-              <code className="rounded bg-surface px-1 py-0.5 text-[11px]">
-                ./scripts/mobile/deploy-devices.sh ios
-              </code>
+              If install fails, unlock the phone, connect it by USB to a Mac,
+              and ask an operator to push a registered development build.
             </li>
           </ol>
         </div>

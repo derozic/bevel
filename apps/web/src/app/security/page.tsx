@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { MarketingPage } from '@/components/marketing/MarketingPage'
 import { BEVEL_NAME } from '@/lib/bevel'
+import { BEVEL_SECURITY_EMAIL } from '@/lib/marketing'
 
 export const metadata: Metadata = {
   title: `Security · ${BEVEL_NAME}`,
@@ -41,8 +42,8 @@ export default function SecurityPage() {
       <h2 className="pt-4 text-xl font-semibold text-foreground">Report an issue</h2>
       <p>
         Security reports:{' '}
-        <a className="text-accent hover:underline" href="mailto:security@bevel.com">
-          security@bevel.com
+        <a className="text-accent hover:underline" href={`mailto:${BEVEL_SECURITY_EMAIL}`}>
+          {BEVEL_SECURITY_EMAIL}
         </a>
         . See also our{' '}
         <Link href="/privacy" className="text-accent hover:underline">

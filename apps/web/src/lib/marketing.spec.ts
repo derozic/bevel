@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   BEVEL_CONTACT_EMAIL,
+  BEVEL_LEGAL_EMAIL,
+  BEVEL_PRIVACY_EMAIL,
+  BEVEL_SECURITY_EMAIL,
   FOOTER_COLUMNS,
   MARKETING_NAV,
   PUBLIC_MARKETING_PATHS,
+  signedInProductHome,
 } from './marketing'
 import { BEVEL_HOME_PATH } from './bevel'
 import { ONBOARDING_HREFS, shouldShowFirstRun } from './onboarding'
@@ -41,6 +45,28 @@ describe('marketing structure', () => {
 
   it('uses the product domain for contact', () => {
     expect(BEVEL_CONTACT_EMAIL).toBe('hello@bevel.is')
+    expect(BEVEL_PRIVACY_EMAIL).toBe('hello@bevel.is')
+    expect(BEVEL_LEGAL_EMAIL).toBe('hello@bevel.is')
+    expect(BEVEL_SECURITY_EMAIL).toBe('hello@bevel.is')
+  })
+
+  it('sends signed-in apex visitors to Private, org hosts to ~general', () => {
+    expect(signedInProductHome('bevel.is')).toEqual({
+      href: '/me',
+      label: 'Open Private',
+    })
+    expect(signedInProductHome('bevel.lvh.me')).toEqual({
+      href: '/me',
+      label: 'Open Private',
+    })
+    expect(signedInProductHome('')).toEqual({
+      href: '/me',
+      label: 'Open Private',
+    })
+    expect(signedInProductHome('bevel.2x4m.cc')).toEqual({
+      href: '/~general',
+      label: 'Open workspace',
+    })
   })
 })
 

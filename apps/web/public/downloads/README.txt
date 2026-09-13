@@ -1,8 +1,11 @@
-BEVEL native downloads
-======================
-macos:  BEVEL-macos-arm64.zip
-android: BEVEL-android.apk
-ios:    IPA + manifest.plist published when ad-hoc/TestFlight signing is available
+BEVEL native 1.0.0
 
-Until then, install iOS via Mac:
-  ./scripts/mobile/deploy-devices.sh ios
+macOS Silicon (arm64): BEVEL-macos-arm64.zip
+  Signed Developer ID Application: Earthena, Inc. (8A36CUVEDS)
+  Default host: https://bevel.is
+  Developer mode in-app switches to .lvh.me
+
+iOS (iPhone + iPad): BEVEL.ipa
+  Ad-hoc / registered devices until TestFlight.
+
+Android: BEVEL-android.apk
