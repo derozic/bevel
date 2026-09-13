@@ -85,6 +85,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   final _oauth = const OAuthBrowser();
   final _googleNative = GoogleNativeAuth();
   var _loading = true;
+  var _firstPaintDone = false;
   var _progress = 0;
   String? _title;
   String? _error;
@@ -165,7 +166,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           onPageStarted: (_) {
             if (!mounted) return;
             setState(() {
-              _loading = true;
+              // Do not blank the WebView on in-app navigations — that flash
+              // is the main desktop jank.
+              if (!_firstPaintDone) _loading = true;
               _error = null;
             });
           },
@@ -175,6 +178,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             final uri = Uri.tryParse(url) ?? _currentUri;
             setState(() {
               _loading = false;
+              _firstPaintDone = true;
               _title = title;
               _currentUri = uri;
             });
@@ -525,10 +529,17 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     final hermes = widget.hermes;
     final layout = BevelLayoutInfo.of(context);
     final path = _currentUri?.path ?? widget.initialPath;
-    final showRail = layout.prefersSplit ||
-        (layout.isFoldInner &&
-            layout.isLandscape &&
-            layout.size.width >= 700);
+    // Desktop: the web app already has BevelRail. A second Flutter rail
+    // plus this AppBar is what made the Silicon window feel stacked/janky.
+    final isDesktopShell = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux);
+    final showRail = !isDesktopShell &&
+        (layout.prefersSplit ||
+            (layout.isFoldInner &&
+                layout.isLandscape &&
+                layout.size.width >= 700));
     final showPhonePicker = !showRail;
 
     final spaceLabel = [
@@ -561,10 +572,11 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           )
         : null;
 
+    const webBackdrop = Color(0xFF0C0C0E);
     final webBody = Stack(
       fit: StackFit.expand,
       children: [
-        ColoredBox(color: p.cream),
+        const ColoredBox(color: webBackdrop),
         if (_error != null)
           _ErrorPane(
             message: _error!,
@@ -574,18 +586,15 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           )
         else
           WebViewWidget(controller: _controller),
-        if (_loading && _error == null)
-          IgnorePointer(
+        if (_loading && !_firstPaintDone && _error == null)
+          const IgnorePointer(
             child: ColoredBox(
-              color: p.cream.withValues(alpha: 0.72),
+              color: webBackdrop,
               child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    BevelMark(size: 40, palette: p),
-                    const SizedBox(height: 14),
-                    const BevelWordmark(size: BevelWordmarkSize.md),
-                  ],
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
             ),
@@ -615,8 +624,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       child: Focus(
         autofocus: true,
         child: Scaffold(
-      backgroundColor: p.cream,
+      backgroundColor: webBackdrop,
       appBar: BevelShellBar(
+        compact: isDesktopShell,
         title: _channelLabel,
         subtitle: spaceLabel.isEmpty ? null : spaceLabel,
         onTitleTap: showPhonePicker ? _openChannelPicker : widget.onSwitchWorkspace,

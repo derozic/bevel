@@ -183,20 +183,16 @@ class _BevelHomePageState extends State<BevelHomePage> {
         _hermesStatus = hermesStatus;
       });
 
-      // Only auto-open chat when the WebView already has a session.
-      // A leftover completedGoogleSignIn flag without cookies reopened
-      // login and stacked more Google hops.
+      // Skip the Flutter home cards when we already know the space.
+      // Session probe inside the WebView still gates chat cookies.
       if (!_didAutoOpenWorkspace &&
-          onboarding.sessionHealthy &&
-          !onboarding.needsOnboarding) {
+          !onboarding.needsOnboarding &&
+          onboarding.selectedWorkspace != null &&
+          (onboarding.sessionHealthy || onboarding.completedGoogleSignIn)) {
         _didAutoOpenWorkspace = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || _workspaceOpen) return;
-          if (onboarding.selectedWorkspace != null) {
-            _openSelectedSpace();
-          } else {
-            _openWorkspacePicker(autoEnterIfSingle: false);
-          }
+          _openSelectedSpace();
         });
       }
     } catch (e) {

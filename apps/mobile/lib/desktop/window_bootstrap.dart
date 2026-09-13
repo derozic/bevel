@@ -17,9 +17,9 @@ Future<void> bootstrapDesktopWindow() async {
     size: Size(1280, 840),
     minimumSize: Size(880, 600),
     center: true,
-    backgroundColor: Color(0xFFF4F0E8),
+    backgroundColor: Color(0xFF0C0C0E),
     skipTaskbar: false,
-    titleBarStyle: TitleBarStyle.normal,
+    titleBarStyle: TitleBarStyle.hidden,
     title: BevelConfig.appName,
   );
 
@@ -29,6 +29,11 @@ Future<void> bootstrapDesktopWindow() async {
     await windowManager.setMinimumSize(options.minimumSize ?? const Size(880, 600));
     await windowManager.setSize(options.size ?? const Size(1280, 840));
     await windowManager.setTitle(BevelConfig.appName);
+    await windowManager.setTitleBarStyle(
+      TitleBarStyle.hidden,
+      windowButtonVisibility: true,
+    );
+    await windowManager.setBackgroundColor(const Color(0xFF0C0C0E));
     await windowManager.center();
     await windowManager.show();
     await windowManager.focus();

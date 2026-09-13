@@ -68,6 +68,7 @@ class BevelShellBar extends StatelessWidget implements PreferredSizeWidget {
     this.onTitleTap,
     this.actions = const [],
     this.progress,
+    this.compact = false,
   });
 
   final String title;
@@ -75,15 +76,21 @@ class BevelShellBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onTitleTap;
   final List<Widget> actions;
   final double? progress;
+  /// macOS: leave room for traffic lights under a hidden title bar.
+  final bool compact;
 
   @override
-  Size get preferredSize => Size.fromHeight(progress != null ? 58 : 56);
+  Size get preferredSize => Size.fromHeight(compact ? 44 : (progress != null ? 58 : 56));
 
   @override
   Widget build(BuildContext context) {
     final p = context.bevel;
     return AppBar(
+      toolbarHeight: compact ? 44 : kToolbarHeight,
       titleSpacing: 8,
+      automaticallyImplyLeading: !compact,
+      leadingWidth: compact ? 76 : null,
+      leading: compact ? const SizedBox(width: 76) : null,
       title: InkWell(
         onTap: onTitleTap,
         borderRadius: BorderRadius.circular(10),

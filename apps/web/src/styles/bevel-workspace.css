@@ -9,19 +9,26 @@
   --bevel-rail-width: clamp(14.5rem, 22vw, 22rem);
 }
 
-/* Flutter / native WebView shell (data-bevel-native set by SessionBridge inject) */
+/* Flutter / native WebView shell (data-bevel-native set by SessionBridge inject).
+   Never use 100svh here — inside WKWebView that fights the Flutter viewport
+   and the layout oscillates. */
+html[data-bevel-native='1'],
+html[data-bevel-native='1'] body,
+html.bevel-native-shell,
+html.bevel-native-shell body,
 html[data-bevel-native='1'] body:has(.bevel-workspace-root),
 html.bevel-native-shell body:has(.bevel-workspace-root) {
-  /* Nested inside native AppBar — use 100% of WebView, not browser chrome dvh */
-  height: 100%;
-  max-height: 100%;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
 }
 
 html[data-bevel-native='1'] .bevel-workspace-root,
-html.bevel-native-shell .bevel-workspace-root {
-  height: 100%;
-  max-height: 100%;
-  /* WebView already has native chrome; avoid double vertical overscroll bounce */
+html.bevel-native-shell .bevel-workspace-root,
+html[data-bevel-native='1'] .landing-shell {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
   overscroll-behavior: none;
 }
 

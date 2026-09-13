@@ -20,7 +20,10 @@ class MainFlutterWindow: NSWindow {
     self.minSize = NSSize(width: 880, height: 600)
     self.setContentSize(NSSize(width: 1280, height: 840))
     self.isReleasedWhenClosed = false
-    self.backgroundColor = NSColor(calibratedRed: 0.039, green: 0.055, blue: 0.071, alpha: 1)
+    self.backgroundColor = NSColor(calibratedRed: 0.047, green: 0.047, blue: 0.055, alpha: 1)
+    self.titleVisibility = .hidden
+    self.titlebarAppearsTransparent = true
+    self.styleMask.insert(.fullSizeContentView)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
