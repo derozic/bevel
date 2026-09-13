@@ -29,8 +29,11 @@ const DOWNLOADS = {
   iosIpa: '/downloads/BEVEL.ipa',
   iosManifest: '/downloads/manifest.plist',
   androidApk: '/downloads/BEVEL-android.apk',
+  macosDmg: '/downloads/BEVEL-macos-arm64.dmg',
   macosZip: '/downloads/BEVEL-macos-arm64.zip',
 } as const
+
+const MAC_VERSION = '1.0.0'
 
 export default async function DownloadPage() {
   const session = await auth()
@@ -75,10 +78,69 @@ export default async function DownloadPage() {
         </p>
       </div>
 
-      {/* iOS — primary request */}
+      {/* Mac — primary desktop install. DMG, not a zip of .app (Chrome flags those). */}
+      <section
+        id="macos"
+        className="scroll-mt-24 flex flex-col gap-4 rounded-2xl border border-accent/40 bg-accent/5 p-6"
+      >
+        <div className="flex items-start gap-3">
+          <span className="inline-flex size-11 items-center justify-center rounded-full bg-accent/15 text-accent">
+            <ComputerDesktopIcon className="size-6" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+              Mac · Apple Silicon
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-foreground">
+              BEVEL for Mac
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              v{MAC_VERSION} disk image, signed by Earthena, Inc. Drag BEVEL into
+              Applications. Prefer Safari if Chrome warns that the file is uncommon
+              — that warning is reputation, not a broken signature.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <a
+            href={DOWNLOADS.macosDmg}
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white hover:opacity-90"
+          >
+            <ArrowDownTrayIcon className="size-4" aria-hidden />
+            Download for Mac
+          </a>
+          <a
+            href="https://github.com/derozic/bevel/releases/latest"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-medium text-foreground hover:bg-surface"
+          >
+            GitHub Releases
+          </a>
+        </div>
+
+        <div className="rounded-xl border border-border/80 bg-background/50 p-4 text-xs leading-relaxed text-muted">
+          <p className="flex items-start gap-2 font-medium text-foreground">
+            <InformationCircleIcon className="mt-0.5 size-4 shrink-0 text-accent" />
+            After download
+          </p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5">
+            <li>
+              If Chrome says the file is uncommon, keep it or open this page in
+              Safari. The disk image is signed by Earthena, Inc. (Developer ID).
+            </li>
+            <li>Open the disk image and drag BEVEL into Applications.</li>
+            <li>
+              Launch BEVEL. It talks to bevel.is. Developer mode (More menu)
+              switches local Caddy if you need it.
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      {/* iOS */}
       <section
         id="ios"
-        className="scroll-mt-24 flex flex-col gap-4 rounded-2xl border border-accent/40 bg-accent/5 p-6"
+        className="scroll-mt-24 flex flex-col gap-4 rounded-2xl border border-border bg-surface/60 p-6"
       >
         <div className="flex items-start gap-3">
           <span className="inline-flex size-11 items-center justify-center rounded-full bg-accent/15 text-accent">
@@ -147,56 +209,27 @@ export default async function DownloadPage() {
         </div>
       </section>
 
-      {/* Android + Mac */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <section
-          id="android"
-          className="scroll-mt-24 flex flex-col gap-3 rounded-2xl border border-border bg-surface/60 p-5"
+      <section
+        id="android"
+        className="scroll-mt-24 flex flex-col gap-3 rounded-2xl border border-border bg-surface/60 p-5"
+      >
+        <span className="inline-flex size-10 items-center justify-center rounded-full bg-accent/15 text-accent">
+          <DeviceTabletIcon className="size-5" aria-hidden />
+        </span>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Android</h2>
+          <p className="mt-1 text-sm leading-relaxed text-muted">
+            Phone, Pixel Tablet, Galaxy Z Fold. Sideload APK (Play track later).
+          </p>
+        </div>
+        <a
+          href={DOWNLOADS.androidApk}
+          className="mt-auto inline-flex items-center justify-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-surface"
         >
-          <span className="inline-flex size-10 items-center justify-center rounded-full bg-accent/15 text-accent">
-            <DeviceTabletIcon className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Android</h2>
-            <p className="mt-1 text-sm leading-relaxed text-muted">
-              Phone, Pixel Tablet, Galaxy Z Fold. Sideload APK (Play track later).
-            </p>
-          </div>
-          <a
-            href={DOWNLOADS.androidApk}
-            download="BEVEL-android.apk"
-            className="mt-auto inline-flex items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-          >
-            <ArrowDownTrayIcon className="size-4" aria-hidden />
-            Download APK
-          </a>
-        </section>
-
-        <section
-          id="macos"
-          className="scroll-mt-24 flex flex-col gap-3 rounded-2xl border border-border bg-surface/60 p-5"
-        >
-          <span className="inline-flex size-10 items-center justify-center rounded-full bg-accent/15 text-accent">
-            <ComputerDesktopIcon className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              Mac (Apple Silicon)
-            </h2>
-            <p className="mt-1 text-sm leading-relaxed text-muted">
-              Full desktop client — Hermes, mics/speakers, audio huddles.
-            </p>
-          </div>
-          <a
-            href={DOWNLOADS.macosZip}
-            download="BEVEL-macos-arm64.zip"
-            className="mt-auto inline-flex items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-          >
-            <ArrowDownTrayIcon className="size-4" aria-hidden />
-            Download zip
-          </a>
-        </section>
-      </div>
+          <ArrowDownTrayIcon className="size-4" aria-hidden />
+          Download APK
+        </a>
+      </section>
 
       <section className="flex flex-col gap-3 rounded-2xl border border-border bg-background/50 p-5">
         <div className="flex items-start gap-3">
@@ -220,7 +253,7 @@ export default async function DownloadPage() {
       </section>
 
       <p className="text-xs leading-relaxed text-muted">
-        Artifacts: IPA / APK / macOS zip under{' '}
+        Artifacts: IPA / APK / macOS disk image under{' '}
         <code className="rounded bg-surface px-1 py-0.5">/downloads/</code>.
         iOS OTA uses{' '}
         <code className="rounded bg-surface px-1 py-0.5">manifest.plist</code>.

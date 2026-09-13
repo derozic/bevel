@@ -65,4 +65,5 @@ dist/
 apps/web/public/downloads/*.ipa
 apps/web/public/downloads/*.apk
 apps/web/public/downloads/*.zip
+apps/web/public/downloads/*.dmg
 apps/web/public/downloads/*.aab
