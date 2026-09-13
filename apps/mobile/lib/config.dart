@@ -104,6 +104,25 @@ class BevelConfig {
   /// Semantic version shown in About / release notes (mirrors pubspec).
   static const String versionLabel = '1.0.0';
 
+  /// WKWebView user agent. Desktop must look like Safari — a `Mobile` token
+  /// makes the workspace render phone chrome inside a Silicon window.
+  static String webViewUserAgent([TargetPlatform? platform]) {
+    final p = platform ?? defaultTargetPlatform;
+    final v = versionLabel;
+    switch (p) {
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+      case TargetPlatform.linux:
+        return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+            'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 '
+            'Safari/605.1.15 BevelNative/$v';
+      default:
+        return 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) '
+            'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 '
+            'Mobile/15E148 Safari/604.1 BevelNative/$v';
+    }
+  }
+
   /// Magenta Extensions + analytics API.
   static const String magentaApiBase = String.fromEnvironment(
     'MAGENTA_API_BASE',

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../config.dart';
 import '../theme/theme.dart';
@@ -38,6 +39,17 @@ import 'nugget/nugget_stage.dart';
 bool webViewSupportsBackgroundColor([TargetPlatform? platform]) {
   final p = platform ?? defaultTargetPlatform;
   return p == TargetPlatform.iOS || p == TargetPlatform.android;
+}
+
+/// Silicon / Windows / Linux: the web app owns the rail. A Flutter AppBar
+/// stacked on BevelRail is what made the window feel like two products.
+@visibleForTesting
+bool bevelIsDesktopShell([TargetPlatform? platform]) {
+  if (kIsWeb) return false;
+  final p = platform ?? defaultTargetPlatform;
+  return p == TargetPlatform.macOS ||
+      p == TargetPlatform.windows ||
+      p == TargetPlatform.linux;
 }
 
 class WorkspaceShellPage extends StatefulWidget {
@@ -140,11 +152,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setUserAgent(
-        'Mozilla/5.0 (Mobile; BevelNative/${BevelConfig.versionLabel}) '
-        'AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 '
-        'BevelNative/${BevelConfig.versionLabel}',
-      )
+      ..setUserAgent(BevelConfig.webViewUserAgent())
       ..addJavaScriptChannel(
         'BevelHaptics',
         onMessageReceived: (msg) {
@@ -171,6 +179,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               if (!_firstPaintDone) _loading = true;
               _error = null;
             });
+            unawaited(_markNativeChrome());
           },
           onPageFinished: (url) async {
             final title = await _controller.getTitle();
@@ -189,10 +198,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                 widget.onPathChanged?.call(path);
               }
             }
-            // Mark page as native shell + tighten layout for chat.
-            unawaited(
-              _controller.runJavaScript(SessionBridge.injectNativeChromeJs),
-            );
+            unawaited(_markNativeChrome());
             // After leaving handoff (or direct load), probe session once.
             if (!_sessionChecked &&
                 uri != null &&
@@ -325,6 +331,14 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       }
     } catch (_) {
       /* keep defaults */
+    }
+  }
+
+  Future<void> _markNativeChrome() async {
+    try {
+      await _controller.runJavaScript(SessionBridge.injectNativeChromeJs);
+    } catch (_) {
+      /* document may not exist yet on page-start */
     }
   }
 
@@ -529,12 +543,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     final hermes = widget.hermes;
     final layout = BevelLayoutInfo.of(context);
     final path = _currentUri?.path ?? widget.initialPath;
-    // Desktop: the web app already has BevelRail. A second Flutter rail
-    // plus this AppBar is what made the Silicon window feel stacked/janky.
-    final isDesktopShell = !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.macOS ||
-            defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux);
+    // Desktop: the web app already has BevelRail. Do not stack a Flutter
+    // rail or AppBar on top of it.
+    final isDesktopShell = bevelIsDesktopShell();
     final showRail = !isDesktopShell &&
         (layout.prefersSplit ||
             (layout.isFoldInner &&
@@ -599,6 +610,14 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               ),
             ),
           ),
+        if (isDesktopShell)
+          const Positioned(
+            top: 0,
+            left: 0,
+            width: 88,
+            height: 28,
+            child: DragToMoveArea(child: SizedBox.expand()),
+          ),
       ],
     );
 
@@ -621,12 +640,14 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
         const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () =>
             unawaited(_reload()),
       },
-      child: Focus(
+      child: _wrapDesktopMenu(
+        Focus(
         autofocus: true,
         child: Scaffold(
       backgroundColor: webBackdrop,
-      appBar: BevelShellBar(
-        compact: isDesktopShell,
+      appBar: isDesktopShell
+          ? null
+          : BevelShellBar(
         title: _channelLabel,
         subtitle: spaceLabel.isEmpty ? null : spaceLabel,
         onTitleTap: showPhonePicker ? _openChannelPicker : widget.onSwitchWorkspace,
@@ -795,6 +816,100 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       ),
     ),
       ),
+      ),
+    );
+  }
+
+  Widget _wrapDesktopMenu(Widget child) {
+    if (!bevelIsDesktopShell()) return child;
+    return PlatformMenuBar(
+      menus: [
+        PlatformMenu(
+          label: 'BEVEL',
+          menus: [
+            const PlatformMenuItemGroup(
+              members: [
+                PlatformProvidedMenuItem(
+                  type: PlatformProvidedMenuItemType.about,
+                ),
+              ],
+            ),
+            PlatformMenuItemGroup(
+              members: [
+                if (OnDeviceIntelligence.isSupportedPlatform)
+                  PlatformMenuItem(
+                    label: 'On-device brief',
+                    shortcut: const SingleActivator(
+                      LogicalKeyboardKey.keyB,
+                      meta: true,
+                      shift: true,
+                    ),
+                    onSelected: () => unawaited(_briefOnDevice()),
+                  ),
+                PlatformMenuItem(
+                  label: 'Reload',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.keyR,
+                    meta: true,
+                  ),
+                  onSelected: () => unawaited(_reload()),
+                ),
+              ],
+            ),
+            const PlatformMenuItemGroup(
+              members: [
+                PlatformProvidedMenuItem(
+                  type: PlatformProvidedMenuItemType.hide,
+                ),
+                PlatformProvidedMenuItem(
+                  type: PlatformProvidedMenuItemType.quit,
+                ),
+              ],
+            ),
+          ],
+        ),
+        PlatformMenu(
+          label: 'View',
+          menus: [
+            PlatformMenuItem(
+              label: 'Timeline',
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.keyT,
+                meta: true,
+              ),
+              onSelected: () => _navigatePath('/timeline'),
+            ),
+            PlatformMenuItem(
+              label: 'Private',
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.keyP,
+                meta: true,
+                shift: true,
+              ),
+              onSelected: () => _navigatePath('/me'),
+            ),
+            if (widget.onSwitchWorkspace != null)
+              PlatformMenuItem(
+                label: 'Switch space',
+                onSelected: widget.onSwitchWorkspace,
+              ),
+          ],
+        ),
+        PlatformMenu(
+          label: 'Window',
+          menus: [
+            PlatformMenuItem(
+              label: 'Re-authenticate',
+              onSelected: () => unawaited(_nativeGoogleThenReload()),
+            ),
+            PlatformMenuItem(
+              label: 'Open in Safari',
+              onSelected: () => unawaited(_openExternal()),
+            ),
+          ],
+        ),
+      ],
+      child: child,
     );
   }
 

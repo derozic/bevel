@@ -32,6 +32,18 @@ html[data-bevel-native='1'] .landing-shell {
   overscroll-behavior: none;
 }
 
+/* Silicon: traffic lights sit on the rail. Phone hamburger stays hidden. */
+@media (min-width: 56.25rem) {
+  html[data-bevel-desktop='1'] .bevel-rail-header {
+    padding-top: 2.35rem;
+  }
+
+  html[data-bevel-desktop='1'] .bevel-rail-close-btn,
+  html[data-bevel-desktop='1'] .fleet-chat-channels-btn {
+    display: none;
+  }
+}
+
 /* Operator destinations stay on the web browser — de-emphasize in-app */
 html[data-bevel-native='1'] a[href^='/console'],
 html[data-bevel-native='1'] a[href*='//bevel.is/console'] {

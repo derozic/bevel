@@ -42,6 +42,21 @@ void main() {
       expect(SessionBridge.isChatPath('/talk/hermes'), isTrue);
       expect(SessionBridge.isChatPath('/console'), isFalse);
     });
+
+    test('native inject marks desktop chrome and traffic-light inset', () {
+      expect(
+        SessionBridge.injectNativeChromeJs,
+        contains('data-bevel-desktop'),
+      );
+      expect(
+        SessionBridge.injectNativeChromeJs,
+        contains('padding-top: 2.35rem'),
+      );
+      expect(
+        SessionBridge.injectNativeChromeJs,
+        contains('fleet-chat-channels-btn'),
+      );
+    });
   });
 
   group('gesture haptics', () {

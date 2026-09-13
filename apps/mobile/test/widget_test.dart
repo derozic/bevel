@@ -141,6 +141,22 @@ void main() {
     expect(webViewSupportsBackgroundColor(TargetPlatform.android), isTrue);
   });
 
+  test('desktop shell skips Flutter chrome; phone keeps it', () {
+    expect(bevelIsDesktopShell(TargetPlatform.macOS), isTrue);
+    expect(bevelIsDesktopShell(TargetPlatform.iOS), isFalse);
+    expect(bevelIsDesktopShell(TargetPlatform.android), isFalse);
+  });
+
+  test('desktop WebView UA is Safari, not Mobile', () {
+    final mac = BevelConfig.webViewUserAgent(TargetPlatform.macOS);
+    expect(mac, contains('Macintosh'));
+    expect(mac, contains('BevelNative/1.0.0'));
+    expect(mac, isNot(contains('Mobile')));
+    final phone = BevelConfig.webViewUserAgent(TargetPlatform.iOS);
+    expect(phone, contains('Mobile'));
+    expect(phone, contains('BevelNative/1.0.0'));
+  });
+
   test('native login gate allows only one browser hop', () {
     NativeLoginGate.reset();
     expect(NativeLoginGate.tryBegin(), isTrue);

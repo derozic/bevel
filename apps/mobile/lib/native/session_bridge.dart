@@ -73,23 +73,27 @@ class SessionBridge {
 
   /// Mark the document as running inside the native shell so web CSS can
   /// de-emphasize console / marketing chrome that belongs in the browser.
+  /// Desktop UA also sets data-bevel-desktop so the rail clears traffic lights
+  /// and phone hamburger / close controls stay hidden.
   static const String injectNativeChromeJs = r'''
 (function() {
   try {
-    document.documentElement.setAttribute('data-bevel-native', '1');
-    document.documentElement.setAttribute('data-bevel-gestures', 'playful');
-    document.documentElement.classList.add('bevel-native-shell');
+    var root = document.documentElement;
+    root.setAttribute('data-bevel-native', '1');
+    root.setAttribute('data-bevel-gestures', 'playful');
+    root.classList.add('bevel-native-shell');
+    var desktop = /Macintosh|Windows NT|X11/.test(navigator.userAgent || '');
+    if (desktop) {
+      root.setAttribute('data-bevel-desktop', '1');
+      root.classList.add('bevel-native-desktop');
+    } else {
+      root.removeAttribute('data-bevel-desktop');
+      root.classList.remove('bevel-native-desktop');
+    }
     if (!document.getElementById('bevel-native-style')) {
       var s = document.createElement('style');
       s.id = 'bevel-native-style';
       s.textContent = [
-        'html[data-bevel-native="1"] .platform-footer,',
-        'html[data-bevel-native="1"] footer.platform-footer,',
-        'html[data-bevel-native="1"] a[href*="/console"],',
-        'html[data-bevel-native="1"] a[href*="/download"],',
-        'html[data-bevel-native="1"] a[href*="/claim"] {',
-        '  /* Keep layout; de-emphasize operator destinations */',
-        '}',
         'html[data-bevel-native="1"] .landing-shell > .page-shell-container { display: none !important; }',
         'html[data-bevel-native="1"],',
         'html[data-bevel-native="1"] body,',
@@ -101,10 +105,17 @@ class SessionBridge {
         'html[data-bevel-native="1"] .fleet-chat {',
         '  touch-action: manipulation;',
         '}',
+        'html[data-bevel-desktop="1"] .bevel-rail-header {',
+        '  padding-top: 2.35rem;',
+        '}',
+        'html[data-bevel-desktop="1"] .bevel-rail-close-btn,',
+        'html[data-bevel-desktop="1"] .fleet-chat-channels-btn {',
+        '  display: none !important;',
+        '}',
       ].join('\\n');
       (document.head || document.documentElement).appendChild(s);
     }
-    return 'ok';
+    return desktop ? 'ok-desktop' : 'ok';
   } catch (e) {
     return String(e);
   }
