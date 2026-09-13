@@ -49,6 +49,20 @@ class BevelLayoutInfo {
   bool get isFoldCover => surfaceMode == BevelSurfaceMode.foldCover;
   bool get isFoldInner => surfaceMode == BevelSurfaceMode.foldInner;
 
+  /// iPad Pro 13-class (M4/M5) — extra sidebar, more breathing room.
+  bool get isIpadPro13 => shortestSide >= 1000;
+
+  /// iPad Pro 11 or 13, Pixel Tablet, and similar.
+  bool get isTabletClass => shortestSide >= 744;
+
+  /// Apple HIG sidebar: 320 on 13", 288 on 11"/desktop, 260 on fold inner.
+  double get sidebarWidth {
+    if (isFoldInner) return 260;
+    if (isIpadPro13) return 320;
+    if (isExpanded) return 288;
+    return 260;
+  }
+
   /// Dual-pane (native rail + workspace) when width and surface allow it.
   ///
   /// Tablets (iPad Pro, Pixel Tablet) get a rail in landscape always, and in

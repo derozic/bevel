@@ -174,9 +174,10 @@ class _NavTile extends StatelessWidget {
     final p = context.bevel;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Material(
-        color: selected ? p.accent.withValues(alpha: 0.12) : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
+      child: _HoverTile(
+        selected: selected,
+        selectedColor: p.accent.withValues(alpha: 0.12),
+        hoverColor: p.accent.withValues(alpha: 0.07),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           onTap: onTap,
@@ -221,6 +222,45 @@ class _NavTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Pointer hover for iPad Pro trackpad / macOS — Apple HIG highlight.
+class _HoverTile extends StatefulWidget {
+  const _HoverTile({
+    required this.child,
+    required this.selected,
+    required this.selectedColor,
+    required this.hoverColor,
+  });
+
+  final Widget child;
+  final bool selected;
+  final Color selectedColor;
+  final Color hoverColor;
+
+  @override
+  State<_HoverTile> createState() => _HoverTileState();
+}
+
+class _HoverTileState extends State<_HoverTile> {
+  var _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Material(
+        color: widget.selected
+            ? widget.selectedColor
+            : _hover
+                ? widget.hoverColor
+                : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        child: widget.child,
       ),
     );
   }

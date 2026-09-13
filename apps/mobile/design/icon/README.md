@@ -8,7 +8,7 @@ Goal: **award-tier** mark across iOS, Android adaptive, and macOS dock.
 |------|------|
 | `bevel-icon-master.svg` | Layered vector master (import into Icon Composer) |
 | `icon-composer.json` | Layer roles + palette + quality bar |
-| `bevel-icon-1024.png` | Marketing / iOS single-size source |
+| `bevel-icon-1024.png` | Marketing / iOS single-size source (1.0 commercial cut) |
 | `bevel-icon-fg-1024.png` | Android adaptive **foreground** |
 | `bevel-icon-mono-1024.png` | Android **monochrome** (themed icons) |
 

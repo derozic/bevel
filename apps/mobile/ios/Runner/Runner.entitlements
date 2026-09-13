@@ -1,15 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Device install baseline.
-
-  Full capabilities (Push, HealthKit, Associated Domains) require the App ID
-  com.derozic.bevel.bevelApp to enable those services in Apple Developer Portal
-  and a regenerated provisioning profile. Re-enable via:
-
-    apps/mobile/ios/Runner/Runner.entitlements.full.example
-
-  Chat + workspace shell work without them; push needs APNs capability.
+  Shipping entitlements match the current App ID (wildcard team profile).
+  Enable Push + Associated Domains on com.derozic.bevel.bevelApp in
+  Apple Developer, then copy Runner.entitlements.full.example over this file.
 -->
 <plist version="1.0">
 <dict>

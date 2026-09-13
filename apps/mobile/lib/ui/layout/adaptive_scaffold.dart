@@ -30,7 +30,7 @@ class AdaptiveScaffold extends StatelessWidget {
       content = Row(
         children: [
           SizedBox(
-            width: info.isFoldInner ? 280 : 300,
+            width: info.sidebarWidth,
             child: Material(
               color: p.railWash,
               child: rail,

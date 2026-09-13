@@ -43,11 +43,11 @@ dart run flutter_launcher_icons
 From the monorepo root:
 
 ```bash
-# Local (default .lvh.me)
+# Production Silicon app → bevel.is (default)
 ./scripts/mobile/release.sh macos
 
-# Production Silicon app → bevel.is / bevel.2x4m.cc
-BEVEL_ENV=production ./scripts/mobile/release.sh macos
+# Local Caddy only when you need a .lvh.me-locked build
+BEVEL_ENV=local ./scripts/mobile/release.sh macos
 
 ./scripts/mobile/release.sh android   # APK + AAB
 ./scripts/mobile/release.sh ios       # unsigned .app
@@ -62,11 +62,14 @@ See [docs/NATIVE_RELEASE.md](../../docs/NATIVE_RELEASE.md).
 
 | Define | Local (`BEVEL_ENV=local`) | Production (default) |
 |--------|---------------------------|----------------------|
-| `BEVEL_BASE_URL` | `https://bevel.2x4m.lvh.me` | `https://bevel.is` |
+| `BEVEL_BASE_URL` | `https://bevel.lvh.me` | `https://bevel.is` |
 | `BEVEL_WORKSPACE_URL` | `https://bevel.2x4m.lvh.me` | `https://bevel.2x4m.cc` |
 | `BEVEL_API_URL` | `https://api.bevel.lvh.me` | `https://api.bevel.is` |
 
-Override to local Caddy with `BEVEL_ENV=local` or `pnpm mobile:run:macos:local`.
+The Silicon desktop app defaults to **production**. Toggle **Developer mode** in
+the home screen, More menu, or Native Hub to point the same build at `.lvh.me`
+without rebuilding. `BEVEL_ENV=local` / `pnpm mobile:run:macos:local` starts
+with developer mode on.
 System-browser Google always uses a relative `/api/auth/native-complete`
 callback so the desktop app comes back via `bevel://auth/complete`.
 
@@ -77,7 +80,7 @@ jar (Safari cookies are never shared with WKWebView).
 
 ## Version
 
-`pubspec.yaml` → `0.4.2+7` (name + build). Bump for each store submission.
+`pubspec.yaml` → `1.0.0+16` (name + build). Bump for each store submission.
 
 ### Workspace chooser (parity with web)
 

@@ -6,7 +6,7 @@ One Flutter app lives at `apps/mobile` and produces three platform bundles:
 |----------|----------|--------|
 | **iOS** | `BEVEL-ios-Runner.app` / TestFlight IPA | Signed in Xcode or CI with Apple distribution cert |
 | **Android** | `BEVEL-android-release.apk` + `.aab` | Play Store uses AAB; APK for sideload |
-| **macOS Silicon** | `BEVEL-macos-arm64.app` + `.zip` | **arm64 only** (M1/M2/M3/M4). Intel not supported |
+| **macOS Silicon** | `BEVEL-macos-arm64.app` + `.zip` | **arm64 only** (M1–M5). Developer ID: Earthena, Inc. (`8A36CUVEDS`) |
 
 ## Prerequisites
 
@@ -57,9 +57,9 @@ dist/native/<version>/
 
 ```bash
 cd apps/mobile
-flutter run -d macos \
-  --dart-define=BEVEL_BASE_URL=https://bevel.2x4m.lvh.me \
-  --dart-define=BEVEL_API_URL=https://api.bevel.lvh.me
+flutter run -d macos
+# Production by default. In the Silicon app: More → Developer mode (lvh.me)
+# or: flutter run -d macos --dart-define=BEVEL_ENV=local
 ```
 
 ## Signing (production)

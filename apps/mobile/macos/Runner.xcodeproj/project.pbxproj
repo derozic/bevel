@@ -35,6 +35,7 @@
 		BEVEL0IM100000000000005 /* IMessageSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEVEL0IM100000000000006 /* IMessageSender.swift */; };
 		BEVEL0IM100000000000007 /* IMessageApiServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEVEL0IM100000000000008 /* IMessageApiServer.swift */; };
 		BEVEL0MD100000000000001 /* MediaDeviceChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEVEL0MD100000000000002 /* MediaDeviceChannel.swift */; };
+		BEVEL0AI100000000000001 /* OnDeviceIntelligenceChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEVEL0AI100000000000002 /* OnDeviceIntelligenceChannel.swift */; };
 		EBAFC3E7C2730618CEB4C297 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4D77D05D6B7971B0AB979823 /* Pods_RunnerTests.framework */; };
 /* End PBXBuildFile section */
 
@@ -102,6 +103,7 @@
 		BEVEL0IM100000000000006 /* IMessageSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMessageSender.swift; sourceTree = "<group>"; };
 		BEVEL0IM100000000000008 /* IMessageApiServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMessageApiServer.swift; sourceTree = "<group>"; };
 		BEVEL0MD100000000000002 /* MediaDeviceChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDeviceChannel.swift; sourceTree = "<group>"; };
+		BEVEL0AI100000000000002 /* OnDeviceIntelligenceChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceIntelligenceChannel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -195,6 +197,7 @@
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				BEVEL0MD100000000000002 /* MediaDeviceChannel.swift */,
+				BEVEL0AI100000000000002 /* OnDeviceIntelligenceChannel.swift */,
 				BEVEL0IM100000000000002 /* IMessageChannel.swift */,
 				BEVEL0IM100000000000004 /* IMessageStore.swift */,
 				BEVEL0IM100000000000006 /* IMessageSender.swift */,
@@ -451,6 +454,7 @@
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				BEVEL0MD100000000000001 /* MediaDeviceChannel.swift in Sources */,
+				BEVEL0AI100000000000001 /* OnDeviceIntelligenceChannel.swift in Sources */,
 				BEVEL0IM100000000000001 /* IMessageChannel.swift in Sources */,
 				BEVEL0IM100000000000003 /* IMessageStore.swift in Sources */,
 				BEVEL0IM100000000000005 /* IMessageSender.swift in Sources */,

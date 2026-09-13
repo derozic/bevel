@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -11,6 +12,7 @@ import '../theme/theme.dart';
 import '../native/hermes_bridge.dart';
 import '../native/google_native_auth.dart';
 import '../native/oauth_browser.dart';
+import '../native/on_device_intelligence.dart';
 import '../native/session_bridge.dart';
 import '../native/sharing_service.dart';
 import 'channel_picker_sheet.dart';
@@ -591,7 +593,28 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
       ],
     );
 
-    return Scaffold(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.digit1, meta: true): () =>
+            _navigatePath('/~general'),
+        const SingleActivator(LogicalKeyboardKey.digit2, meta: true): () =>
+            _navigatePath('/~ops'),
+        const SingleActivator(LogicalKeyboardKey.digit3, meta: true): () =>
+            _navigatePath('/~product'),
+        const SingleActivator(LogicalKeyboardKey.keyT, meta: true): () =>
+            _navigatePath('/timeline'),
+        const SingleActivator(LogicalKeyboardKey.keyP, meta: true, shift: true):
+            () => _navigatePath('/me'),
+        const SingleActivator(LogicalKeyboardKey.keyH, meta: true, shift: true):
+            () => _navigatePath('/talk/hermes'),
+        const SingleActivator(LogicalKeyboardKey.keyB, meta: true, shift: true):
+            () => unawaited(_briefOnDevice()),
+        const SingleActivator(LogicalKeyboardKey.keyR, meta: true): () =>
+            unawaited(_reload()),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       backgroundColor: p.cream,
       appBar: BevelShellBar(
         title: _channelLabel,
@@ -611,6 +634,12 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               tooltip: 'Timeline',
               onPressed: () => _navigatePath('/timeline'),
               icon: const Icon(Icons.schedule_outlined),
+            ),
+          if (OnDeviceIntelligence.isSupportedPlatform)
+            IconButton(
+              tooltip: 'On-device brief',
+              onPressed: () => unawaited(_briefOnDevice()),
+              icon: const Icon(Icons.auto_awesome_outlined),
             ),
           PopupMenuButton<String>(
             tooltip: 'More',
@@ -701,7 +730,7 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
                 ? Row(
                     children: [
                       SizedBox(
-                        width: layout.isFoldInner ? 260 : 300,
+                        width: layout.sidebarWidth,
                         child: Material(
                           color: p.railWash,
                           child: WorkspaceRail(
@@ -754,7 +783,71 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
           ),
         ],
       ),
+    ),
+      ),
     );
+  }
+
+  Future<void> _briefOnDevice() async {
+    if (!OnDeviceIntelligence.isSupportedPlatform) return;
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        title: Text('On-device brief'),
+        content: SizedBox(
+          height: 72,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+    );
+    try {
+      final raw = await _controller.runJavaScriptReturningResult(
+        '(document.body && document.body.innerText) ? document.body.innerText.slice(0, 12000) : ""',
+      );
+      final text = SessionBridge.unwrapJsString(raw.toString());
+      final brief = await OnDeviceIntelligence.summarize(text);
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('On-device brief'),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Text(
+                brief.isEmpty ? 'Nothing to brief on this page.' : brief,
+                style: const TextStyle(height: 1.45),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('On-device brief'),
+          content: Text('$e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }
 

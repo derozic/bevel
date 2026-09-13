@@ -54,5 +54,9 @@
 	<string>BEVEL needs the camera for optional video in huddles.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>BEVEL sends iMessages through Messages.app when you map a conversation or send a test. It never injects into Messages.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>BEVEL notifies you for @mentions and ^escalations so you never miss work that needs you.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

@@ -31,6 +31,23 @@ class WorkspaceTarget {
 
   Uri homeUri() => Uri.parse(origin).replace(path: homePath);
 
+  WorkspaceTarget withHost(String nextHost) {
+    final clean = nextHost.toLowerCase().split(':').first.trim();
+    if (clean.isEmpty || clean == host) return this;
+    return WorkspaceTarget(
+      kind: kind,
+      id: id,
+      name: name,
+      host: clean,
+      homePath: homePath,
+      slug: slug,
+      subtitle: isPrivate ? subtitle : clean,
+    );
+  }
+
+  /// Align this target with the current prod / developer-mode hosts.
+  WorkspaceTarget remappedForEnvironment() => withHost(BevelConfig.remapHost(host));
+
   /// Platform apex private space (agents only) — always available.
   static WorkspaceTarget private({String? platformHost}) {
     final host = (platformHost ?? Uri.parse(BevelConfig.baseUrl).host)

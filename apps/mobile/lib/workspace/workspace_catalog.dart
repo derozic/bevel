@@ -62,7 +62,7 @@ class WorkspaceCatalog {
         final domainHost = (raw['domain'] ?? '').toString().toLowerCase();
         if (domainHost.isNotEmpty) hosts.add(domainHost);
 
-        final host = _pickProductionHost(hosts);
+        final host = _pickHost(hosts);
         if (host == null) continue;
 
         // Closed auth policy (explicit emails/domains) → only show if matched.
@@ -130,7 +130,23 @@ class WorkspaceCatalog {
     return !hasEmails && !hasDomains;
   }
 
-  /// Prefer public production host over *.lvh.me.
+  /// Prefer public production host over *.lvh.me, unless developer mode.
+  static String? _pickHost(List<String> hosts) {
+    if (hosts.isEmpty) return null;
+    if (BevelConfig.isDeveloperMode) {
+      final local = hosts
+          .where((h) => h.toLowerCase().contains('lvh.me'))
+          .toList();
+      if (local.isNotEmpty) {
+        final bevel = local.where((h) => h.startsWith('bevel.')).toList();
+        return bevel.isNotEmpty ? bevel.first : local.first;
+      }
+      final prod = _pickProductionHost(hosts);
+      return prod == null ? null : BevelConfig.toLocalHost(prod);
+    }
+    return _pickProductionHost(hosts);
+  }
+
   static String? _pickProductionHost(List<String> hosts) {
     if (hosts.isEmpty) return null;
     final prod = hosts.where((h) {
@@ -141,7 +157,6 @@ class WorkspaceCatalog {
           x.contains('.');
     }).toList();
     if (prod.isNotEmpty) {
-      // Prefer bevel.* product hosts
       final bevel = prod.where((h) => h.startsWith('bevel.')).toList();
       return (bevel.isNotEmpty ? bevel.first : prod.first);
     }

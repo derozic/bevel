@@ -6,6 +6,8 @@ class MainFlutterWindow: NSWindow {
   private var mediaDeviceChannel: MediaDeviceChannel?
   /// Local iMessage host (chat.db + AppleScript). Replaces BlueBubbles.
   private var iMessageChannel: IMessageChannel?
+  /// Apple Intelligence / Neural Engine — on-device only.
+  private var intelligenceChannel: OnDeviceIntelligenceChannel?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -27,6 +29,9 @@ class MainFlutterWindow: NSWindow {
       messenger: flutterViewController.engine.binaryMessenger
     )
     iMessageChannel = IMessageChannel(
+      messenger: flutterViewController.engine.binaryMessenger
+    )
+    intelligenceChannel = OnDeviceIntelligenceChannel(
       messenger: flutterViewController.engine.binaryMessenger
     )
 

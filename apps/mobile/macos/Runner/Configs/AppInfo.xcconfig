@@ -6,5 +6,8 @@ PRODUCT_NAME = BEVEL
 // Bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.derozic.bevel.bevelApp
 
+// Earthena, Inc. — Apple Developer team
+DEVELOPMENT_TEAM = 8A36CUVEDS
+
 // Copyright
 PRODUCT_COPYRIGHT = Copyright © 2026 deˆrozic. All rights reserved.

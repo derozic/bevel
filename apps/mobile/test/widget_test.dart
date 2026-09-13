@@ -7,6 +7,7 @@ import 'package:bevel_app/native/deep_links.dart';
 import 'package:bevel_app/native/media_device_discovery.dart';
 import 'package:bevel_app/native/macos_plugin_gaps.dart';
 import 'package:bevel_app/native/native_login_gate.dart';
+import 'package:bevel_app/ui/layout/bevel_breakpoints.dart';
 import 'package:bevel_app/ui/workspace_shell.dart';
 
 void main() {
@@ -96,6 +97,41 @@ void main() {
     expect(BevelConfig.isAllowedInAppHost('bevel.2x4m.cc'), isTrue);
     expect(BevelConfig.isAllowedInAppHost('realtime.bevel.is'), isTrue);
     expect(BevelConfig.isAllowedInAppHost('evil.example.com'), isFalse);
+  });
+
+  test('iPad Pro 13 gets a 320pt sidebar', () {
+    const info = BevelLayoutInfo(
+      layoutClass: BevelLayoutClass.expanded,
+      surfaceMode: BevelSurfaceMode.flat,
+      size: Size(1376, 1032),
+      shortestSide: 1032,
+      longestSide: 1376,
+      isLandscape: true,
+      hasHinge: false,
+      safePadding: EdgeInsets.zero,
+    );
+    expect(info.isIpadPro13, isTrue);
+    expect(info.prefersSplit, isTrue);
+    expect(info.sidebarWidth, 320);
+  });
+
+  test('developer mode remaps apex and 2x4m hosts onto lvh.me', () {
+    BevelConfig.developerMode.value = false;
+    expect(BevelConfig.baseUrl, 'https://bevel.is');
+    expect(BevelConfig.remapHost('bevel.2x4m.lvh.me'), 'bevel.2x4m.cc');
+    expect(BevelConfig.remapHost('bevel.lvh.me'), 'bevel.is');
+    expect(BevelConfig.isApexHost('bevel.is'), isTrue);
+    expect(BevelConfig.isApexHost('bevel.lvh.me'), isTrue);
+
+    BevelConfig.developerMode.value = true;
+    addTearDown(() => BevelConfig.developerMode.value = false);
+    expect(BevelConfig.baseUrl, 'https://bevel.lvh.me');
+    expect(BevelConfig.workspaceUrl, 'https://bevel.2x4m.lvh.me');
+    expect(BevelConfig.apiBaseUrl, 'https://api.bevel.lvh.me');
+    expect(BevelConfig.remapHost('bevel.is'), 'bevel.lvh.me');
+    expect(BevelConfig.remapHost('bevel.2x4m.cc'), 'bevel.2x4m.lvh.me');
+    expect(BevelConfig.systemBrowserLoginUri().host, 'bevel.lvh.me');
+    expect(BevelConfig.isProduction, isFalse);
   });
 
   test('WebView background color is skipped on macOS', () {

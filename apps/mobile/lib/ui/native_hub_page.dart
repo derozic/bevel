@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
+import 'settings/developer_mode_tile.dart';
 import '../native/deep_links.dart';
 import '../native/health_service.dart';
 import '../native/hermes_bridge.dart';
@@ -26,6 +27,7 @@ class NativeHubPage extends StatefulWidget {
     this.initialHermesStatus,
     this.focusHermes = false,
     this.onHermesStatus,
+    this.onDeveloperModeChanged,
   });
 
   final NativeCapabilities capabilities;
@@ -36,6 +38,7 @@ class NativeHubPage extends StatefulWidget {
   final HermesBridgeStatus? initialHermesStatus;
   final bool focusHermes;
   final ValueChanged<HermesBridgeStatus>? onHermesStatus;
+  final ValueChanged<bool>? onDeveloperModeChanged;
 
   @override
   State<NativeHubPage> createState() => _NativeHubPageState();
@@ -422,6 +425,17 @@ class _NativeHubPageState extends State<NativeHubPage> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 20),
+          if (c.isAppleSiliconMac || c.platformLabel == 'macos') ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: DeveloperModeTile(
+                  onChanged: widget.onDeveloperModeChanged,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           _ActionCard(
             title: 'Magenta Extensions',
             subtitle:

@@ -28,6 +28,7 @@ import 'ui/native_hub_page.dart';
 import 'ui/onboarding/auth_shell.dart';
 import 'ui/onboarding/google_workspace_onboarding.dart';
 import 'ui/onboarding/onboarding_state.dart';
+import 'ui/settings/developer_mode_tile.dart';
 import 'ui/settings/notification_settings_page.dart';
 import 'theme/theme.dart';
 import 'ui/workspace_picker_page.dart';
@@ -38,6 +39,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installMacosPluginGuards();
   await bootstrapDesktopWindow();
+  await BevelConfig.load();
   try {
     await MagentaAnalytics.configure(
       siteId: 'bevel',
@@ -135,7 +137,16 @@ class _BevelHomePageState extends State<BevelHomePage> {
 
   Future<void> _bootstrap() async {
     try {
-      final onboarding = await OnboardingState.load();
+      await BevelConfig.load();
+      var onboarding = await OnboardingState.load();
+      final selected = onboarding.selectedWorkspace;
+      if (selected != null) {
+        final remapped = selected.remappedForEnvironment();
+        if (remapped.host != selected.host) {
+          onboarding = onboarding.copyWith(selectedWorkspace: remapped);
+          await onboarding.save();
+        }
+      }
       final caps = await NativeCapabilities.probe();
       if (caps.supportsNotifications) {
         await _notifications.initialize();
@@ -330,9 +341,7 @@ class _BevelHomePageState extends State<BevelHomePage> {
     // Prefer host from OAuth (org) when present; else selected space / chooser.
     if (workspaceHost != null && workspaceHost.trim().isNotEmpty) {
       final host = workspaceHost.trim().toLowerCase();
-      final isApex = host == 'bevel.is' ||
-          host == 'www.bevel.is' ||
-          host == 'app.bevel.is';
+      final isApex = BevelConfig.isApexHost(host);
       final target = isApex
           ? WorkspaceTarget.private(platformHost: host)
           : WorkspaceTarget.org(
@@ -655,6 +664,28 @@ class _BevelHomePageState extends State<BevelHomePage> {
     );
   }
 
+  Future<void> _applyDeveloperMode() async {
+    final selected = _onboarding.selectedWorkspace;
+    if (selected != null) {
+      final remapped = selected.remappedForEnvironment();
+      if (remapped.host != selected.host) {
+        final next = _onboarding.copyWith(selectedWorkspace: remapped);
+        await next.save();
+        if (mounted) setState(() => _onboarding = next);
+      }
+    }
+    if (!mounted) return;
+    if (_workspaceOpen) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      setState(() => _workspaceOpen = false);
+    }
+    setState(() {
+      _status = BevelConfig.isDeveloperMode
+          ? 'Developer mode · ${Uri.parse(BevelConfig.baseUrl).host}'
+          : 'Production · ${Uri.parse(BevelConfig.baseUrl).host}';
+    });
+  }
+
   Future<void> _openExternal(Uri uri) async {
     setState(() => _status = 'Opening ${uri.host}${uri.path}…');
     try {
@@ -684,6 +715,9 @@ class _BevelHomePageState extends State<BevelHomePage> {
           focusHermes: focusHermes,
           onHermesStatus: (s) {
             if (mounted) setState(() => _hermesStatus = s);
+          },
+          onDeveloperModeChanged: (_) {
+            unawaited(_applyDeveloperMode());
           },
         ),
       ),
@@ -850,6 +884,26 @@ class _BevelHomePageState extends State<BevelHomePage> {
       appBar: AppBar(
         title: const BevelBrandTitle(),
         actions: [
+          if (isMac)
+            ValueListenableBuilder<bool>(
+              valueListenable: BevelConfig.developerMode,
+              builder: (context, enabled, _) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Center(
+                    child: Text(
+                      enabled ? 'DEV' : 'PROD',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.7,
+                        color: enabled ? p.accent : p.muted,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           IconButton(
             tooltip: 'Choose workspace',
             onPressed: () => _openWorkspacePicker(),
@@ -879,6 +933,11 @@ class _BevelHomePageState extends State<BevelHomePage> {
                   }
                 case 'browser':
                   await _openExternal(BevelConfig.entryUri());
+                case 'developer':
+                  await BevelConfig.setDeveloperMode(
+                    !BevelConfig.isDeveloperMode,
+                  );
+                  await _applyDeveloperMode();
               }
             },
             itemBuilder: (ctx) => [
@@ -899,10 +958,21 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 value: 'copy',
                 child: Text('Copy workspace URL'),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'browser',
-                child: Text('Open bevel.is in browser'),
+                child: Text(
+                  'Open ${Uri.parse(BevelConfig.baseUrl).host} in browser',
+                ),
               ),
+              if (isMac)
+                PopupMenuItem(
+                  value: 'developer',
+                  child: Text(
+                    BevelConfig.isDeveloperMode
+                        ? 'Use production (bevel.is)'
+                        : 'Developer mode (lvh.me)',
+                  ),
+                ),
             ],
           ),
         ],
@@ -974,6 +1044,10 @@ class _BevelHomePageState extends State<BevelHomePage> {
                       textAlign: TextAlign.center,
                       style: TextStyle(color: p.accent, fontSize: 13),
                     ),
+                  ],
+                  if (isMac) ...[
+                    const SizedBox(height: 20),
+                    DeveloperModeTile(onChanged: (_) => _applyDeveloperMode()),
                   ],
                 ],
               ),
@@ -1098,13 +1172,23 @@ class _BevelHomePageState extends State<BevelHomePage> {
                 icon: const Icon(Icons.login_rounded, size: 18),
                 label: const Text('Re-authenticate'),
               ),
+              if (isMac) ...[
+                const SizedBox(height: 20),
+                DeveloperModeTile(onChanged: (_) => _applyDeveloperMode()),
+              ],
               const SizedBox(height: 28),
               const BevelDaypartControl(),
               const SizedBox(height: 20),
-              Text(
-                'Private is bevel.is agents. Orgs are product hosts. '
-                'Console stays on the web.',
-                style: Theme.of(context).textTheme.bodySmall,
+              ValueListenableBuilder<bool>(
+                valueListenable: BevelConfig.developerMode,
+                builder: (context, enabled, _) {
+                  return Text(
+                    enabled
+                        ? 'Developer mode uses ${Uri.parse(BevelConfig.baseUrl).host}. Private and orgs stay on local Caddy.'
+                        : 'Private is bevel.is agents. Orgs are product hosts. Console stays on the web.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  );
+                },
               ),
               if (hermesLabel != null && isMac) ...[
                 const SizedBox(height: 20),
