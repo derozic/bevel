@@ -117,6 +117,9 @@ build_macos() {
   echo "    -> $dest"
   echo "    -> $OUT/BEVEL-macos-arm64.zip"
   echo "    entitlements: network.client OK"
+
+  echo "==> professional installer + full manifest"
+  OUT="$OUT" APP="$dest" "$ROOT/scripts/mobile/package-macos-installer.sh"
 }
 
 _notarize_macos() {
@@ -217,8 +220,10 @@ case "$TARGET" in
     ;;
 esac
 
-# Manifest for download page / release notes
-cat > "$OUT/MANIFEST.txt" <<EOF
+# Full SHA / codesign / component manifest is written by package-macos-installer.sh
+# when the macOS target ran. Keep a stub only for android/ios-only runs.
+if [[ ! -f "$OUT/manifest.json" ]]; then
+  cat > "$OUT/MANIFEST.txt" <<EOF
 BEVEL native release
 version: $VERSION
 env: $ENV_NAME
@@ -229,6 +234,7 @@ built_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 host: $(uname -s) $(uname -m)
 targets: $TARGET
 EOF
+fi
 
 echo "==> Done. Artifacts in $OUT"
 ls -la "$OUT"

@@ -258,17 +258,17 @@ function CommandPalette() {
         label: "Download / install",
         group: "Navigate",
         icon: Download,
-        keywords: "install brew macos app silicon arm64 zip menu bar",
+        keywords: "install brew macos app silicon arm64 pkg installer menu bar",
         run: () => go("/download"),
       },
       {
         id: "download-mac-app",
-        label: "Download Mac app (Apple Silicon)",
+        label: "Install Mac app (Apple Silicon)",
         group: "Navigate",
         icon: Download,
-        keywords: "bevel.app menu bar silicon m1 m2 m3 arm64",
+        keywords: "bevel.app pkg installer silicon m1 m2 m3 arm64 applications",
         run: () => {
-          window.location.href = "/downloads/BEVEL-macos-arm64.zip";
+          window.location.href = "/downloads/BEVEL-macos-arm64.pkg";
         },
       },
       {

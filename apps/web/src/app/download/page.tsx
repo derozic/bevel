@@ -29,11 +29,14 @@ const DOWNLOADS = {
   iosIpa: '/downloads/BEVEL.ipa',
   iosManifest: '/downloads/manifest.plist',
   androidApk: '/downloads/BEVEL-android.apk',
+  macosPkg: '/downloads/BEVEL-macos-arm64.pkg',
   macosDmg: '/downloads/BEVEL-macos-arm64.dmg',
   macosZip: '/downloads/BEVEL-macos-arm64.zip',
+  releaseManifest: '/downloads/manifest.json',
 } as const
 
 const MAC_VERSION = '1.0.0'
+const MAC_BUILD = '16'
 
 export default async function DownloadPage() {
   const session = await auth()
@@ -95,20 +98,33 @@ export default async function DownloadPage() {
               BEVEL for Mac
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              v{MAC_VERSION} disk image, signed by Earthena, Inc. Drag BEVEL into
-              Applications. Prefer Safari if Chrome warns that the file is uncommon
-              — that warning is reputation, not a broken signature.
+              v{MAC_VERSION} (build {MAC_BUILD}) signed installer. Places BEVEL in
+              /Applications and registers the bevel:// handler. Signed by
+              Earthena, Inc. (Developer ID Installer · 8A36CUVEDS). Apple Silicon,
+              macOS 11 or later.
             </p>
           </div>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <a
-            href={DOWNLOADS.macosDmg}
+            href={DOWNLOADS.macosPkg}
             className="inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white hover:opacity-90"
           >
             <ArrowDownTrayIcon className="size-4" aria-hidden />
-            Download for Mac
+            Install for Mac
+          </a>
+          <a
+            href={DOWNLOADS.macosDmg}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-medium text-foreground hover:bg-surface"
+          >
+            Disk image
+          </a>
+          <a
+            href={DOWNLOADS.releaseManifest}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-medium text-foreground hover:bg-surface"
+          >
+            Full manifest
           </a>
           <a
             href="https://github.com/derozic/bevel/releases/latest"
@@ -121,19 +137,30 @@ export default async function DownloadPage() {
         <div className="rounded-xl border border-border/80 bg-background/50 p-4 text-xs leading-relaxed text-muted">
           <p className="flex items-start gap-2 font-medium text-foreground">
             <InformationCircleIcon className="mt-0.5 size-4 shrink-0 text-accent" />
-            After download
+            Professional install
           </p>
           <ol className="mt-2 list-decimal space-y-1 pl-5">
             <li>
-              If Chrome says the file is uncommon, keep it or open this page in
-              Safari. The disk image is signed by Earthena, Inc. (Developer ID).
+              Download the installer. Prefer Safari if Chrome warns that the file
+              is uncommon — that is reputation, not a broken signature.
             </li>
-            <li>Open the disk image and drag BEVEL into Applications.</li>
             <li>
-              Launch BEVEL. It talks to bevel.is. Developer mode (More menu)
-              switches local Caddy if you need it.
+              Open <code className="rounded bg-surface px-1">BEVEL-macos-arm64.pkg</code>.
+              Installer copies BEVEL into <code className="rounded bg-surface px-1">/Applications</code>
+              and registers <code className="rounded bg-surface px-1">bevel://</code>.
+            </li>
+            <li>
+              Launch BEVEL from Applications or Spotlight. It talks to bevel.is.
+              Developer mode in the BEVEL menu switches local Caddy when you need it.
             </li>
           </ol>
+          <p className="mt-3">
+            SHA-256, entitlements, codesign identity, and component list:{' '}
+            <a href={DOWNLOADS.releaseManifest} className="text-accent hover:underline">
+              manifest.json
+            </a>
+            .
+          </p>
         </div>
       </section>
 
@@ -253,11 +280,15 @@ export default async function DownloadPage() {
       </section>
 
       <p className="text-xs leading-relaxed text-muted">
-        Artifacts: IPA / APK / macOS disk image under{' '}
+        Artifacts: Mac installer (.pkg), disk image, IPA, APK under{' '}
         <code className="rounded bg-surface px-1 py-0.5">/downloads/</code>.
-        iOS OTA uses{' '}
+        Full release bill of materials:{' '}
+        <a href={DOWNLOADS.releaseManifest} className="text-accent hover:underline">
+          manifest.json
+        </a>
+        . iOS OTA uses{' '}
         <code className="rounded bg-surface px-1 py-0.5">manifest.plist</code>.
-        Rebuild: <code className="rounded bg-surface px-1 py-0.5">./scripts/mobile/release.sh</code>
+        Rebuild: <code className="rounded bg-surface px-1 py-0.5">./scripts/mobile/release.sh macos</code>
         {' · '}
         <Link href="/console" className="text-accent hover:underline">
           Console

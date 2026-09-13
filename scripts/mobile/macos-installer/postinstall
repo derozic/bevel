@@ -1,0 +1,12 @@
+#!/bin/bash
+# Register BEVEL with Launch Services so bevel:// opens the installed app.
+set -euo pipefail
+APP="/Applications/BEVEL.app"
+if [[ -d "$APP" ]]; then
+  xattr -cr "$APP" >/dev/null 2>&1 || true
+  LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  if [[ -x "$LSREGISTER" ]]; then
+    "$LSREGISTER" -f "$APP" >/dev/null 2>&1 || true
+  fi
+fi
+exit 0

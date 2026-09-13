@@ -1,0 +1,7 @@
+#!/bin/bash
+# Quit a running BEVEL so the payload is not copied over a live binary.
+set -euo pipefail
+osascript -e 'tell application "BEVEL" to quit' >/dev/null 2>&1 || true
+sleep 1
+pkill -x BEVEL >/dev/null 2>&1 || true
+exit 0
