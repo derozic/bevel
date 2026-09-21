@@ -253,8 +253,13 @@ export function GestureThumbTray({
   const [popKind, setPopKind] = useState<GestureKind | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [nativeShare, setNativeShare] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
   const copiedTimer = useRef<number | null>(null)
+
+  useEffect(() => {
+    setNativeShare(isBevelNativeShell())
+  }, [])
 
   const copyLink = useCallback(async () => {
     if (!permalink) return
@@ -420,10 +425,10 @@ export function GestureThumbTray({
                     <LinkIcon className="fleet-chat-action-icon" />
                   )}
                   {copied
-                    ? isBevelNativeShell()
+                    ? nativeShare
                       ? 'Shared'
                       : 'Copied'
-                    : isBevelNativeShell()
+                    : nativeShare
                       ? 'Share'
                       : 'Copy link'}
                 </span>
