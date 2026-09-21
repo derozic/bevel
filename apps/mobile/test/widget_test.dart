@@ -57,6 +57,42 @@ void main() {
     expect(auth.handoffCode, 'x');
   });
 
+  test('https conversation URLs keep host, path, and msg query', () {
+    final grok = DeepLinkService.parse(
+      Uri.parse('https://bevel.is/talk/grok?msg=abc'),
+    );
+    expect(grok.kind, 'navigate');
+    expect(grok.route, '/talk/grok?msg=abc');
+    expect(grok.workspaceHost, 'bevel.is');
+
+    final claude = DeepLinkService.parse(
+      Uri.parse('https://bevel.is/talk/claude'),
+    );
+    expect(claude.route, '/talk/claude');
+
+    final channel = DeepLinkService.parse(
+      Uri.parse('https://bevel.2x4m.cc/~general?msg=xyz'),
+    );
+    expect(channel.route, '/~general?msg=xyz');
+    expect(channel.channel, 'general');
+    expect(channel.workspaceHost, 'bevel.2x4m.cc');
+
+    expect(
+      DeepLinkService.routeFor(Uri.parse('bevel://talk/openai')),
+      '/talk/openai',
+    );
+    expect(
+      DeepLinkService.routeFor(Uri.parse('bevel:///~general?msg=1')),
+      '/~general?msg=1',
+    );
+  });
+
+  test('workspaceUri preserves permalink query', () {
+    final uri = BevelConfig.workspaceUri('/~general?msg=hello');
+    expect(uri.path, '/~general');
+    expect(uri.queryParameters['msg'], 'hello');
+  });
+
   test('OAuth hosts are detected for system browser', () {
     expect(
       BevelConfig.isOAuthNavigation(
@@ -153,8 +189,13 @@ void main() {
     expect(mac, contains('BevelNative/1.0.0'));
     expect(mac, isNot(contains('Mobile')));
     final phone = BevelConfig.webViewUserAgent(TargetPlatform.iOS);
+    expect(phone, contains('iPhone'));
     expect(phone, contains('Mobile'));
     expect(phone, contains('BevelNative/1.0.0'));
+    final ipad = BevelConfig.webViewUserAgent(TargetPlatform.iOS, true);
+    expect(ipad, contains('iPad'));
+    expect(ipad, contains('Mobile'));
+    expect(ipad, contains('BevelNative/1.0.0'));
   });
 
   test('native login gate allows only one browser hop', () {

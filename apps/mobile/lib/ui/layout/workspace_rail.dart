@@ -120,6 +120,28 @@ class WorkspaceRail extends StatelessWidget {
                   onTap: () => onNavigate('/talk/hermes'),
                 ),
                 _NavTile(
+                  icon: Icons.chat_outlined,
+                  label: 'ChatGPT',
+                  subtitle: 'OpenAI',
+                  selected: _isActive('/talk/openai') ||
+                      _isActive('/talk/chatgpt'),
+                  onTap: () => onNavigate('/talk/openai'),
+                ),
+                _NavTile(
+                  icon: Icons.psychology_outlined,
+                  label: 'Claude',
+                  subtitle: 'Anthropic',
+                  selected: _isActive('/talk/claude'),
+                  onTap: () => onNavigate('/talk/claude'),
+                ),
+                _NavTile(
+                  icon: Icons.bolt_outlined,
+                  label: 'Grok',
+                  subtitle: 'xAI',
+                  selected: _isActive('/talk/grok'),
+                  onTap: () => onNavigate('/talk/grok'),
+                ),
+                _NavTile(
                   icon: Icons.chat_bubble_outline,
                   label: 'Private',
                   subtitle: 'your space',

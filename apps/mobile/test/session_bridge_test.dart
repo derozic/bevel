@@ -56,6 +56,10 @@ void main() {
         SessionBridge.injectNativeChromeJs,
         contains('fleet-chat-channels-btn'),
       );
+      expect(
+        SessionBridge.injectNativeChromeJs,
+        contains('data-bevel-tablet'),
+      );
     });
   });
 

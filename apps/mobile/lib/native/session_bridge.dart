@@ -82,13 +82,20 @@ class SessionBridge {
     root.setAttribute('data-bevel-native', '1');
     root.setAttribute('data-bevel-gestures', 'playful');
     root.classList.add('bevel-native-shell');
-    var desktop = /Macintosh|Windows NT|X11/.test(navigator.userAgent || '');
+    var ua = navigator.userAgent || '';
+    var desktop = /Macintosh|Windows NT|X11/.test(ua);
+    var tablet = /iPad/.test(ua);
     if (desktop) {
       root.setAttribute('data-bevel-desktop', '1');
       root.classList.add('bevel-native-desktop');
     } else {
       root.removeAttribute('data-bevel-desktop');
       root.classList.remove('bevel-native-desktop');
+    }
+    if (tablet) {
+      root.setAttribute('data-bevel-tablet', '1');
+    } else {
+      root.removeAttribute('data-bevel-tablet');
     }
     if (!document.getElementById('bevel-native-style')) {
       var s = document.createElement('style');

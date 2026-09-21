@@ -213,6 +213,63 @@ class ChannelPickerSheet extends StatelessWidget {
                     ),
                     ListTile(
                       leading: Icon(
+                        Icons.chat_outlined,
+                        color: _isActive('/talk/openai') ? p.accent : p.muted,
+                      ),
+                      title: Text(
+                        'ChatGPT',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: p.ink,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'OpenAI',
+                        style: TextStyle(color: p.subtle),
+                      ),
+                      selected: _isActive('/talk/openai'),
+                      onTap: () => onSelectPath('/talk/openai'),
+                    ),
+                    ListTile(
+                      leading: Icon(
+                        Icons.psychology_outlined,
+                        color: _isActive('/talk/claude') ? p.accent : p.muted,
+                      ),
+                      title: Text(
+                        'Claude',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: p.ink,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Anthropic',
+                        style: TextStyle(color: p.subtle),
+                      ),
+                      selected: _isActive('/talk/claude'),
+                      onTap: () => onSelectPath('/talk/claude'),
+                    ),
+                    ListTile(
+                      leading: Icon(
+                        Icons.bolt_outlined,
+                        color: _isActive('/talk/grok') ? p.accent : p.muted,
+                      ),
+                      title: Text(
+                        'Grok',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: p.ink,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'xAI',
+                        style: TextStyle(color: p.subtle),
+                      ),
+                      selected: _isActive('/talk/grok'),
+                      onTap: () => onSelectPath('/talk/grok'),
+                    ),
+                    ListTile(
+                      leading: Icon(
                         Icons.chat_bubble_outline,
                         color: _isActive('/me') ? p.accent : p.muted,
                       ),

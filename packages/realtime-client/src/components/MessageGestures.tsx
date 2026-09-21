@@ -27,7 +27,11 @@ import {
   type GestureKind,
 } from '@bevel/schema'
 import type { ChatMsg } from '../lib/colyseus-messages'
-import { notifyNativeGesture } from '../lib/bubble-gestures'
+import {
+  isBevelNativeShell,
+  notifyNativeGesture,
+  notifyNativeShare,
+} from '../lib/bubble-gestures'
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -259,6 +263,22 @@ export function GestureThumbTray({
       : permalink.startsWith('?')
         ? `${window.location.origin}${window.location.pathname}${permalink}`
         : `${window.location.origin}${permalink}`
+    if (
+      isBevelNativeShell() &&
+      notifyNativeShare({
+        title: 'BEVEL',
+        url: absolute,
+        text: 'Open this conversation in BEVEL',
+      })
+    ) {
+      setCopied(true)
+      if (copiedTimer.current) window.clearTimeout(copiedTimer.current)
+      copiedTimer.current = window.setTimeout(() => {
+        setCopied(false)
+        setMoreOpen(false)
+      }, 900)
+      return
+    }
     const ok = await copyText(absolute)
     if (!ok) return
     setCopied(true)
@@ -399,7 +419,13 @@ export function GestureThumbTray({
                   ) : (
                     <LinkIcon className="fleet-chat-action-icon" />
                   )}
-                  {copied ? 'Copied' : 'Copy link'}
+                  {copied
+                    ? isBevelNativeShell()
+                      ? 'Shared'
+                      : 'Copied'
+                    : isBevelNativeShell()
+                      ? 'Share'
+                      : 'Copy link'}
                 </span>
                 {copied ? null : (
                   <span className="fleet-chat-action-menu-kbd">L</span>

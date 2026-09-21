@@ -38,6 +38,7 @@ const PUBLIC_PATHS = [
   '/account',
   '/me',
   '/auth/cli',
+  '/auth/apple',
   '/claim',
   '/onboarding',
   '/about',
@@ -51,6 +52,9 @@ const PUBLIC_PATHS = [
   '/console',
   '/_next',
   '/favicon.ico',
+  '/.well-known',
+  '/apple-app-site-association',
+  '/downloads',
 ]
 
 function isLoopbackHost(hostname: string): boolean {

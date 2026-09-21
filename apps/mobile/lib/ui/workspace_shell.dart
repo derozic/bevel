@@ -138,10 +138,17 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     }
     final origin = _workspaceOrigin;
     if (origin != null) {
-      final base = Uri.parse(origin);
-      return base.replace(path: _callbackPath);
+      return BevelConfig.resolveOnOrigin(Uri.parse(origin), _callbackPath);
     }
     return BevelConfig.workspaceUri(_callbackPath);
+  }
+
+  bool get _isTabletViewport {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) return false;
+    final view = views.first;
+    final size = view.physicalSize / view.devicePixelRatio;
+    return size.shortestSide >= 600;
   }
 
   @override
@@ -152,7 +159,13 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setUserAgent(BevelConfig.webViewUserAgent())
+      ..setUserAgent(BevelConfig.webViewUserAgent(null, _isTabletViewport))
+      ..addJavaScriptChannel(
+        'BevelShare',
+        onMessageReceived: (msg) {
+          unawaited(_shareFromBridge(msg.message));
+        },
+      )
       ..addJavaScriptChannel(
         'BevelHaptics',
         onMessageReceived: (msg) {
@@ -193,9 +206,11 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
             });
             if (uri != null) {
               final path = uri.path.isEmpty ? '/' : uri.path;
+              final persisted =
+                  uri.hasQuery ? '$path?${uri.query}' : path;
               // Don't persist the handoff intermediate path
               if (!path.contains('/api/auth/handoff')) {
-                widget.onPathChanged?.call(path);
+                widget.onPathChanged?.call(persisted);
               }
             }
             unawaited(_markNativeChrome());
@@ -407,8 +422,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   Future<void> _goHome() {
     final origin = _workspaceOrigin;
     if (origin != null) {
-      return _controller
-          .loadRequest(Uri.parse(origin).replace(path: '/~general'));
+      return _controller.loadRequest(
+        BevelConfig.resolveOnOrigin(Uri.parse(origin), '/~general'),
+      );
     }
     return _controller.loadRequest(BevelConfig.workspaceUri('/~general'));
   }
@@ -416,8 +432,9 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
   Future<void> _navigatePath(String path) {
     final origin = _workspaceOrigin;
     if (origin != null) {
-      final base = Uri.parse(origin);
-      return _controller.loadRequest(base.replace(path: path));
+      return _controller.loadRequest(
+        BevelConfig.resolveOnOrigin(Uri.parse(origin), path),
+      );
     }
     return _controller.loadRequest(BevelConfig.workspaceUri(path));
   }
@@ -433,13 +450,46 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     );
   }
 
+  Rect _shareOrigin() {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box != null && box.hasSize) {
+      return box.localToGlobal(Offset.zero) & box.size;
+    }
+    final size = MediaQuery.sizeOf(context);
+    return Rect.fromLTWH(size.width - 56, 12, 44, 44);
+  }
+
   Future<void> _share() async {
     final uri = _currentUri ?? BevelConfig.workspaceUri();
     await _sharing.shareWorkspace(
       title: _title ?? BevelConfig.appName,
-      text: 'Open in ${BevelConfig.appName}',
+      text: 'Open this conversation in ${BevelConfig.appName}',
       uri: uri,
+      sharePositionOrigin: _shareOrigin(),
     );
+  }
+
+  Future<void> _shareFromBridge(String raw) async {
+    try {
+      final map = jsonDecode(raw);
+      if (map is! Map) {
+        await _share();
+        return;
+      }
+      final url = (map['url'] ?? map['uri'] ?? '').toString().trim();
+      final title = (map['title'] ?? _title ?? BevelConfig.appName).toString();
+      final text = (map['text'] ?? 'Open this conversation in ${BevelConfig.appName}')
+          .toString();
+      final uri = url.isEmpty ? (_currentUri ?? BevelConfig.workspaceUri()) : Uri.tryParse(url);
+      await _sharing.shareWorkspace(
+        title: title,
+        text: text,
+        uri: uri,
+        sharePositionOrigin: _shareOrigin(),
+      );
+    } catch (_) {
+      await _share();
+    }
   }
 
   Future<void> _openExternal() async {
@@ -546,12 +596,10 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
     // Desktop: the web app already has BevelRail. Do not stack a Flutter
     // rail or AppBar on top of it.
     final isDesktopShell = bevelIsDesktopShell();
-    final showRail = !isDesktopShell &&
-        (layout.prefersSplit ||
-            (layout.isFoldInner &&
-                layout.isLandscape &&
-                layout.size.width >= 700));
-    final showPhonePicker = !showRail;
+    // Web BevelRail owns ChatGPT / Claude / Grok. A Flutter rail on iPad
+    // stacked a second sidebar and hid the three platform agents.
+    final showRail = false;
+    final showPhonePicker = !isDesktopShell && !layout.isTabletClass;
 
     final spaceLabel = [
       if (widget.workspaceLabel != null && widget.workspaceLabel!.isNotEmpty)
@@ -666,6 +714,11 @@ class _WorkspaceShellPageState extends State<WorkspaceShellPage> {
               onPressed: () => _navigatePath('/timeline'),
               icon: const Icon(Icons.schedule_outlined),
             ),
+          IconButton(
+            tooltip: 'Share conversation',
+            onPressed: () => unawaited(_share()),
+            icon: const Icon(Icons.ios_share),
+          ),
           if (OnDeviceIntelligence.isSupportedPlatform)
             IconButton(
               tooltip: 'On-device brief',

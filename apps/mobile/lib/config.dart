@@ -106,7 +106,7 @@ class BevelConfig {
 
   /// WKWebView user agent. Desktop must look like Safari — a `Mobile` token
   /// makes the workspace render phone chrome inside a Silicon window.
-  static String webViewUserAgent([TargetPlatform? platform]) {
+  static String webViewUserAgent([TargetPlatform? platform, bool tablet = false]) {
     final p = platform ?? defaultTargetPlatform;
     final v = versionLabel;
     switch (p) {
@@ -116,6 +116,15 @@ class BevelConfig {
         return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
             'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 '
             'Safari/605.1.15 BevelNative/$v';
+      case TargetPlatform.iOS:
+        if (tablet) {
+          return 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) '
+              'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 '
+              'Mobile/15E148 Safari/604.1 BevelNative/$v';
+        }
+        return 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) '
+            'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 '
+            'Mobile/15E148 Safari/604.1 BevelNative/$v';
       default:
         return 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) '
             'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 '
@@ -148,8 +157,25 @@ class BevelConfig {
 
   /// Workspace URI opened inside the in-app WebView.
   static Uri workspaceUri([String path = '/']) {
-    final base = Uri.parse(workspaceUrl);
-    return base.replace(path: path.startsWith('/') ? path : '/$path');
+    return resolveOnOrigin(Uri.parse(workspaceUrl), path);
+  }
+
+  /// Join a host origin with a relative path that may include `?msg=`.
+  /// `Uri.replace(path: '/~general?msg=x')` would put the query in the path.
+  static Uri resolveOnOrigin(Uri origin, String pathAndQuery) {
+    final raw = pathAndQuery.trim();
+    if (raw.isEmpty || raw == '/') {
+      return origin.replace(path: '/', query: '', fragment: '');
+    }
+    final parsed = Uri.parse(raw.startsWith('/') ? raw : '/$raw');
+    if (parsed.hasScheme || parsed.hasAuthority) {
+      return origin.replace(path: '/~general', query: '', fragment: '');
+    }
+    return origin.replace(
+      path: parsed.path.isEmpty ? '/' : parsed.path,
+      query: parsed.query,
+      fragment: parsed.fragment,
+    );
   }
 
   static bool isApexHost(String host) {

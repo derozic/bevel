@@ -190,8 +190,11 @@ function IosCard({
       </div>
       {!otaLabel ? (
         <p className="text-xs leading-relaxed text-muted">
-          Open this page in Safari on an iPhone to light up{' '}
-          <span className="font-medium text-foreground">Install on this iPhone</span>.
+          Open this page in Safari on an iPhone or iPad to light up{' '}
+          <span className="font-medium text-foreground">
+            Install on this iPhone / iPad
+          </span>
+          .
         </p>
       ) : (
         <div className="rounded-xl border border-border/80 bg-background/50 p-4 text-xs leading-relaxed text-muted">

@@ -156,7 +156,9 @@ class DeepLinkService {
         final slug = id?.toLowerCase();
         return BevelDeepLinkAction(
           kind: 'navigate',
-          route: slug == null || slug.isEmpty ? '/~general' : '/~$slug',
+          route: slug == null || slug.isEmpty
+              ? '/~general'
+              : '/~$slug${querySuffix(uri)}',
           channel: slug,
           raw: uri,
         );
@@ -179,7 +181,29 @@ class DeepLinkService {
                 : 'hermes');
         return BevelDeepLinkAction(
           kind: 'navigate',
-          route: '/talk/${agent.toLowerCase()}',
+          route: '/talk/${agent.toLowerCase()}${querySuffix(uri)}',
+          raw: uri,
+        );
+      }
+      // bevel://me — private agents (ChatGPT / Claude / Grok)
+      if (host == 'me' || uri.path == '/me' || uri.path.startsWith('/me/')) {
+        return BevelDeepLinkAction(
+          kind: 'navigate',
+          route: '/me${querySuffix(uri)}',
+          raw: uri,
+        );
+      }
+      // bevel://session/{id}?msg=
+      if (host == 'session' || uri.path.startsWith('/session')) {
+        final id = host == 'session'
+            ? (uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '')
+            : (uri.pathSegments.length > 1 ? uri.pathSegments[1] : '');
+        final route = id.isEmpty
+            ? '/me'
+            : '/session/$id${querySuffix(uri)}';
+        return BevelDeepLinkAction(
+          kind: 'navigate',
+          route: route,
           raw: uri,
         );
       }
@@ -210,23 +234,82 @@ class DeepLinkService {
       if (host == 'login' || uri.path == '/login') {
         return BevelDeepLinkAction(kind: 'navigate', route: '/login', raw: uri);
       }
+      // bevel:///~general?msg=  ·  bevel:///talk/claude  ·  bevel://open/~general
+      if (host.isEmpty || host == 'localhost' || host == 'open') {
+        final path = uri.path.isEmpty ? '/' : uri.path;
+        if (path != '/') {
+          return BevelDeepLinkAction(
+            kind: 'navigate',
+            route: pathAndQuery(uri),
+            channel: channelFromPath(path),
+            raw: uri,
+          );
+        }
+      }
       return BevelDeepLinkAction(kind: 'navigate', route: '/', raw: uri);
     }
 
-    // https://*.bevel… /channel/…
+    // https://bevel.is/~general?msg=  ·  https://bevel.is/talk/claude
+    final host = isBevelHttpHost(uri.host) ? uri.host.toLowerCase() : null;
     if (uri.pathSegments.isNotEmpty && uri.pathSegments.first == 'bevel') {
+      final rest = uri.pathSegments.length > 1 ? uri.pathSegments[1] : '';
+      final mapped = rest == 'talk' || rest == 'session' || rest == 'me'
+          ? '/${uri.pathSegments.skip(1).join('/')}${querySuffix(uri)}'
+          : pathAndQuery(uri);
       return BevelDeepLinkAction(
         kind: 'navigate',
-        route: uri.path,
-        channel: uri.pathSegments.length > 1 ? uri.pathSegments[1] : null,
+        route: mapped,
+        channel: channelFromPath(uri.path),
+        workspaceHost: host,
         raw: uri,
       );
     }
     return BevelDeepLinkAction(
       kind: 'navigate',
-      route: uri.path.isEmpty ? '/' : uri.path,
+      route: pathAndQuery(uri),
+      channel: channelFromPath(uri.path),
+      workspaceHost: host,
       raw: uri,
     );
+  }
+
+  /// Production and preview hosts that Universal Links / App Links may open.
+  static bool isBevelHttpHost(String host) {
+    final h = host.toLowerCase().split(':').first;
+    if (h.isEmpty) return false;
+    if (h == 'bevel.is' || h == 'www.bevel.is' || h == 'app.bevel.is') {
+      return true;
+    }
+    if (h.endsWith('.bevel.is')) return true;
+    if (h.contains('bevel') &&
+        (h.endsWith('.2x4m.cc') || h.endsWith('.lvh.me'))) {
+      return true;
+    }
+    return false;
+  }
+
+  static String querySuffix(Uri uri) => uri.hasQuery ? '?${uri.query}' : '';
+
+  static String pathAndQuery(Uri uri) {
+    final path = uri.path.isEmpty ? '/' : uri.path;
+    return '$path${querySuffix(uri)}';
+  }
+
+  /// Channel slug from `/~general`, `/^ops`, `/bevel/c/product`.
+  static String? channelFromPath(String path) {
+    final segs = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (segs.isEmpty) return null;
+    var first = segs.first;
+    if (first == 'bevel' && segs.length > 1) {
+      first = segs[1];
+      if (first == 'c' && segs.length > 2) first = segs[2];
+      if (first == 'talk' || first == 'session' || first == 'me') return null;
+    }
+    if (first.startsWith('~') || first.startsWith('^')) {
+      final slug = first.substring(1);
+      return slug.isEmpty ? null : slug.toLowerCase();
+    }
+    return null;
   }
 
   /// Map bevel://channel/product → app path (legacy helper).

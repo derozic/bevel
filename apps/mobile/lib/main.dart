@@ -289,11 +289,61 @@ class _BevelHomePageState extends State<BevelHomePage> {
         break;
       default:
         if (action.route != null) {
-          _openWorkspace(path: action.route!);
+          unawaited(
+            _openSharedConversation(
+              path: action.route!,
+              workspaceHost: action.workspaceHost,
+            ),
+          );
         } else if (action.channel != null && action.channel!.isNotEmpty) {
-          _openWorkspace(path: '/~${action.channel!.toLowerCase()}');
+          unawaited(
+            _openSharedConversation(
+              path: '/~${action.channel!.toLowerCase()}',
+              workspaceHost: action.workspaceHost,
+            ),
+          );
         }
     }
+  }
+
+  /// Open a shared https://bevel.is/… or bevel:// conversation URL.
+  Future<void> _openSharedConversation({
+    required String path,
+    String? workspaceHost,
+  }) async {
+    final safePath = path.trim().isEmpty ? '/~general' : path.trim();
+    var host = workspaceHost?.trim().toLowerCase();
+    if (host != null && host.isNotEmpty) {
+      host = BevelConfig.remapHost(host);
+      final isApex = BevelConfig.isApexHost(host);
+      final target = isApex
+          ? WorkspaceTarget.private(platformHost: host)
+          : WorkspaceTarget.org(
+              slug: host.split('.').firstWhere(
+                    (s) => s != 'bevel' && s.isNotEmpty,
+                    orElse: () => host!,
+                  ),
+              name: isApex ? 'Private' : host,
+              host: host,
+              homePath: safePath.startsWith('/me')
+                  ? '/me'
+                  : (safePath.startsWith('/talk')
+                      ? safePath.split('?').first
+                      : (safePath.startsWith('/~')
+                          ? safePath.split('?').first
+                          : '/~general')),
+            );
+      final next = _onboarding.copyWith(
+        selectedWorkspace: target,
+        lastWorkspacePath: safePath,
+      );
+      await next.save();
+      if (!mounted) return;
+      setState(() => _onboarding = next);
+      _openWorkspace(path: safePath, workspaceHost: host);
+      return;
+    }
+    _openWorkspace(path: safePath);
   }
 
   @override

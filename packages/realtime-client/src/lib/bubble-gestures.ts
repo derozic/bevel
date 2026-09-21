@@ -33,6 +33,35 @@ export function notifyNativeGesture(kind: string): void {
   window.dispatchEvent(new CustomEvent('bevel:gesture', { detail: { kind } }))
 }
 
+export function isBevelNativeShell(): boolean {
+  if (typeof window === 'undefined') return false
+  if (document.documentElement.getAttribute('data-bevel-native') === '1') {
+    return true
+  }
+  return /BevelNative/i.test(window.navigator.userAgent)
+}
+
+/** Open the iOS / Android share sheet from a conversation permalink. */
+export function notifyNativeShare(payload: {
+  title: string
+  url: string
+  text?: string
+}): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const bridge = (
+      window as unknown as {
+        BevelShare?: { postMessage: (m: string) => void }
+      }
+    ).BevelShare
+    if (!bridge?.postMessage) return false
+    bridge.postMessage(JSON.stringify(payload))
+    return true
+  } catch {
+    return false
+  }
+}
+
 type Handlers = {
   onPointerDown: (e: ReactPointerEvent) => void
   onPointerMove: (e: ReactPointerEvent) => void

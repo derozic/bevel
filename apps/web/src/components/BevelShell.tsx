@@ -16,6 +16,7 @@ import type {
   TenantPlan,
 } from '@bevel/schema'
 import { BevelRail, type FleetChannelSummary } from '@/components/BevelRail'
+import { OpenInBevelApp } from '@/components/OpenInBevelApp'
 import type { SessionSummary } from '@/lib/realtime'
 import {
   markBevelInputMode,
@@ -172,6 +173,7 @@ export function BevelShell({
           {children}
         </BevelChatPaneContext.Provider>
       </main>
+      <OpenInBevelApp />
     </div>
   )
 }
