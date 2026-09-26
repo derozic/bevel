@@ -5,6 +5,30 @@
 @import "../styles/bevel-workspace.css";
 @import "../styles/daypart.css";
 
+/* Chat body must match product chrome (rail ~13px), not a document scale. */
+.fleet-chat-shell .fleet-chat-bubble,
+.fleet-chat-shell .fleet-chat-msg-body,
+.fleet-chat-shell .fleet-chat-paragraph,
+.fleet-chat-shell .fleet-chat-formatted,
+.fleet-chat-shell .fleet-chat-list,
+.fleet-chat-shell .fleet-chat-list-item,
+.fleet-chat-shell .fleet-chat-input {
+  font-family: var(--bevel-font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: -0.011em;
+}
+
+.fleet-chat-shell .fleet-chat-pre,
+.fleet-chat-shell .fleet-chat-pre code,
+.fleet-chat-shell .fleet-chat-code {
+  font-family: var(--bevel-font-mono), ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 400;
+}
+
 /* Radix puts z-index on Content, not the popper wrapper. z-index:auto
    wrappers paint under later stacking contexts (agent chip row). */
 [data-radix-popper-content-wrapper] {
@@ -394,18 +418,28 @@ body {
   border-bottom-color: var(--bevel-accent, #7c5cff);
 }
 
-.bevel-daypart-control[data-compact='true'] {
-  flex-direction: row;
+.bevel-daypart-trigger {
+  display: inline-flex;
+  height: 1.75rem;
   align-items: center;
   gap: 0.35rem;
-  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--bevel-border);
+  background: color-mix(in srgb, var(--bevel-surface) 88%, transparent);
+  padding: 0 0.55rem 0 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--bevel-text);
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.bevel-daypart-control[data-compact='true'] .bevel-daypart-control__chip {
-  height: 1.75rem;
-  min-width: 2.35rem;
-  padding: 0 0.55rem;
-  font-size: 0.6875rem;
+.bevel-daypart-trigger:hover {
+  border-color: color-mix(in srgb, var(--bevel-accent) 40%, var(--bevel-border));
+}
+
+.bevel-daypart-trigger[data-state='open'] {
+  border-color: color-mix(in srgb, var(--bevel-accent) 50%, var(--bevel-border));
 }
 
 .public-panel,

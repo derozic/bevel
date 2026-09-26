@@ -9,7 +9,7 @@ const FENCE_RE = /^```/
 const LIST_RE = /^[-•*]\s+/
 const MENTION_LINE_RE = /^[@^][a-zA-Z0-9_-]+/
 const CODEISH_RE =
-  /^(import |from |def |class |const |let |var |export |return |if |elif |else:|for |while |try:|except |with |#include |package |fn |pub |using |\{|\}|<\/|[\]];?$|\t| {2,})/
+  /^(import\s|from\s|def\s|class\s|const\s|let\s|var\s|export\s|return\s|if\s|elif\s|else:|for\s|while\s|try:|except\s|with\s|#include\s|package\s|fn\s|pub\s|using\s|print\(|console\.|\{|\}|<\/|[\]];?$|\t| {2,}|[a-zA-Z_][\w.]*\()/
 
 /**
  * Split inline text into code, bold, @soft-mentions, and ^escalations.

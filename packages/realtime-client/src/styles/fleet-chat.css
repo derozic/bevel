@@ -969,9 +969,11 @@
   flex: 0 1 auto;
   border-radius: 1rem;
   padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
-  line-height: 1.45;
+  font-family: var(--bevel-font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
   font-weight: 400;
+  letter-spacing: -0.011em;
 }
 
 .fleet-chat-bubble--human {
