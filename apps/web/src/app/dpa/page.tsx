@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function DpaPage() {
   return (
-    <MarketingPage title="Data Processing Addendum" kicker="Legal" article>
+    <MarketingPage title="Data Processing Addendum" kicker="Legal" article legal>
       <p>
         <strong className="text-foreground">Last updated:</strong> {LEGAL_UPDATED}
       </p>

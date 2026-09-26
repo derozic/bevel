@@ -20,6 +20,10 @@ import {
 } from '@/lib/bevel'
 import { BrandSquare } from '@/components/BrandSquare'
 import { FirstRunPanel } from '@/components/onboarding/FirstRunPanel'
+import {
+  ProductChrome,
+  PublicShell,
+} from '@/components/marketing/PublicShell'
 import { auth } from '@/auth'
 import { workspaceOpenHref } from '@/lib/workspace-spaces.server'
 import {
@@ -73,7 +77,8 @@ export default async function WorkspacesPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-8 px-6 py-16">
+    <PublicShell header={<ProductChrome />} footer={false}>
+    <main className="mx-auto flex min-h-[calc(100vh-4.5rem)] w-full max-w-5xl flex-col justify-center gap-8 px-6 py-12">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-3">
           <div className="flex items-center gap-3">
@@ -133,6 +138,7 @@ export default async function WorkspacesPage() {
         {BEVEL_TRADEMARK_NOTICE}
       </p>
     </main>
+    </PublicShell>
   )
 }
 

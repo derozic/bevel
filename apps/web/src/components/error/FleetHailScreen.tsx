@@ -213,12 +213,12 @@ export function FleetHailScreen({
 
 const HAIL_CSS = `
 .bevel-hail {
-  --void: #081018;
-  --grid: #143044;
-  --fog: #8ba3b5;
-  --hail: #ff8c42;
-  --tape: #d5e1ea;
-  --box: #0c161c;
+  --void: var(--bevel-bg, #081018);
+  --grid: color-mix(in srgb, var(--bevel-accent, #143044) 35%, var(--bevel-bg, #081018));
+  --fog: var(--bevel-text-muted, #8ba3b5);
+  --hail: var(--bevel-accent, #ff8c42);
+  --tape: var(--bevel-text, #d5e1ea);
+  --box: var(--bevel-surface, #0c161c);
   box-sizing: border-box;
   min-height: 100svh;
   padding: 1.25rem 1.25rem 2rem;

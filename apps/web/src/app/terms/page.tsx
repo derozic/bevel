@@ -17,13 +17,13 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <MarketingPage title="Terms of Service" kicker="Legal" article>
+    <MarketingPage title="Terms of Service" kicker="Legal" article legal>
       <p>
         <strong className="text-foreground">Last updated:</strong> {LEGAL_UPDATED}
       </p>
       <p>
         These Terms of Service (the “Agreement”) are a contract between you and{' '}
-        {LEGAL_OPERATOR} (“Earthena,” “we,” “us”) governing access to {LEGAL_PRODUCT}{' '}
+        {LEGAL_OPERATOR} (“Entity,” “we,” “us”) governing access to {LEGAL_PRODUCT}{' '}
         websites, native applications, APIs, and related services (the “Service”). By
         creating an account, signing in, claiming a workspace, or using the Service, you
         agree to this Agreement. If you use the Service on behalf of an organization, you
@@ -72,7 +72,7 @@ export default function TermsPage() {
 
       <h2 className="pt-4 text-xl font-semibold text-foreground">5. Customer content</h2>
       <p>
-        You retain rights to content you post (“Customer Content”). You grant Earthena a
+        You retain rights to content you post (“Customer Content”). You grant Entity a
         worldwide, non-exclusive license to host, process, transmit, and display Customer
         Content solely to operate and improve the Service. You represent that you have the
         rights needed to post it. {LEGAL_PRODUCT} software, marks, and documentation
@@ -126,14 +126,14 @@ export default function TermsPage() {
       <h2 className="pt-4 text-xl font-semibold text-foreground">10. Disclaimers</h2>
       <p>
         THE SERVICE IS PROVIDED “AS IS” AND “AS AVAILABLE.” TO THE FULLEST EXTENT
-        PERMITTED BY LAW, EARTHENA DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING
+        PERMITTED BY LAW, ENTITY DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING
         MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. We do not
         warrant uninterrupted or error-free operation.
       </p>
 
       <h2 className="pt-4 text-xl font-semibold text-foreground">11. Limitation of liability</h2>
       <p>
-        TO THE FULLEST EXTENT PERMITTED BY LAW, EARTHENA AND ITS AFFILIATES WILL NOT BE
+        TO THE FULLEST EXTENT PERMITTED BY LAW, ENTITY AND ITS AFFILIATES WILL NOT BE
         LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR
         FOR LOST PROFITS, REVENUE, OR DATA. OUR AGGREGATE LIABILITY FOR ALL CLAIMS ARISING
         OUT OF THE SERVICE IS LIMITED TO THE FEES YOU PAID US FOR THE SERVICE IN THE
@@ -142,7 +142,7 @@ export default function TermsPage() {
 
       <h2 className="pt-4 text-xl font-semibold text-foreground">12. Indemnity</h2>
       <p>
-        You will defend and indemnify Earthena against claims arising from Customer
+        You will defend and indemnify Entity against claims arising from Customer
         Content, your use of agents, or your breach of this Agreement, including
         reasonable attorneys’ fees.
       </p>

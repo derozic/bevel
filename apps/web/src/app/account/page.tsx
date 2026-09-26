@@ -6,6 +6,10 @@ import { BevelNavMark } from '@/components/BevelNavMark'
 import { SuiteNav } from '@/components/SuiteNav'
 import { BEVEL_NAME, BEVEL_PRIVATE_PATH, BEVEL_TRADEMARK_NOTICE } from '@/lib/bevel'
 import { auth } from '@/auth'
+import {
+  ProductChrome,
+  PublicShell,
+} from '@/components/marketing/PublicShell'
 
 /**
  * Apex platform account (bevel.is) — profile metadata + primary agent + memberships.
@@ -24,7 +28,8 @@ export default async function AccountPage() {
     'hermes'
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-10 px-6 py-16">
+    <PublicShell header={<ProductChrome />} footer={false}>
+    <main className="mx-auto flex max-w-2xl flex-col gap-10 px-6 py-12">
       <header className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           <span className="flex size-14 items-center justify-center rounded-2xl border border-border bg-surface shadow-sm">
@@ -127,5 +132,6 @@ export default async function AccountPage() {
         {BEVEL_TRADEMARK_NOTICE}
       </p>
     </main>
+    </PublicShell>
   )
 }

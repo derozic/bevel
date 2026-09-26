@@ -3,10 +3,10 @@
 .status-page {
   min-height: 100vh;
   background:
-    radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, #6b8cff 18%, transparent), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, color-mix(in srgb, #1a1a1a 8%, transparent), transparent 50%),
-    #f6f5f2;
-  color: #141414;
+    radial-gradient(1200px 600px at 10% -10%, var(--daypart-mesh-a, color-mix(in srgb, var(--bevel-accent) 18%, transparent)), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, var(--daypart-mesh-b, transparent), transparent 50%),
+    var(--bevel-bg, #f6f5f2);
+  color: var(--bevel-text, #141414);
   font-family:
     ui-sans-serif,
     system-ui,
@@ -37,7 +37,7 @@
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #141414;
+  color: var(--bevel-text, #141414);
   text-decoration: none;
 }
 
@@ -53,9 +53,9 @@
   border-radius: 1rem;
   padding: 1.5rem 1.35rem;
   margin-bottom: 1.5rem;
-  border: 1px solid color-mix(in srgb, #141414 10%, transparent);
-  background: #fff;
-  box-shadow: 0 12px 40px color-mix(in srgb, #141414 6%, transparent);
+  border: 1px solid var(--bevel-border, color-mix(in srgb, #141414 10%, transparent));
+  background: var(--bevel-surface, #fff);
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--ink, #141414) 6%, transparent);
 }
 
 .status-hero--ok {
@@ -214,7 +214,7 @@ button.status-row-hit:focus-visible {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #141414;
+  color: var(--bevel-text, #141414);
 }
 
 .status-row-url {
@@ -237,7 +237,7 @@ button.status-row-hit:focus-visible {
 
 .status-latency {
   font-weight: 600;
-  color: #141414;
+  color: var(--bevel-text, #141414);
 }
 
 .status-refresh {
@@ -256,7 +256,7 @@ button.status-row-hit:focus-visible {
 }
 
 .status-footer a {
-  color: #141414;
+  color: var(--bevel-text, #141414);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 0.15em;

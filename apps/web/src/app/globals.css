@@ -408,6 +408,7 @@ body {
   font-size: 0.6875rem;
 }
 
+.public-panel,
 .legal-article {
   position: relative;
   border-radius: 1.75rem;
@@ -420,6 +421,7 @@ body {
 }
 
 @media (min-width: 640px) {
+  .public-panel,
   .legal-article {
     padding: 2.75rem 2.5rem 3rem;
   }

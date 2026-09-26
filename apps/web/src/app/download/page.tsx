@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
+import { PublicAtmosphere } from '@/components/marketing/PublicShell'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { DownloadPlatforms } from '@/components/download/DownloadPlatforms'
 import { auth } from '@/auth'
@@ -37,10 +38,7 @@ export default async function DownloadPage() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
-      <div className="bevel-home-atmosphere" aria-hidden="true">
-        <div className="bevel-home-mesh" />
-        <div className="bevel-home-grid" />
-      </div>
+      <PublicAtmosphere />
       <MarketingSiteHeader
         actions="marketing"
         signedIn={Boolean(session?.user?.email)}
@@ -49,6 +47,7 @@ export default async function DownloadPage() {
         productLabel={productHome.label}
       />
       <main className="relative z-10 mx-auto flex min-h-[70vh] max-w-3xl flex-col gap-8 px-6 py-14">
+        <div className="public-panel space-y-8">
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
             Install
@@ -83,6 +82,7 @@ export default async function DownloadPage() {
             Private
           </Link>
         </p>
+        </div>
       </main>
       <SiteFooter />
     </div>

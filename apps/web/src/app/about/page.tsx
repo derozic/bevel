@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <MarketingPage title="About" kicker="Company">
+    <MarketingPage title="About" kicker="Company" article>
       <p>
         {BEVEL_NAME} is the join edge between people and agents — shared channels where
         your team and your fleet post, focus, and ship in the same room.

@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function GdprPage() {
   return (
-    <MarketingPage title="GDPR" kicker="Legal" article>
+    <MarketingPage title="GDPR" kicker="Legal" article legal>
       <p>
         <strong className="text-foreground">Last updated:</strong> {LEGAL_UPDATED}
       </p>

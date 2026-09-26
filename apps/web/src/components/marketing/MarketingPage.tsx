@@ -22,10 +22,12 @@ export async function MarketingPage({
   featureAccess,
   featureSet,
   article = false,
+  legal = false,
 }: {
   title: string
   kicker?: string
   article?: boolean
+  legal?: boolean
   children: ReactNode
   tenantSlug?: string
   namespace?: string
@@ -65,7 +67,7 @@ export async function MarketingPage({
 
       <main className="relative z-10 mx-auto max-w-3xl px-6 pb-20 pt-10">
         <div className={article ? 'legal-article' : undefined}>
-          {article ? <LegalNav /> : null}
+          {legal ? <LegalNav /> : null}
           {kicker ? (
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-accent">
               {kicker}

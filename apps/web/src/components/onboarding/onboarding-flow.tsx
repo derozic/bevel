@@ -12,7 +12,8 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/24/outline'
 import { Button } from '@bevel/ui'
-import { BevelCutMark } from '@/components/BevelCutMark'
+import { DaypartControl } from '@/components/DaypartControl'
+import { BevelDaypartMark } from '@/components/BevelDaypartMark'
 import { BevelMark } from '@/components/BevelMark'
 import { BEVEL_NAME } from '@/lib/bevel'
 import {
@@ -94,13 +95,16 @@ function OnboardingInner() {
           className="flex items-center gap-3 text-foreground transition hover:opacity-90"
         >
           <span className="flex size-9 items-center justify-center rounded-lg border border-border bg-surface">
-            <BevelCutMark />
+            <BevelDaypartMark className="size-[18px]" />
           </span>
           <BevelMark size="md" />
         </Link>
-        <Button asChild variant="ghost" size="sm">
-          <Link href={skipHref}>Skip to workspace</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <DaypartControl compact className="hidden sm:flex" />
+          <Button asChild variant="ghost" size="sm">
+            <Link href={skipHref}>Skip to workspace</Link>
+          </Button>
+        </div>
       </header>
 
       <main className="relative z-10 mx-auto max-w-3xl px-6 pb-20 pt-6">

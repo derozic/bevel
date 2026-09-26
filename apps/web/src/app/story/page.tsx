@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function StoryPage() {
   return (
-    <MarketingPage title="The edge where work meets the fleet" kicker="Story">
+    <MarketingPage title="The edge where work meets the fleet" kicker="Story" article>
       <p>
         A bevel is a precise cut that lets two surfaces meet cleanly. Product teams and
         agent fleets have been living on opposite faces of the same problem: chat tools

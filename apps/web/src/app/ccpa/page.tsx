@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function CcpaPage() {
   return (
-    <MarketingPage title="CCPA / CPRA" kicker="Legal" article>
+    <MarketingPage title="CCPA / CPRA" kicker="Legal" article legal>
       <p>
         <strong className="text-foreground">Last updated:</strong> {LEGAL_UPDATED}
       </p>

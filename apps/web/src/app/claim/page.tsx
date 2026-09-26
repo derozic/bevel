@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button, cn } from '@bevel/ui'
 import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
+import { PublicAtmosphere } from '@/components/marketing/PublicShell'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { GoogleSignInButton } from '@/app/login/GoogleSignInButton'
 import { BEVEL_NAME } from '@/lib/bevel'
@@ -124,10 +125,7 @@ export default function ClaimPage() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
-      <div className="bevel-home-atmosphere" aria-hidden="true">
-        <div className="bevel-home-mesh" />
-        <div className="bevel-home-grid" />
-      </div>
+      <PublicAtmosphere />
 
       <MarketingSiteHeader
         actions="claim"
@@ -138,6 +136,7 @@ export default function ClaimPage() {
       />
 
       <main className="relative z-10 mx-auto max-w-xl px-6 pb-24 pt-8">
+        <div className="public-panel">
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-accent">
           Secure your namespace
         </p>
@@ -170,7 +169,7 @@ export default function ClaimPage() {
             <GoogleSignInButton
               callbackUrl="/claim"
               label="Continue with Google Workspace"
-              className="bevel-auth-google inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold"
+              className="login-provider"
             />
             <p className="text-center text-xs text-muted">
               Already have a workspace?{' '}
@@ -292,6 +291,7 @@ export default function ClaimPage() {
             </li>
           ))}
         </ul>
+        </div>
       </main>
 
       <SiteFooter />

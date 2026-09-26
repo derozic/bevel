@@ -16,7 +16,9 @@ import type {
 } from '@bevel/schema'
 import { Button, Separator, cn } from '@bevel/ui'
 import { ChannelPreview } from '@/components/home/ChannelPreview'
+import { BevelDaypartMark } from '@/components/BevelDaypartMark'
 import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
+import { PublicAtmosphere } from '@/components/marketing/PublicShell'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import {
   BEVEL_HOME_PATH,
@@ -120,10 +122,7 @@ export function HomePage({
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       {/* Atmosphere: soft mesh first, quiet grid on top */}
-      <div className="bevel-home-atmosphere" aria-hidden="true">
-        <div className="bevel-home-mesh" />
-        <div className="bevel-home-grid" />
-      </div>
+      <PublicAtmosphere />
 
       <MarketingSiteHeader
         actions="home"
@@ -137,6 +136,7 @@ export function HomePage({
         <section className="mx-auto grid max-w-6xl gap-12 px-6 pb-20 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:pb-28 lg:pt-16">
           <div className="space-y-8">
             <div className="space-y-4">
+              <BevelDaypartMark className="h-10 w-10" title="BEVEL" />
               <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted">
                 <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />
                 {[productName, tenantName]
@@ -159,18 +159,18 @@ export function HomePage({
               <Button
                 asChild
                 size="lg"
-                className="bg-[var(--bevel-ink)] text-[var(--bevel-cream)] hover:opacity-90 shadow-[0_0_0_1px_color-mix(in_srgb,var(--bevel-accent)_40%,transparent),0_12px_40px_-12px_var(--bevel-accent)]"
+                className="h-12 rounded-full bg-foreground px-7 text-background hover:opacity-90 shadow-[0_0_0_1px_color-mix(in_srgb,var(--bevel-accent)_40%,transparent),0_12px_40px_-12px_var(--bevel-accent)]"
               >
                 <Link href={primaryHref} data-testid="hero-claim">
                   {primaryLabel}
                 </Link>
               </Button>
               {signedIn ? (
-                <Button asChild variant="secondary" size="lg">
+                <Button asChild variant="secondary" size="lg" className="h-12 rounded-full">
                   <Link href={BEVEL_HOME_PATH}>Go to ~general</Link>
                 </Button>
               ) : (
-                <Button asChild variant="secondary" size="lg">
+                <Button asChild variant="secondary" size="lg" className="h-12 rounded-full">
                   <Link href={secondaryHref}>Sign in to existing workspace</Link>
                 </Button>
               )}
@@ -218,7 +218,7 @@ export function HomePage({
                 <li
                   key={title}
                   className={cn(
-                    'group rounded-2xl border border-border bg-background/60 p-6 transition',
+                    'group rounded-2xl border border-border bg-surface/70 p-6 transition',
                     'hover:border-accent/45',
                   )}
                 >

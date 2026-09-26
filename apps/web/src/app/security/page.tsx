@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function SecurityPage() {
   return (
-    <MarketingPage title="Security" kicker="Trust" article>
+    <MarketingPage title="Security" kicker="Trust" article legal>
       <p>
         <strong className="text-foreground">Last updated:</strong> {LEGAL_UPDATED}
       </p>

@@ -16,12 +16,12 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <MarketingPage title="Privacy Policy" kicker="Legal" article>
+    <MarketingPage title="Privacy Policy" kicker="Legal" article legal>
       <p>
         <strong className="text-foreground">Last updated:</strong> {LEGAL_UPDATED}
       </p>
       <p>
-        {LEGAL_OPERATOR} (“Earthena,” “we,” “us”) operates {LEGAL_PRODUCT}. This policy
+        {LEGAL_OPERATOR} (“Entity,” “we,” “us”) operates {LEGAL_PRODUCT}. This policy
         describes how we handle personal information when you use our sites, apps, and
         APIs. For EEA/UK rights see our{' '}
         <Link href="/gdpr" className="text-accent hover:underline">
@@ -40,9 +40,9 @@ export default function PrivacyPage() {
 
       <h2 className="pt-4 text-xl font-semibold text-foreground">Who is responsible</h2>
       <p>
-        Earthena is the controller of account, billing, and platform telemetry data.
+        Entity is the controller of account, billing, and platform telemetry data.
         When you use a workspace, your organization is typically the controller of
-        channel content and membership; Earthena processes that content as a processor
+        channel content and membership; Entity processes that content as a processor
         under our{' '}
         <Link href="/dpa" className="text-accent hover:underline">
           DPA
