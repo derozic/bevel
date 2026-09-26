@@ -4,6 +4,21 @@
 
 .fleet-chat {
   color: var(--ink);
+  font-family: var(--bevel-font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.fleet-chat p,
+.fleet-chat li {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
 }
 
 /* Embed mode — compact card inside marketing pages */
@@ -902,7 +917,7 @@
   display: flex;
   align-items: flex-end;
   gap: 0.375rem;
-  max-width: 88%;
+  max-width: min(36rem, 88%);
   animation: fleet-chat-in 0.28s ease-out both;
 }
 
