@@ -44,7 +44,9 @@ export {
 } from './featuresets'
 
 export const TenantAuthPolicySchema = z.object({
-  providers: z.array(z.enum(['google', 'github', 'credentials'])).default(['google']),
+  providers: z
+    .array(z.enum(['google', 'github', 'microsoft', 'credentials']))
+    .default(['google']),
   allowedEmailDomains: z.array(z.string()).optional(),
   allowedEmails: z.array(z.string().email()).optional(),
   /** Domains that route to this tenant first after platform (bevel.lvh.me) login. */

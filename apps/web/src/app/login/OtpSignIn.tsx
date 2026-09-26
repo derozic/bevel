@@ -1,38 +1,64 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import type { OtpChannel } from '@bevel/auth'
+import { detectOtpChannel, writeLastUsedMethod } from './login-methods'
+
+const RESEND_SEC = 45
 
 /**
- * Email or SMS one-time code sign-in.
- * 1) send code → 2) verify via Auth.js credentials provider "otp"
+ * Unified mobile-or-email destination, then one long OTP line.
+ * Email → magic link + 6-digit backup. Phone → SMS code.
  */
 export function OtpSignIn({
   callbackUrl = '/welcome',
+  onStepChange,
 }: {
   callbackUrl?: string
+  onStepChange?: (step: 'dest' | 'code') => void
 }) {
-  const [channel, setChannel] = useState<OtpChannel>('email')
   const [destination, setDestination] = useState('')
+  const [channel, setChannel] = useState<OtpChannel>('sms')
   const [code, setCode] = useState('')
   const [step, setStep] = useState<'dest' | 'code'>('dest')
   const [masked, setMasked] = useState('')
   const [devCode, setDevCode] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [info, setInfo] = useState<string | null>(null)
+  const [resendIn, setResendIn] = useState(0)
+  const verifying = useRef(false)
+  const otpInput = useRef<HTMLInputElement>(null)
 
-  const sendCode = async () => {
+  useEffect(() => {
+    onStepChange?.(step)
+  }, [step, onStepChange])
+
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const id = window.setTimeout(() => setResendIn((s) => Math.max(0, s - 1)), 1000)
+    return () => window.clearTimeout(id)
+  }, [resendIn])
+
+  useEffect(() => {
+    if (step === 'code') otpInput.current?.focus()
+  }, [step])
+
+  const sendCode = async (dest = destination, forced?: OtpChannel) => {
+    const detected = forced ?? detectOtpChannel(dest)
+    if (!detected) {
+      setError('Enter a mobile number or an email address.')
+      return
+    }
     setPending(true)
     setError(null)
-    setInfo(null)
     setDevCode(null)
+    setChannel(detected)
     try {
       const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel, destination: destination.trim() }),
+        body: JSON.stringify({ channel: detected, destination: dest.trim() }),
       })
       const data = (await res.json()) as {
         ok?: boolean
@@ -46,17 +72,13 @@ export function OtpSignIn({
           data.error ??
             (res.status === 402
               ? 'Mobile OTP requires a paid BEVEL plan. Use email or Google.'
-              : 'Could not send code'),
+              : 'Could not send a code.'),
         )
         return
       }
-      setMasked(data.masked ?? destination)
+      setMasked(data.masked ?? dest)
       setStep('code')
-      setInfo(
-        data.simulated
-          ? `Code sent (dev simulation) to ${data.masked ?? 'you'}.`
-          : `Code sent to ${data.masked ?? 'you'}.`,
-      )
+      setResendIn(RESEND_SEC)
       if (data.devCode) setDevCode(data.devCode)
     } catch {
       setError('Network error — try again.')
@@ -65,7 +87,10 @@ export function OtpSignIn({
     }
   }
 
-  const verify = async () => {
+  const verify = async (value = code) => {
+    const trimmed = value.trim()
+    if (trimmed.length < 6 || verifying.current) return
+    verifying.current = true
     setPending(true)
     setError(null)
     try {
@@ -73,7 +98,7 @@ export function OtpSignIn({
         redirect: false,
         callbackUrl,
         channel,
-        otp: code.trim(),
+        otp: trimmed,
         ...(channel === 'email'
           ? { email: destination.trim() }
           : { phone: destination.trim() }),
@@ -85,8 +110,10 @@ export function OtpSignIn({
             : result.error,
         )
         setPending(false)
+        verifying.current = false
         return
       }
+      writeLastUsedMethod(channel === 'email' ? 'email-link' : 'phone')
       if (result?.url) {
         window.location.href = result.url
         return
@@ -95,144 +122,127 @@ export function OtpSignIn({
     } catch {
       setError('Sign-in failed. Try again.')
       setPending(false)
+      verifying.current = false
     }
   }
 
-  return (
-    <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-foreground">
-          Sign in with a code
-        </p>
-        <div className="flex rounded-lg border border-border p-0.5 text-xs">
+  useEffect(() => {
+    if (step === 'code' && code.length === 6 && !pending) {
+      void verify(code)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, step])
+
+  if (step === 'code') {
+    return (
+      <div className="space-y-5">
+        <div className="text-center">
+          <p className="text-sm font-semibold text-foreground">Enter the code we sent</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            {channel === 'email'
+              ? 'Check your inbox for the link, or type the 6-digit backup sent to '
+              : 'We texted a 6-digit code to '}
+            <span className="font-medium text-foreground">{masked}</span>.
+          </p>
+        </div>
+        {devCode ? (
+          <p className="rounded-xl border border-dashed border-accent/40 bg-accent/10 px-3 py-2 text-center font-mono text-xs text-accent">
+            Dev code: {devCode}
+          </p>
+        ) : null}
+        <label className="block">
+          <span className="sr-only">One-time code</span>
+          <input
+            ref={otpInput}
+            className="login-otp"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder=""
+            value={code}
+            aria-label="One-time code"
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                void verify()
+              }
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={pending || code.length < 6}
+          onClick={() => void verify()}
+          className="login-provider login-provider--apple"
+        >
+          {pending ? 'Verifying…' : 'Verify and sign in'}
+        </button>
+        <div className="flex flex-col gap-2 text-center text-xs">
           <button
             type="button"
-            className={`rounded-md px-2.5 py-1 font-medium transition ${
-              channel === 'email'
-                ? 'bg-accent text-white'
-                : 'text-muted hover:text-foreground'
-            }`}
-            onClick={() => {
-              setChannel('email')
-              setStep('dest')
-              setCode('')
-              setError(null)
-            }}
+            disabled={pending || resendIn > 0}
+            className="font-medium text-muted hover:text-foreground disabled:opacity-50"
+            onClick={() => void sendCode(destination, channel)}
           >
-            Email
+            {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
           </button>
           <button
             type="button"
-            className={`rounded-md px-2.5 py-1 font-medium transition ${
-              channel === 'sms'
-                ? 'bg-accent text-white'
-                : 'text-muted hover:text-foreground'
-            }`}
+            className="font-medium text-muted hover:text-foreground"
             onClick={() => {
-              setChannel('sms')
               setStep('dest')
               setCode('')
               setError(null)
+              verifying.current = false
             }}
           >
-            Mobile
+            Use a different number or email
           </button>
         </div>
-      </div>
-
-      {step === 'dest' ? (
-        <>
-          <label className="block space-y-1 text-sm">
-            <span className="font-medium text-foreground">
-              {channel === 'email' ? 'Work email' : 'Mobile number'}
-            </span>
-            <input
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-accent"
-              type={channel === 'email' ? 'email' : 'tel'}
-              inputMode={channel === 'email' ? 'email' : 'tel'}
-              autoComplete={channel === 'email' ? 'email' : 'tel'}
-              placeholder={
-                channel === 'email' ? 'you@company.com' : '+15551234567'
-              }
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  void sendCode()
-                }
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            disabled={pending || !destination.trim()}
-            onClick={() => void sendCode()}
-            className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-border bg-surface text-sm font-semibold text-foreground transition hover:bg-accent/10 disabled:opacity-60"
-          >
-            {pending ? 'Sending…' : 'Send code'}
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="text-xs text-muted">
-            Enter the 6-digit code sent to{' '}
-            <span className="font-medium text-foreground">{masked}</span>
+        {error ? (
+          <p className="text-center text-xs text-danger" role="alert">
+            {error}
           </p>
-          {devCode ? (
-            <p className="rounded-lg border border-dashed border-accent/40 bg-accent/5 px-3 py-2 font-mono text-xs text-accent">
-              Dev code: {devCode}
-            </p>
-          ) : null}
-          <label className="block space-y-1 text-sm">
-            <span className="font-medium text-foreground">One-time code</span>
-            <input
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 font-mono text-lg tracking-[0.3em] outline-none focus:border-accent"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={8}
-              placeholder="••••••"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  void verify()
-                }
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            disabled={pending || code.trim().length < 4}
-            onClick={() => void verify()}
-            className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-accent text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-          >
-            {pending ? 'Verifying…' : 'Verify and sign in'}
-          </button>
-          <button
-            type="button"
-            className="w-full text-center text-xs font-medium text-muted hover:text-foreground"
-            onClick={() => {
-              setStep('dest')
-              setCode('')
-              setError(null)
-              setInfo(null)
-            }}
-          >
-            Use a different {channel === 'email' ? 'email' : 'number'}
-          </button>
-        </>
-      )}
+        ) : null}
+      </div>
+    )
+  }
 
+  return (
+    <div className="space-y-3">
+      <label className="block">
+        <span className="sr-only">Mobile or email</span>
+        <input
+          className="login-dest"
+          type="text"
+          inputMode="email"
+          autoComplete="username"
+          placeholder="Mobile or email"
+          value={destination}
+          aria-label="Mobile or email"
+          data-cta="phone"
+          onChange={(e) => setDestination(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              void sendCode()
+            }
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        disabled={pending || !destination.trim()}
+        onClick={() => void sendCode()}
+        className="login-provider"
+        data-cta="email-link"
+      >
+        {pending ? 'Sending…' : 'Continue'}
+      </button>
       {error ? (
-        <p className="text-xs text-danger" role="alert">
+        <p className="text-center text-xs text-danger" role="alert">
           {error}
-        </p>
-      ) : null}
-      {info && !error ? (
-        <p className="text-xs text-muted" role="status">
-          {info}
         </p>
       ) : null}
     </div>

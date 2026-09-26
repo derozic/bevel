@@ -4,6 +4,7 @@ import { Bars3Icon } from '@heroicons/react/24/outline'
 import { Button } from '@bevel/ui'
 import { BevelDaypartMark } from '@/components/BevelDaypartMark'
 import { BevelMark } from '@/components/BevelMark'
+import { DaypartControl } from '@/components/DaypartControl'
 import { MARKETING_NAV, signedInProductHome } from '@/lib/marketing'
 
 export type MarketingSiteHeaderActions = 'home' | 'claim' | 'marketing'
@@ -177,7 +178,10 @@ function MobileNav({ hideOn = 'md' }: { hideOn?: 'sm' | 'md' }) {
         <Bars3Icon className="size-5" aria-hidden />
         <span className="sr-only">Menu</span>
       </summary>
-      <div className="absolute right-0 z-50 mt-2 w-48 rounded-xl border border-border bg-surface p-2 shadow-xl">
+      <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-border bg-surface p-2 shadow-xl">
+        <div className="px-1 pb-2">
+          <DaypartControl compact />
+        </div>
         {MARKETING_NAV.map((item) => (
           <Link
             key={item.href}
@@ -246,6 +250,7 @@ export function MarketingSiteHeader({
       <BrandLink />
       <nav className="flex flex-nowrap items-center justify-end gap-1 sm:gap-2">
         <MarketingNavLinks hideOn={navHide} />
+        <DaypartControl compact className="hidden sm:flex" />
         {trailing}
         <MobileNav hideOn={navHide} />
       </nav>

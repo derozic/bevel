@@ -16,8 +16,14 @@ const OPTIONS: { id: DaypartPreference; label: string }[] = [
   })),
 ]
 
-/** Compact day-part switcher for the rail footer — Auto is default. */
-export function DaypartControl({ className }: { className?: string }) {
+/** Compact day-part switcher — Auto is default. `compact` hides the greeting. */
+export function DaypartControl({
+  className,
+  compact = false,
+}: {
+  className?: string
+  compact?: boolean
+}) {
   const prefs = usePreferencesOptional()
   if (!prefs) return null
 
@@ -26,8 +32,17 @@ export function DaypartControl({ className }: { className?: string }) {
   const meta = DAYPART_META[resolved]
 
   return (
-    <div className={className ? `bevel-daypart-control ${className}` : 'bevel-daypart-control'}>
-      <p className="bevel-daypart-control__label">Day part</p>
+    <div
+      className={
+        className
+          ? `bevel-daypart-control ${className}`
+          : 'bevel-daypart-control'
+      }
+      data-compact={compact ? 'true' : 'false'}
+    >
+      {compact ? null : (
+        <p className="bevel-daypart-control__label">Day part</p>
+      )}
       <div className="bevel-daypart-control__row" role="group" aria-label="Day part">
         {OPTIONS.map((opt) => (
           <button
@@ -48,11 +63,13 @@ export function DaypartControl({ className }: { className?: string }) {
           </button>
         ))}
       </div>
-      <p className="bevel-daypart-control__meta">
-        {preference === 'auto' ? `Auto · ${meta.label}` : meta.label}
-        {' · '}
-        {meta.greeting}
-      </p>
+      {compact ? null : (
+        <p className="bevel-daypart-control__meta">
+          {preference === 'auto' ? `Auto · ${meta.label}` : meta.label}
+          {' · '}
+          {meta.greeting}
+        </p>
+      )}
     </div>
   )
 }

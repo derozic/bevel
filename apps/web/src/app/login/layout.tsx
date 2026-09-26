@@ -7,15 +7,11 @@ import {
   isPlatformEntryTenantSlug,
   platformEntryTenant,
 } from '@bevel/tenant-config'
-import { BevelCutMark } from '@/components/BevelCutMark'
 import { BevelMark } from '@/components/BevelMark'
+import { LoginDaypartBar } from '@/components/login/LoginDaypartBar'
 
 /**
- * Login shell:
- * - bevel.is (platform entry) → BEVEL cut-mark + wordmark only (never customer brands)
- * - org hosts (e.g. bevel.2x4m.cc) → that tenant's name/logo after host resolve
- *
- * Customer logos only appear on *their* host, not on the platform login.
+ * Login shell: void canvas + quiet wordmark. The card itself is the object.
  */
 export default async function LoginLayout({ children }: { children: ReactNode }) {
   const headerStore = await headers()
@@ -45,101 +41,44 @@ export default async function LoginLayout({ children }: { children: ReactNode })
   const year = new Date().getFullYear()
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="relative z-50 border-b border-border bg-surface/80 backdrop-blur-sm">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="flex items-center gap-3 text-foreground transition hover:opacity-90"
-          >
-            {isPlatform ? (
-              <>
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-foreground">
-                  <BevelCutMark className="text-foreground" />
-                </span>
-                <BevelMark size="md" className="text-foreground" />
-              </>
-            ) : (
-              <>
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-foreground">
-                  <BevelCutMark className="text-foreground" />
-                </span>
-                <span className="font-display text-sm font-semibold tracking-tight text-foreground">
-                  {productName}
-                </span>
-              </>
-            )}
-            {isPlatform ? (
-              <span className="hidden text-sm text-muted sm:inline">
-                channels for humans and agents
-              </span>
-            ) : null}
-          </Link>
-          <nav className="flex items-center gap-4 text-sm font-semibold text-muted">
-            {isPlatform ? (
-              <>
-                <Link href="/about" className="transition hover:text-foreground">
-                  About
-                </Link>
-                <Link
-                  href="/download"
-                  className="hidden transition hover:text-foreground sm:inline"
-                >
-                  Download
-                </Link>
-                <Link href="/claim" className="transition hover:text-foreground">
-                  Claim
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href="/" className="transition hover:text-foreground">
-                  Workspace
-                </Link>
-                <Link href="/login" className="transition hover:text-foreground">
-                  Sign in
-                </Link>
-              </>
-            )}
-          </nav>
-        </div>
+    <div className="login-stage">
+      <div className="login-stage__grid" aria-hidden />
+      <header className="login-stage__header flex items-center justify-between gap-3 px-5 py-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-foreground/80 transition hover:text-foreground"
+        >
+          {isPlatform ? (
+            <BevelMark size="md" className="text-foreground" />
+          ) : (
+            <span className="text-xs font-semibold tracking-[0.22em] uppercase">
+              {productName}
+            </span>
+          )}
+        </Link>
+        <LoginDaypartBar />
       </header>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-12 sm:px-6 sm:py-16">
-        <div className="w-full max-w-md">{children}</div>
-      </div>
+      <div className="login-stage__main">{children}</div>
 
-      <footer className="border-t border-border py-6 text-center text-xs text-muted">
-        {isPlatform ? (
-          <>
-            <span>© {year} BEVEL</span>
-            <span className="mx-2">·</span>
-            <Link href="/" className="font-medium hover:text-foreground">
-              Home
-            </Link>
-            <span className="mx-2">·</span>
-            <Link href="/privacy" className="font-medium hover:text-foreground">
-              Privacy
-            </Link>
-          </>
-        ) : (
-          <>
-            <span>
-              © {year} {productName}
-            </span>
-            <span className="mx-2">·</span>
-            <Link href="/" className="font-medium hover:text-foreground">
-              Workspace
-            </Link>
-            <span className="mx-2">·</span>
-            <Link
-              href="https://bevel.is"
-              className="font-medium hover:text-foreground"
-            >
-              Powered by BEVEL
-            </Link>
-          </>
-        )}
+      <footer className="login-stage__footer px-5 py-5 text-center text-[11px] text-muted">
+        <span>© {year} {isPlatform ? 'BEVEL' : productName}</span>
+        <span className="mx-2">·</span>
+        <Link href="/terms" className="hover:text-foreground">
+          Terms
+        </Link>
+        <span className="mx-2">·</span>
+        <Link href="/privacy" className="hover:text-foreground">
+          Privacy
+        </Link>
+        <span className="mx-2">·</span>
+        <Link href="/gdpr" className="hover:text-foreground">
+          GDPR
+        </Link>
+        <span className="mx-2">·</span>
+        <Link href="/ccpa" className="hover:text-foreground">
+          CCPA
+        </Link>
       </footer>
     </div>
   )

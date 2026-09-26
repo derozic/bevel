@@ -8,15 +8,14 @@ import {
   platformEntryTenant,
 } from '@bevel/tenant-config'
 import {
-  isGitHubAuthConfigured,
+  isAppleAuthConfigured,
   isGoogleAuthConfigured,
+  isMicrosoftAuthConfigured,
   isOtpAuthEnabled,
 } from '@bevel/auth'
 import { auth } from '@/auth'
-import { BevelCutMark } from '@/components/BevelCutMark'
-import { BevelMark } from '@/components/BevelMark'
-import { GitHubSignInButton, GoogleSignInButton } from './GoogleSignInButton'
-import { OtpSignIn } from './OtpSignIn'
+import { LoginBevelFrame } from '@/components/login/LoginBevelFrame'
+import { LoginPanel } from './LoginPanel'
 import {
   NATIVE_COMPLETE_PATH,
   NATIVE_RETURNED_COOKIE,
@@ -26,7 +25,7 @@ import { csrfTokenFromCookies } from '@/lib/csrf-cookie'
 
 const ERROR_COPY: Record<string, string> = {
   Configuration:
-    'Google sign-in did not finish. Clear session cookies below, then try Continue with Google Workspace again.',
+    'Google sign-in did not finish. Clear session cookies below, then try Continue with Google again.',
   InvalidCheck:
     'Google sign-in could not be verified (the login cookie was missing). Clear session cookies below and try again.',
   AccessDenied:
@@ -34,19 +33,24 @@ const ERROR_COPY: Record<string, string> = {
   OAuthAccountNotLinked:
     'This email is already linked to another sign-in method. Try the original provider.',
   OAuthCallback:
-    'Google returned an error. Confirm the OAuth redirect URI matches this host’s /api/auth/callback/google.',
-  OAuthSignin: 'Could not start Google sign-in. Try again in a moment.',
+    'The identity provider returned an error. Confirm the OAuth redirect URI matches this host.',
+  OAuthSignin: 'Could not start sign-in. Try again in a moment.',
   MissingCSRF:
-    'Sign-in form expired. Hard-refresh this page, then try Continue with Google again.',
+    'Sign-in form expired. Hard-refresh this page, then try again.',
   Verification:
-    'Sign-in link expired or already used. Start Google sign-in again from this page.',
+    'Sign-in link expired or already used. Start sign-in again from this page.',
   Default: 'Sign-in failed. Try again, or contact your workspace admin.',
   Callback:
-    'Sign-in callback failed after Google. If this persists, contact support — server auth logs will show the cause.',
+    'Sign-in callback failed. If this persists, contact support — server auth logs will show the cause.',
   CallbackRouteError:
-    'Google signed you in, but BEVEL could not finish the session. Reload and try again.',
+    'Signed in, but BEVEL could not finish the session. Reload and try again.',
   OAuthCallbackError:
-    'Google returned an error during sign-in. Try again, or use a different Google account.',
+    'The identity provider returned an error during sign-in. Try again, or use a different account.',
+  Apple:
+    'Apple sign-in is not configured on this server yet. Use Google.',
+  AppleCancelled: 'Apple sign-in was cancelled.',
+  Microsoft:
+    'Microsoft sign-in is not configured on this server yet. Use Google.',
   HandoffMissing: 'Session handoff code was missing. Sign in again from this host.',
   HandoffFailed:
     'Could not complete cross-host sign-in. Sign in directly on this workspace host, or try again.',
@@ -58,6 +62,7 @@ export default async function LoginPage({
   searchParams: Promise<{
     callbackUrl?: string
     error?: string
+    message?: string
     native?: string
     return?: string
   }>
@@ -66,10 +71,11 @@ export default async function LoginPage({
   const params = await searchParams
   const nativeReturn = isNativeLoginRequest(params)
   const errorKey = params.error ?? ''
-  const errorMessage = errorKey
-    ? (ERROR_COPY[errorKey] ?? ERROR_COPY.Default)
-    : null
-  // Surface a clear-session escape when Auth.js reports JWT/session breakage.
+  const errorMessage = params.message
+    ? params.message
+    : errorKey
+      ? (ERROR_COPY[errorKey] ?? ERROR_COPY.Default)
+      : null
 
   const headerStore = await headers()
   const host = (
@@ -81,7 +87,6 @@ export default async function LoginPage({
     .toLowerCase()
     .split(':')[0]
   const platformEntry = isPlatformEntryHost(host)
-  // Soft resolve: org hosts use YAML/DB registry; apex uses synthetic platform tenant.
   const tenant =
     (await getTenantFromRequest()) ??
     (platformEntry ? platformEntryTenant(host || 'bevel.is') : null)
@@ -91,9 +96,6 @@ export default async function LoginPage({
   const isPlatformTenant = isPlatformEntryTenantSlug(tenant.slug)
   const isPlatform = platformEntry || isPlatformTenant
 
-  // Flutter sends native=1. Absolute callback URLs used to be discarded
-  // (must start with /), so Auth.js landed on /welcome and never returned
-  // to the desktop app.
   const rawCallback =
     nativeReturn
       ? NATIVE_COMPLETE_PATH
@@ -109,7 +111,6 @@ export default async function LoginPage({
     '/api/auth/signin',
     '/api/auth/callback',
   ])
-  // /welcome is the post-login router (chooser / org handoff). Honor it.
   const callbackUrl =
     nativeReturn || callbackPathOnly === NATIVE_COMPLETE_PATH
       ? NATIVE_COMPLETE_PATH
@@ -121,10 +122,7 @@ export default async function LoginPage({
   const nativeAlreadyReturned =
     cookieJar.get(NATIVE_RETURNED_COOKIE)?.value === '1'
   const csrfToken = csrfTokenFromCookies((name) => cookieJar.get(name)?.value)
-  // Do not redirect away when Auth.js returned an error — that hid the
-  // failure and looped /login?error= → /welcome → /login.
   if (session?.user?.email && !errorKey) {
-    // Already bounced into the Mac app — do not send the browser around again.
     if (!(nativeReturn && nativeAlreadyReturned)) {
       redirect(callbackUrl)
     }
@@ -136,15 +134,13 @@ export default async function LoginPage({
       isPlatformTenant) &&
     isGoogleAuthConfigured()
 
-  // Native Google OAuth is registered on bevel.is. Local .lvh.me often has no
-  // Google client / redirect URI — bounce the Mac/iOS app to production.
   if (nativeReturn && !googleOk && host !== 'bevel.is' && host !== 'www.bevel.is') {
     redirect(
       `https://bevel.is/login?native=1&callbackUrl=${NATIVE_COMPLETE_PATH}`,
     )
   }
-  const githubOk =
-    tenant.auth.providers.includes('github') && isGitHubAuthConfigured()
+  const appleOk = isAppleAuthConfigured()
+  const microsoftOk = isMicrosoftAuthConfigured()
   const otpOk = isOtpAuthEnabled()
 
   const workspaceLabel = (
@@ -153,209 +149,87 @@ export default async function LoginPage({
     tenant.slug
   ).replace(/\s+Agents$/i, '')
 
-  // Org workspaces only: list that tenant’s allowed domains. Never show another
-  // customer’s domains (e.g. 2x4m) on the platform entry host.
-  const domains =
-    !isPlatform &&
-    tenant.auth.allowedEmailDomains &&
-    tenant.auth.allowedEmailDomains.length > 0
-      ? tenant.auth.allowedEmailDomains.map((domain) => ({
-          domain,
-          label: `@${domain}`,
-        }))
-      : []
-
-  const explicitEmails =
-    !isPlatform &&
-    tenant.auth.allowedEmails &&
-    tenant.auth.allowedEmails.length > 0
-      ? tenant.auth.allowedEmails
-      : []
-
-  const title = isPlatform
-    ? 'Find your workspace'
-    : `Sign in to ${workspaceLabel}`
-
+  const title = isPlatform ? 'Welcome to Bevel' : `Welcome to ${workspaceLabel}`
   const subtitle = isPlatform
-    ? 'Sign in with Google or email to open your organization workspace — or claim a new one. Channels for humans and agents.'
-    : `Sign in with an authorized account for ${workspaceLabel}. Open channels, agents, and workspace tools.`
+    ? 'Choose your work account to get started.'
+    : `Sign in with an authorized work account for ${workspaceLabel}.`
 
   return (
-    <div className="w-full rounded-2xl border border-border bg-surface p-8 shadow-sm sm:p-10">
-      <div className="mb-6 flex flex-col items-center gap-3">
-        {isPlatform ? (
-          <>
-            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-background text-foreground">
-              <BevelCutMark className="h-7 w-7 text-foreground" />
-            </span>
-            <BevelMark size="lg" className="text-foreground" />
-          </>
-        ) : (
-          <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-background text-foreground">
-            <BevelCutMark className="h-7 w-7 text-foreground" />
-          </span>
-        )}
-      </div>
-
-      <h1 className="text-center font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-        {title}
-      </h1>
-      <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-muted">
-        {subtitle}
-      </p>
-      {nativeReturn ? (
-        <p className="mx-auto mt-4 max-w-md rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm leading-relaxed text-muted">
-          {nativeAlreadyReturned
-            ? 'You can close this tab. Finish in the BEVEL app.'
-            : 'After Google, this browser will send you back to the BEVEL app. Stay here until that handoff finishes.'}
+    <div className="flex w-full flex-col items-center">
+      <LoginBevelFrame>
+        <h1 className="text-center font-display text-[2rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.35rem]">
+          {title}
+        </h1>
+        <p className="mx-auto mt-3 max-w-sm text-center text-[15px] leading-relaxed text-muted">
+          {subtitle}
         </p>
-      ) : null}
 
-      {errorMessage ? (
-        <div
-          role="alert"
-          className="mt-6 space-y-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-        >
-          <p>{errorMessage}</p>
-          <p className="text-xs text-red-700">
-            Stuck in a redirect loop?{' '}
-            <a
-              className="font-semibold underline underline-offset-2"
-              href="/login?clear=1"
-            >
-              Clear session cookies and try again
-            </a>
-            .
+        {nativeReturn ? (
+          <p className="mt-4 rounded-xl border border-border bg-background/40 px-4 py-3 text-center text-sm leading-relaxed text-muted">
+            {nativeAlreadyReturned
+              ? 'You can close this tab. Finish in the BEVEL app.'
+              : 'After you sign in, this browser will send you back to the BEVEL app. Stay here until that handoff finishes.'}
           </p>
-        </div>
-      ) : null}
+        ) : null}
 
-      <div className="mt-8 space-y-4">
-        {nativeAlreadyReturned ? (
-          <p className="text-center text-sm text-muted">
-            Return to the desktop window. Signing in again here will loop.
-          </p>
-        ) : googleOk ? (
-          <GoogleSignInButton
-            callbackUrl={callbackUrl}
-            label="Continue with Google Workspace"
-            csrfToken={csrfToken}
-          />
-        ) : (
-          <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted">
-            Google sign-in is not configured on this server.
+        {errorMessage ? (
+          <div
+            role="alert"
+            className="mt-5 space-y-2 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
+          >
+            <p>{errorMessage}</p>
+            <p className="text-xs text-danger/80">
+              Stuck in a redirect loop?{' '}
+              <a
+                className="font-semibold underline underline-offset-2"
+                href="/login?clear=1"
+              >
+                Clear session cookies and try again
+              </a>
+              .
+            </p>
           </div>
-        )}
-
-        {githubOk && !nativeAlreadyReturned ? (
-          <GitHubSignInButton callbackUrl={callbackUrl} csrfToken={csrfToken} />
         ) : null}
 
-        {otpOk && !nativeAlreadyReturned ? (
-          <>
-            <div className="relative py-1 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
-              <span className="relative z-10 bg-surface px-2">or</span>
-              <span
-                className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border"
-                aria-hidden
-              />
-            </div>
-            <OtpSignIn callbackUrl={callbackUrl} />
-          </>
-        ) : null}
-      </div>
+        <div className="mt-8">
+          {nativeAlreadyReturned ? (
+            <p className="text-center text-sm text-muted">
+              Return to the desktop window. Signing in again here will loop.
+            </p>
+          ) : (
+            <LoginPanel
+              callbackUrl={callbackUrl}
+              csrfToken={csrfToken}
+              googleOk={googleOk}
+              appleOk={appleOk}
+              microsoftOk={microsoftOk}
+              otpOk={otpOk}
+            />
+          )}
+        </div>
+      </LoginBevelFrame>
 
       {isPlatform ? (
-        <div className="mt-8 rounded-xl border border-dashed border-border bg-background p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-foreground">
-            New organization?
-          </p>
-          <p className="mt-2 text-xs leading-relaxed text-muted">
-            Claim a BEVEL workspace for your company domain. No customer brands
-            are shown here — you only see your workspace after sign-in.
-          </p>
-          <p className="mt-3">
-            <Link
-              href="/claim"
-              className="text-xs font-semibold text-foreground underline-offset-2 hover:underline"
-            >
-              Claim workspace
-            </Link>
-            {' · '}
-            <Link
-              href="/workspaces"
-              className="text-xs font-semibold text-foreground underline-offset-2 hover:underline"
-            >
-              Browse workspaces
-            </Link>
-          </p>
-        </div>
-      ) : domains.length > 0 || explicitEmails.length > 0 ? (
-        <div className="mt-8 rounded-xl border border-dashed border-border bg-background p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-foreground">
-            Authorized for this workspace
-          </p>
-          <ul className="mt-2 space-y-1 text-xs text-muted">
-            {domains.map(({ domain, label }) => (
-              <li key={domain}>{label}</li>
-            ))}
-            {explicitEmails.map((email) => (
-              <li key={email}>{email}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <p className="mt-6 text-center text-xs text-muted">
-        {isPlatform ? (
-          <>
-            <Link
-              href="/download"
-              className="font-semibold text-gray-800 underline-offset-2 hover:underline"
-            >
-              Download app
-            </Link>
-            {' · '}
-            <Link
-              href="/about"
-              className="font-semibold text-gray-800 underline-offset-2 hover:underline"
-            >
-              About BEVEL
-            </Link>
-            {errorKey === 'AccessDenied' ? (
-              <>
-                {' · '}
-                <Link
-                  href="/claim"
-                  className="font-semibold text-gray-800 underline-offset-2 hover:underline"
-                >
-                  Claim workspace
-                </Link>
-              </>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <Link
-              href="https://bevel.is"
-              className="font-semibold text-gray-800 underline-offset-2 hover:underline"
-            >
-              BEVEL platform
-            </Link>
-            {errorKey === 'AccessDenied' ? (
-              <>
-                {' · '}
-                <Link
-                  href="https://bevel.is/claim"
-                  className="font-semibold text-gray-800 underline-offset-2 hover:underline"
-                >
-                  Claim workspace
-                </Link>
-              </>
-            ) : null}
-          </>
-        )}
-      </p>
+        <p className="mt-6 text-center text-xs text-muted">
+          New organization?{' '}
+          <Link href="/claim" className="font-semibold text-foreground/80 underline-offset-2 hover:underline">
+            Claim a workspace
+          </Link>
+          {' · '}
+          <Link href="/download" className="font-semibold text-foreground/80 underline-offset-2 hover:underline">
+            Download the app
+          </Link>
+        </p>
+      ) : (
+        <p className="mt-6 text-center text-xs text-muted">
+          <Link
+            href="https://bevel.is"
+            className="font-semibold text-foreground/80 underline-offset-2 hover:underline"
+          >
+            BEVEL platform
+          </Link>
+        </p>
+      )}
     </div>
   )
 }

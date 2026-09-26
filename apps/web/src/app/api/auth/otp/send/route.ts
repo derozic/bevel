@@ -72,8 +72,9 @@ export async function POST(request: Request) {
     }
   }
 
-  // SMS gates before issueOtp — avoid orphaned codes and closed-org admits
-  if (channel === 'sms') {
+  // SMS gates before issueOtp — avoid orphaned codes and closed-org admits.
+  // Apex / platform entry always allows phone (Private is available after login).
+  if (channel === 'sms' && !platformEntry) {
     if (!tenant || !hasFeature(tenant, 'otpSms')) {
       return NextResponse.json(
         {
@@ -152,8 +153,8 @@ export async function POST(request: Request) {
     delivered = result.delivered
     simulated = result.simulated
   } else {
-    const slug = tenant!.slug
-    const workspace = loadWorkspaceTwilio(slug)
+    const slug = tenant?.slug
+    const workspace = slug ? loadWorkspaceTwilio(slug) : null
     const cfg =
       toTwilioClientConfig(workspace) ??
       ({

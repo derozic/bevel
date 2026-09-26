@@ -22,6 +22,10 @@ describe('marketing structure', () => {
         '/security',
         '/privacy',
         '/terms',
+        '/gdpr',
+        '/ccpa',
+        '/cookies',
+        '/dpa',
         '/claim',
         '/download',
         '/login',
@@ -40,6 +44,10 @@ describe('marketing structure', () => {
     expect(hrefs).toContain('/download')
     expect(hrefs).toContain('/claim')
     expect(hrefs).toContain('/status')
+    expect(hrefs).toContain('/gdpr')
+    expect(hrefs).toContain('/ccpa')
+    expect(hrefs).toContain('/cookies')
+    expect(hrefs).toContain('/dpa')
     expect(hrefs.some((h) => h.startsWith('mailto:hello@bevel.is'))).toBe(true)
   })
 

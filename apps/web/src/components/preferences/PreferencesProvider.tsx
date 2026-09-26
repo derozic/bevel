@@ -50,6 +50,7 @@ export type PreferencesSectionId =
   | 'media'
   | 'integrations'
   | 'privacy'
+  | 'domains'
   | 'security'
 
 /** Save feedback for the prefs shell (Update + autosave + ⌘S). */
@@ -145,6 +146,12 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const persist = useCallback(
     async (value: BevelUserPreferences, source: 'auto' | 'manual') => {
       writeLocalCache(value)
+
+      // Signed-out login (anon) keeps day-part in localStorage only.
+      if (userId === 'anon') {
+        setDirty(false)
+        return
+      }
 
       // Coalesce: one network write at a time; queue one more for the latest value
       if (inFlight.current) {

@@ -5,6 +5,7 @@ import type {
   ResolvedFeatureSet,
   TenantPlan,
 } from '@bevel/schema'
+import { LegalNav } from '@/components/marketing/LegalNav'
 import { MarketingSiteHeader } from '@/components/marketing/MarketingSiteHeader'
 import { SiteFooter } from '@/components/marketing/SiteFooter'
 import { auth } from '@/auth'
@@ -20,9 +21,11 @@ export async function MarketingPage({
   plan,
   featureAccess,
   featureSet,
+  article = false,
 }: {
   title: string
   kicker?: string
+  article?: boolean
   children: ReactNode
   tenantSlug?: string
   namespace?: string
@@ -61,20 +64,23 @@ export async function MarketingPage({
       />
 
       <main className="relative z-10 mx-auto max-w-3xl px-6 pb-20 pt-10">
-        {kicker ? (
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-accent">
-            {kicker}
+        <div className={article ? 'legal-article' : undefined}>
+          {article ? <LegalNav /> : null}
+          {kicker ? (
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-accent">
+              {kicker}
+            </p>
+          ) : null}
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
+            {title}
+          </h1>
+          <div className="prose-bevel mt-8 space-y-4 leading-relaxed">
+            {children}
+          </div>
+          <p className="mt-12 text-sm text-muted">
+            {BEVEL_NAME} · open channels for humans and agents
           </p>
-        ) : null}
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
-          {title}
-        </h1>
-        <div className="prose-bevel mt-8 space-y-4 text-base leading-relaxed text-muted">
-          {children}
         </div>
-        <p className="mt-12 text-sm text-muted">
-          {BEVEL_NAME} · open channels for humans and agents
-        </p>
       </main>
 
       <SiteFooter

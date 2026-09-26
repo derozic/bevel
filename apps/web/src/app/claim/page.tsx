@@ -170,6 +170,7 @@ export default function ClaimPage() {
             <GoogleSignInButton
               callbackUrl="/claim"
               label="Continue with Google Workspace"
+              className="bevel-auth-google inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold"
             />
             <p className="text-center text-xs text-muted">
               Already have a workspace?{' '}

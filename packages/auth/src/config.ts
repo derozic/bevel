@@ -1,6 +1,7 @@
 import './types'
 import Google from 'next-auth/providers/google'
 import GitHub from 'next-auth/providers/github'
+import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id'
 import Credentials from 'next-auth/providers/credentials'
 import { customFetch } from 'next-auth'
 import type { NextAuthConfig } from 'next-auth'
@@ -24,6 +25,15 @@ import {
   verifyOtpCode,
   type OtpChannel,
 } from './otp'
+import { verifyAppleSessionTicket } from './apple'
+import {
+  isMicrosoftAuthConfigured,
+  microsoftClientId,
+  microsoftClientSecret,
+  microsoftIssuer,
+} from './microsoft'
+
+export { isAppleAuthConfigured } from './apple'
 
 export interface CreateTenantAuthConfigOptions {
   /** Tenant resolved from Host (shell / org surface). */
@@ -316,11 +326,29 @@ export function isGitHubAuthConfigured(): boolean {
   return Boolean(id && secret)
 }
 
+export function isOtpEmailConfigured(): boolean {
+  return Boolean(process.env.SENDGRID_API_KEY || process.env.RESEND_API_KEY)
+}
+
+export function isOtpSmsConfigured(): boolean {
+  return Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      (process.env.TWILIO_FROM_NUMBER || process.env.TWILIO_PHONE_NUMBER),
+  )
+}
+
 /** OTP (email + SMS) is always available; delivery needs SMTP and/or Twilio. */
 export function isOtpAuthEnabled(): boolean {
   const flag = process.env.AUTH_OTP_ENABLED
   if (flag === '0' || flag === 'false') return false
   return true
+}
+
+export function isOtpDebugEnabled(): boolean {
+  const flag = process.env.OTP_DEBUG
+  if (flag === '1' || flag === 'true') return process.env.NODE_ENV !== 'production'
+  return process.env.NODE_ENV !== 'production'
 }
 
 export function createTenantAuthConfig(
@@ -414,6 +442,23 @@ export function createTenantAuthConfig(
     )
   }
 
+  if (isMicrosoftAuthConfigured()) {
+    providers.push(
+      MicrosoftEntraID({
+        clientId: microsoftClientId(),
+        clientSecret: microsoftClientSecret(),
+        issuer: microsoftIssuer(),
+        allowDangerousEmailAccountLinking: true,
+        authorization: {
+          params: {
+            scope: 'openid profile email User.Read',
+            prompt: 'select_account',
+          },
+        },
+      }),
+    )
+  }
+
   // GitHub is available for primary sign-in (mode=github) OR account linking
   // for work mode (require_github_for_work) even when primary auth is Google.
   if (isGitHubAuthConfigured()) {
@@ -435,6 +480,33 @@ export function createTenantAuthConfig(
       }),
     )
   }
+
+  // Apple REST callback mints a 2-minute ticket; this provider consumes it.
+  providers.push(
+    Credentials({
+      id: 'apple',
+      name: 'Apple',
+      credentials: {
+        ticket: { label: 'Ticket', type: 'text' },
+      },
+      authorize: async (credentials) => {
+        const ticket =
+          typeof credentials?.ticket === 'string' ? credentials.ticket : ''
+        const claims = await verifyAppleSessionTicket(ticket)
+        if (!claims?.email) return null
+        if (platformEntry) {
+          if (!emailAllowedOnPlatform(claims.email)) return null
+        } else if (!emailAllowedOnTenant(claims.email, tenant)) {
+          return null
+        }
+        return {
+          id: claims.email,
+          email: claims.email,
+          name: claims.name || claims.email.split('@')[0] || claims.email,
+        }
+      },
+    }),
+  )
 
   // Email + SMS OTP (Credentials). Codes issued via /api/auth/otp/send.
   if (isOtpAuthEnabled()) {

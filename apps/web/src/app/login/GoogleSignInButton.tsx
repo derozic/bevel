@@ -1,30 +1,81 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useSession } from 'next-auth/react'
-import { Button } from '@bevel/ui'
+import { writeLastUsedMethod, type LoginMethodCta } from './login-methods'
 
 /**
- * Google / GitHub sign-in.
+ * Google / Microsoft / GitHub sign-in.
  *
  * Native form POST to Auth.js (no Next server actions, no client signIn()).
  */
 export function GoogleSignInButton({
   callbackUrl = '/welcome',
-  label = 'Continue with Google Workspace',
+  label = 'Sign in with Google',
   csrfToken,
+  lastUsed,
+  className,
 }: {
   callbackUrl?: string
   label?: string
   csrfToken?: string | null
+  lastUsed?: boolean
+  className?: string
 }) {
   return (
     <OAuthSignInButton
       provider="google"
       callbackUrl={callbackUrl}
       label={label}
-      variant="primary"
       initialCsrf={csrfToken}
+      dataCta="google"
+      lastUsed={lastUsed}
+      glyph={<GoogleGlyph />}
+      className={className}
+    />
+  )
+}
+
+export function MicrosoftSignInButton({
+  callbackUrl = '/welcome',
+  label = 'Sign in with Microsoft',
+  csrfToken,
+  lastUsed,
+  configured,
+  onUnconfigured,
+}: {
+  callbackUrl?: string
+  label?: string
+  csrfToken?: string | null
+  lastUsed?: boolean
+  configured: boolean
+  onUnconfigured: () => void
+}) {
+  if (!configured) {
+    return (
+      <div className="relative">
+        {lastUsed ? <LastUsedBadge /> : null}
+        <button
+          type="button"
+          className="login-provider"
+          data-cta="microsoft"
+          onClick={onUnconfigured}
+        >
+          <MicrosoftGlyph />
+          {label}
+        </button>
+      </div>
+    )
+  }
+  return (
+    <OAuthSignInButton
+      provider="microsoft-entra-id"
+      callbackUrl={callbackUrl}
+      label={label}
+      initialCsrf={csrfToken}
+      dataCta="microsoft"
+      lastUsed={lastUsed}
+      glyph={<MicrosoftGlyph />}
     />
   )
 }
@@ -43,8 +94,9 @@ export function GitHubSignInButton({
       provider="github"
       callbackUrl={callbackUrl}
       label={label}
-      variant="outline"
       initialCsrf={csrfToken}
+      className="h-12 w-full rounded-full"
+      glyph={null}
     />
   )
 }
@@ -85,14 +137,20 @@ function OAuthSignInButton({
   provider,
   callbackUrl,
   label,
-  variant,
   initialCsrf,
+  dataCta,
+  lastUsed,
+  glyph,
+  className,
 }: {
-  provider: 'google' | 'github'
+  provider: 'google' | 'github' | 'microsoft-entra-id'
   callbackUrl: string
   label: string
-  variant: 'primary' | 'outline'
   initialCsrf?: string | null
+  dataCta?: LoginMethodCta
+  lastUsed?: boolean
+  glyph: ReactNode
+  className?: string
 }) {
   const { status } = useSession()
   const [csrfToken, setCsrfToken] = useState<string | null>(() => {
@@ -105,9 +163,6 @@ function OAuthSignInButton({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // SessionProvider GET /api/auth/session also mints the CSRF cookie.
-    // Fetch csrf only after that settles, or the form token and cookie diverge
-    // (MissingCSRF / "Could not prepare sign-in").
     if (status === 'loading' || csrfToken) return
     let cancelled = false
     void loadCsrfToken()
@@ -127,34 +182,31 @@ function OAuthSignInButton({
     }
   }, [status, csrfToken])
 
-  // Same primitive as HomePage: accent fill, never ink `--color-cta`.
-  const btnClass =
-    variant === 'primary'
-      ? 'bevel-auth-primary h-12 w-full rounded-full'
-      : 'h-12 w-full rounded-full'
-
-  // Native form POST to Auth.js. Do not preventDefault + getCsrfToken() on
-  // submit — that second fetch is what surfaces "Could not prepare sign-in"
-  // when HMR/Caddy interrupts /api/auth/csrf, even though the hidden field
-  // already has a valid token.
   return (
-    <div className="space-y-2">
-      <form method="POST" action={`/api/auth/signin/${provider}`} suppressHydrationWarning>
+    <div className="relative space-y-2">
+      {lastUsed ? <LastUsedBadge /> : null}
+      <form
+        method="POST"
+        action={`/api/auth/signin/${provider}`}
+        suppressHydrationWarning
+        onSubmit={() => {
+          if (dataCta) writeLastUsedMethod(dataCta)
+        }}
+      >
         {csrfToken ? (
           <input type="hidden" name="csrfToken" value={csrfToken} />
         ) : null}
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
-        <Button
+        <button
           type="submit"
-          size="lg"
-          variant={variant === 'primary' ? 'default' : 'outline'}
           disabled={!csrfToken}
-          className={btnClass}
+          className={className ?? 'login-provider'}
+          data-cta={dataCta}
           suppressHydrationWarning
         >
-          {provider === 'google' ? <GoogleGlyph /> : null}
+          {glyph}
           {label}
-        </Button>
+        </button>
       </form>
       {error ? (
         <p className="text-xs text-danger" role="alert">
@@ -165,29 +217,40 @@ function OAuthSignInButton({
   )
 }
 
+function LastUsedBadge() {
+  return <span className="login-last-used">Last used</span>
+}
+
 function GoogleGlyph() {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
       <path
-        fill="currentColor"
-        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z"
-        opacity=".95"
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
       />
       <path
-        fill="currentColor"
-        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z"
-        opacity=".8"
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
       />
       <path
-        fill="currentColor"
-        d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z"
-        opacity=".65"
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
       />
       <path
-        fill="currentColor"
-        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z"
-        opacity=".85"
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
       />
+    </svg>
+  )
+}
+
+function MicrosoftGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <rect fill="#F25022" x="1" y="1" width="6.5" height="6.5" />
+      <rect fill="#7FBA00" x="8.5" y="1" width="6.5" height="6.5" />
+      <rect fill="#00A4EF" x="1" y="8.5" width="6.5" height="6.5" />
+      <rect fill="#FFB900" x="8.5" y="8.5" width="6.5" height="6.5" />
     </svg>
   )
 }
