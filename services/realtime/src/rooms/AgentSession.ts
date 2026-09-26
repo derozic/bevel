@@ -31,6 +31,7 @@ import {
   ChatMessage,
   HumanPresence,
 } from '../schema/ChatState.js'
+import { intelligenceKeysForTurn, markIdle, markWorking } from '../intelligence.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import {
   HumanPresenceBook,
@@ -630,51 +631,62 @@ export class AgentSession extends Room {
     statusMsg.body = agentThinking(agentNames.join(', '))
     statusMsg.ts = Date.now()
 
+    const workingKeys = intelligenceKeysForTurn({
+      sessionId: this.state.sessionId,
+      agentIds: targets,
+    })
+    markWorking(workingKeys)
     for (const target of targets) {
       const agentRow = this.state.agents.find((a) => a.id === target)
       if (agentRow) agentRow.status = 'thinking'
     }
 
-    const results = await Promise.allSettled(
-      targets.map(async (target) => {
-        const agentName = this.state.agents.find((a) => a.id === target)?.name ?? target
-        // Solo direct thread (/talk/hermes) → personal agent mode for Hermes.
-        const solo = this.state.agentIds.length === 1
-        const res = await dispatchAgentChat(target, text, history, {
-          personalAgent: solo && target.toLowerCase() === 'hermes',
-        })
-        return { target, agentName, res }
-      })
-    )
+    try {
+      const results = await Promise.allSettled(
+        targets.map(async (target) => {
+          const agentName = this.state.agents.find((a) => a.id === target)?.name ?? target
+          // Solo direct thread (/talk/hermes) → personal agent mode for Hermes.
+          const solo = this.state.agentIds.length === 1
+          const res = await dispatchAgentChat(target, text, history, {
+            personalAgent: solo && target.toLowerCase() === 'hermes',
+          })
+          return { target, agentName, res }
+        }),
+      )
 
-    this.removeMessageById(statusMsg.id)
+      this.removeMessageById(statusMsg.id)
 
-    for (let i = 0; i < results.length; i++) {
-      const target = targets[i]
-      const agentRow = this.state.agents.find((a) => a.id === target)
-      if (agentRow) agentRow.status = 'idle'
-
-      const result = results[i]
-      if (result.status === 'fulfilled') {
-        const { agentName, res } = result.value
-        this.pushAgentReply(target, agentName, res.output, {
-          model: res.model,
-          confidence: res.confidence,
-        })
-      } else {
-        const agentName = agentRow?.name ?? target
-        const sanitized = sanitizeAgentError(agentName, result.reason)
-        console.error('[agent_session] agent failed', {
-          session: this.persistSlug,
-          agent: target,
-          code: sanitized.code,
-          detail: sanitized.detail,
-        })
-        this.pushAgentReply(target, agentName, sanitized.publicMessage, {
-          phase: 'error',
-          rateLimited: sanitized.code === 'rate_limit',
-        })
+      for (let i = 0; i < results.length; i++) {
+        const target = targets[i]
+        const agentRow = this.state.agents.find((a) => a.id === target)
+        const result = results[i]
+        if (result.status === 'fulfilled') {
+          const { agentName, res } = result.value
+          this.pushAgentReply(target, agentName, res.output, {
+            model: res.model,
+            confidence: res.confidence,
+          })
+        } else {
+          const agentName = agentRow?.name ?? target
+          const sanitized = sanitizeAgentError(agentName, result.reason)
+          console.error('[agent_session] agent failed', {
+            session: this.persistSlug,
+            agent: target,
+            code: sanitized.code,
+            detail: sanitized.detail,
+          })
+          this.pushAgentReply(target, agentName, sanitized.publicMessage, {
+            phase: 'error',
+            rateLimited: sanitized.code === 'rate_limit',
+          })
+        }
       }
+    } finally {
+      for (const target of targets) {
+        const agentRow = this.state.agents.find((a) => a.id === target)
+        if (agentRow) agentRow.status = 'idle'
+      }
+      markIdle(workingKeys)
     }
   }
 

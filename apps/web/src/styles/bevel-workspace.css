@@ -149,10 +149,10 @@ html[data-bevel-density='compact'] .bevel-workspace {
 
 html[data-bevel-density='compact'] .bevel-rail-channel,
 html[data-bevel-density='compact'] .bevel-rail-conversation {
-  min-height: 2.65rem;
+  min-height: 0;
   height: auto;
-  padding-top: 0.28rem;
-  padding-bottom: 0.28rem;
+  padding-top: 0.12rem;
+  padding-bottom: 0.12rem;
   font-size: 0.8125rem;
 }
 
@@ -226,20 +226,21 @@ html[data-bevel-simplified='true'] .bevel-workspace {
 }
 
 .bevel-rail {
+  position: relative;
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  padding: 0.75rem 0.625rem;
+  padding: 0.75rem 0;
   container-type: inline-size;
   container-name: bevel-rail;
 }
 
 .bevel-rail-header {
   flex-shrink: 0;
-  padding: 0 0.375rem 0.65rem;
+  padding: 0 1rem 0.65rem;
   border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
   color: var(--ink);
 }
@@ -367,11 +368,12 @@ html[data-bevel-simplified='true'] .bevel-workspace {
 }
 
 .bevel-rail-nav {
+  --intel-bleed: 0.875rem;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-anchor: auto;
-  padding: 0.5rem 0.25rem;
+  padding: 0.3rem var(--intel-bleed);
   scrollbar-width: thin;
 }
 
@@ -387,12 +389,12 @@ html[data-bevel-simplified='true'] .bevel-workspace {
   position: relative;
   display: block;
   min-width: 0;
-  min-height: 2.75rem;
+  min-height: 0;
   height: auto;
   box-sizing: border-box;
-  border-radius: 0.5rem;
+  border-radius: 0.4rem;
   border: 1px solid transparent;
-  padding: 0.4rem 0.625rem 0.4rem 0.75rem;
+  padding: 0.18rem 0.5rem 0.18rem 0.6rem;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--sticker-muted);
@@ -413,14 +415,14 @@ html[data-bevel-simplified='true'] .bevel-workspace {
 }
 
 .bevel-rail-channel-slug {
-  line-height: 1.3;
+  line-height: 1.15;
 }
 
 .bevel-rail-channel-name {
-  margin-top: 0.1rem;
-  font-size: 0.6875rem;
+  margin-top: 0;
+  font-size: 0.625rem;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.15;
   color: var(--sticker-subtle);
 }
 
@@ -446,7 +448,7 @@ html[data-bevel-simplified='true'] .bevel-workspace {
 
 .bevel-rail-conversation.bevel-rail-feed {
   height: auto;
-  max-height: 4.35rem;
+  max-height: 2.85rem;
   overflow: hidden;
 }
 
@@ -668,8 +670,8 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   min-width: 0;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.18rem;
-  padding: 0.08rem;
+  gap: 0.1rem;
+  padding: 0.04rem;
   border-radius: 0.55rem;
   text-decoration: none;
   color: var(--ink);
@@ -681,7 +683,7 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   place-items: center;
   aspect-ratio: 1;
   width: 100%;
-  max-width: 3rem;
+  max-width: 2.35rem;
   margin-inline: auto;
   overflow: hidden;
   border-radius: 0.5rem;
@@ -758,7 +760,7 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   }
 
   .bevel-rail-conversation.bevel-rail-feed {
-    max-height: 3.25rem;
+    max-height: 2.5rem;
   }
 
   .bevel-brand-square-face {
@@ -767,9 +769,192 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
 }
 
 .bevel-rail-conversation-row {
+  position: relative;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 0.1rem;
+  min-height: 2rem;
+}
+
+.bevel-intel-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Full lap around a working row. A conic comet rotates 360deg; the mask
+   leaves only the outer edge, which sits on the sidebar's left and right. */
+.bevel-rail-conversation-row[data-working='true'] {
+  margin-inline: calc(var(--intel-bleed, 0.875rem) * -1);
+  padding-inline: var(--intel-bleed, 0.875rem);
+  background: color-mix(in srgb, var(--bevel-accent, #e85d04) 9%, var(--surface));
+}
+
+.bevel-intel-arc {
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+  overflow: hidden;
+  inset: 0;
+  border-radius: 0;
+  padding: 2px;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.bevel-intel-arc::before {
+  content: '';
+  position: absolute;
+  inset: -140%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 248deg,
+    color-mix(in srgb, var(--bevel-accent, #e85d04) 35%, transparent) 300deg,
+    #f6e2d4 334deg,
+    var(--bevel-accent, #e85d04) 352deg,
+    transparent 360deg
+  );
+  will-change: transform;
+  animation: bevel-intel-spin 2.6s linear infinite;
+}
+
+.bevel-rail-header,
+.bevel-rail-nav,
+.bevel-rail-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.bevel-rail[data-intelligence='live']::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -30% -20%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 30% 18%,
+    color-mix(in srgb, var(--bevel-accent, #e85d04) 16%, transparent),
+    transparent 58%
+  );
+  animation: bevel-intel-room 9s ease-in-out infinite;
+}
+
+.bevel-rail-conversation-row[data-working='true'] .bevel-rail-conversation,
+.bevel-rail-conversation-row[data-working='true'] .bevel-rail-channel {
+  border-radius: 0;
+  color: var(--ink);
+  background: transparent;
+}
+
+.bevel-rail-conversation-row[data-working='true'] > :not(.bevel-intel-arc) {
+  position: relative;
+  z-index: 1;
+}
+
+.bevel-rail-conversation-row[data-working='true'] .bevel-rail-agent-mark {
+  position: relative;
+}
+
+.bevel-rail-conversation-row[data-working='true'] .bevel-rail-agent-mark::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  border-top-color: var(--bevel-accent, #e85d04);
+  border-right-color: color-mix(in srgb, var(--bevel-accent, #e85d04) 45%, transparent);
+  animation: bevel-intel-spin 1.15s linear infinite;
+  pointer-events: none;
+}
+
+.bevel-rail-tracks-label[data-working='true'],
+.bevel-rail-section-label[data-working='true'] {
+  color: var(--bevel-accent, #e85d04);
+}
+
+.bevel-rail-tracks-label[data-working='true']::after,
+.bevel-rail-section-label[data-working='true']::after {
+  content: '';
+  display: block;
+  height: 2px;
+  margin-top: 0.28rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--bevel-accent, #e85d04),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: bevel-intel-sweep 1.6s ease-in-out infinite;
+}
+
+.bevel-brand-square[data-working='true'] .bevel-brand-square-face::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  border: 1.5px solid transparent;
+  border-top-color: var(--bevel-accent, #e85d04);
+  border-right-color: color-mix(in srgb, var(--bevel-accent, #e85d04) 40%, transparent);
+  animation: bevel-intel-spin 1.15s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes bevel-intel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bevel-intel-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes bevel-intel-room {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(12%, 8%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bevel-intel-arc::before,
+  .bevel-rail[data-intelligence='live']::before,
+  .bevel-rail-conversation-row[data-working='true'] .bevel-rail-agent-mark::before,
+  .bevel-rail-tracks-label[data-working='true']::after,
+  .bevel-rail-section-label[data-working='true']::after,
+  .bevel-brand-square[data-working='true'] .bevel-brand-square-face::after {
+    animation: none;
+  }
+
+  .bevel-intel-arc {
+    box-shadow: inset 0 0 0 2px var(--bevel-accent, #e85d04);
+    mask: none;
+    -webkit-mask: none;
+    padding: 0;
+  }
+
+  .bevel-intel-arc::before {
+    display: none;
+  }
 }
 
 .bevel-rail-conversation-row .bevel-rail-conversation,
@@ -802,8 +987,8 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
 }
 
 .bevel-rail-section {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
   border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
@@ -812,7 +997,7 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0 0.375rem 0.5rem;
+  padding: 0 0.25rem 0.15rem;
 }
 
 .bevel-rail-section-label {
@@ -820,7 +1005,7 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   z-index: 1;
   display: block;
   margin: 0;
-  padding: 0.35rem 0.25rem 0.5rem;
+  padding: 0.15rem 0.25rem 0.2rem;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -831,11 +1016,11 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
 
 .bevel-rail-conversation {
   display: block;
-  height: 3.125rem;
+  height: auto;
   box-sizing: border-box;
   overflow: hidden;
-  border-radius: 0.5rem;
-  padding: 0.35rem 0.625rem;
+  border-radius: 0.4rem;
+  padding: 0.12rem 0.45rem;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--sticker-muted);
@@ -854,14 +1039,14 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
 }
 
 .bevel-rail-conversation-title {
-  line-height: 1.3;
+  line-height: 1.15;
 }
 
 .bevel-rail-conversation-preview {
-  margin-top: 0.1rem;
-  font-size: 0.6875rem;
+  margin-top: 0;
+  font-size: 0.625rem;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.15;
   color: var(--sticker-subtle);
 }
 
@@ -909,7 +1094,7 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
 
 .bevel-rail-footer {
   flex-shrink: 0;
-  padding: 0.4rem 0.375rem 0.2rem;
+  padding: 0.4rem 1rem 0.2rem;
   border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
@@ -1347,7 +1532,7 @@ html:not([data-bevel-touch='1']) .bevel-rail-channel-wrap:hover .bevel-rail-chan
   align-items: center;
   align-self: center;
   flex-shrink: 0;
-  margin-left: 0.35rem;
+  margin-left: 0.2rem;
   border-radius: 28%;
   line-height: 0;
 }

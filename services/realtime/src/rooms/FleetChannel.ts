@@ -20,6 +20,7 @@ import {
   type GestureKind,
 } from '../gestures.js'
 import { logAgentWorkToProduct } from '../product-log.js'
+import { intelligenceKeysForTurn, markIdle, markWorking } from '../intelligence.js'
 import { BEVEL_POWERED_BY_LABEL } from '../product/bevel.js'
 import { recordEvent } from '../recording.js'
 import { conversationSearchIndex } from '../search-index.js'
@@ -844,11 +845,17 @@ export class FleetChannel extends Room {
     statusMsg.body = agentThinking(agentNames.join(', '))
     statusMsg.ts = Date.now()
 
+    const workingKeys = intelligenceKeysForTurn({
+      channelSlug: this.channelSlug,
+      agentIds: targets,
+    })
+    markWorking(workingKeys)
     for (const target of targets) {
       const agentRow = this.state.agents.find((a) => a.id === target)
       if (agentRow) agentRow.status = 'thinking'
     }
 
+    try {
     // Early pending rows in Postgres so a restart mid-dispatch still shows the turn.
     const pendingIds = new Map<string, string>()
     await Promise.all(
@@ -898,8 +905,6 @@ export class FleetChannel extends Room {
     for (let i = 0; i < results.length; i++) {
       const target = targets[i]
       const agentRow = this.state.agents.find((a) => a.id === target)
-      if (agentRow) agentRow.status = 'idle'
-
       const result = results[i]
       const workMeta = {
         work: opts.work === true,
@@ -927,6 +932,13 @@ export class FleetChannel extends Room {
           status: 'error',
         })
       }
+    }
+    } finally {
+      for (const target of targets) {
+        const agentRow = this.state.agents.find((a) => a.id === target)
+        if (agentRow) agentRow.status = 'idle'
+      }
+      markIdle(workingKeys)
     }
   }
 

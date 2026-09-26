@@ -11,11 +11,13 @@ import {
 import type { MouseEvent, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import type {
-  FeatureAccess,
-  ResolvedFeatureSet,
-  TenantPlan,
+import {
+  turnTouches,
+  type FeatureAccess,
+  type ResolvedFeatureSet,
+  type TenantPlan,
 } from '@bevel/schema'
+import { useWorkingKeys } from '@bevel/realtime-client'
 import { cn } from '@/lib/utils'
 import { agents } from '@/lib/agent-catalog'
 import {
@@ -44,7 +46,7 @@ import {
   syncChannelData,
 } from '@/lib/channel-list'
 import { DEFAULT_CHANNELS, type FleetChannelSummary } from '@/lib/fleet-channels'
-import type { SessionSummary } from '@/lib/realtime'
+import { realtimeUrl, type SessionSummary } from '@/lib/realtime'
 import {
   pinKey,
   resolvePins,
@@ -147,6 +149,8 @@ export function BevelRail({
 }) {
   const { status } = useSession()
   const pathname = usePathname()
+  const workingKeys = useWorkingKeys(realtimeUrl())
+  const intelligenceLive = workingKeys.size > 0
   const prefs = usePreferencesOptional()
   const timelineActive =
     pathname === '/timeline' ||
@@ -433,7 +437,10 @@ export function BevelRail({
   }, [feedTeaser, conversations])
 
   return (
-    <div className="bevel-rail">
+    <div
+      className="bevel-rail"
+      data-intelligence={intelligenceLive ? 'live' : 'quiet'}
+    >
       <div className="bevel-rail-header">
         <div className="bevel-rail-header-brand">
           <WorkspaceBrand productName={productName} />
@@ -451,7 +458,14 @@ export function BevelRail({
           ) : null}
         </div>
         <div className="bevel-rail-tracks-head">
-          <p className="bevel-rail-tracks-label">
+          <p
+            className="bevel-rail-tracks-label"
+            data-working={
+              [...workingKeys].some((key) => key.startsWith('channel:'))
+                ? 'true'
+                : 'false'
+            }
+          >
             {privateAgentsOnly ? 'Private agents' : BEVEL_COPY.channelsLabel}
           </p>
           {!privateAgentsOnly ? (
@@ -476,7 +490,7 @@ export function BevelRail({
 
       <div className="bevel-rail-nav">
         {privateAgentsOnly ? (
-          <nav aria-label="Private home" className="mb-2">
+          <nav aria-label="Private home" className="mb-1">
             <Link
               href={BEVEL_PRIVATE_PATH}
               onClick={onNavigate}
@@ -492,7 +506,7 @@ export function BevelRail({
             </Link>
           </nav>
         ) : null}
-        <nav aria-label="Timeline" className="mb-2">
+        <nav aria-label="Timeline" className="mb-1">
           <Link
             href="/timeline"
             onClick={onNavigate}
@@ -548,11 +562,17 @@ export function BevelRail({
                               activeSessionId.endsWith(`-${pin.id}`)),
                         )
                       : activeSessionId === pin.id
+                const pinWorking = turnTouches(workingKeys, {
+                  agentId: pin.kind === 'talk' ? pin.id : undefined,
+                  channelSlug: pin.kind === 'channel' ? pin.id : undefined,
+                  sessionId: pin.kind === 'session' ? pin.id : undefined,
+                })
                 return (
                   <BrandSquare
                     key={pinKey(pin)}
                     href={pinHref(pin)}
                     label={label}
+                    working={pinWorking}
                     logoUrl={
                       pin.kind === 'talk'
                         ? agent?.avatarUrl
@@ -587,12 +607,22 @@ export function BevelRail({
           {privateAgentsOnly ? null : (
             <>
               {unpinnedChannels.length > 0 ? (
-                <div className="mb-2">
+                <div className="mb-1">
                   {unpinnedChannels.map((ch) => {
                     const escalated = escalatedSet.has(ch.slug.toLowerCase())
                     const distinctName = !isRedundantChannelName(ch.slug, ch.name)
+                    const channelWorking = turnTouches(workingKeys, {
+                      channelSlug: ch.slug,
+                    })
                     return (
-                      <div key={ch.slug} className="bevel-rail-conversation-row">
+                      <div
+                        key={ch.slug}
+                        className="bevel-rail-conversation-row"
+                        data-working={channelWorking ? 'true' : 'false'}
+                      >
+                        {channelWorking ? (
+                          <span className="bevel-intel-arc" aria-hidden />
+                        ) : null}
                         <Link
                           href={bevelChannelPath(ch.slug)}
                           onClick={(e) => onChannelClick(e, ch.slug)}
@@ -605,6 +635,7 @@ export function BevelRail({
                           className="bevel-rail-channel"
                           data-active={activeSlug === ch.slug ? 'true' : 'false'}
                           data-escalated={escalated ? 'true' : 'false'}
+                          aria-busy={channelWorking || undefined}
                           title={channelTag(ch.slug, { escalated })}
                         >
                           <span className="bevel-rail-channel-slug">
@@ -698,9 +729,20 @@ export function BevelRail({
 
         <div className="bevel-rail-section">
           <div className="bevel-rail-section-header">
-            <p className="bevel-rail-section-label">{BEVEL_COPY.conversationsLabel}</p>
+            <p
+              className="bevel-rail-section-label"
+              data-working={
+                [...workingKeys].some(
+                  (key) => key.startsWith('talk:') || key.startsWith('session:'),
+                )
+                  ? 'true'
+                  : 'false'
+              }
+            >
+              {BEVEL_COPY.conversationsLabel}
+            </p>
           </div>
-          <div className="mb-2 px-1">
+          <div className="mb-1 px-1">
             <ConversationRoster onStarted={onNavigate} />
           </div>
           <nav aria-label={BEVEL_COPY.conversationsLabel}>
@@ -723,8 +765,17 @@ export function BevelRail({
                   activeSessionId.endsWith(`-${agent.id.toLowerCase()}`))
               const pin = { kind: 'talk' as const, id: agent.id }
               const isPinned = pinnedKeys.has(pinKey(pin))
+              const working = turnTouches(workingKeys, {
+                agentId: agent.id,
+                sessionId: live?.sessionId,
+              })
               return (
-                <div key={agent.id} className="bevel-rail-conversation-row">
+                <div
+                  key={agent.id}
+                  className="bevel-rail-conversation-row"
+                  data-working={working ? 'true' : 'false'}
+                >
+                  {working ? <span className="bevel-intel-arc" aria-hidden /> : null}
                   <Link
                     href={bevelAgentProfilePath(agent.id)}
                     onClick={onNavigate}
@@ -736,16 +787,18 @@ export function BevelRail({
                       agentId={agent.id}
                       name={agent.name}
                       accent={agent.accent}
-                      size={28}
+                      size={20}
                     />
                   </Link>
                   <Link
                     href={href}
                     onClick={onNavigate}
                     data-active={active ? 'true' : 'false'}
+                    aria-busy={working || undefined}
                     className="bevel-rail-conversation"
                     title={`Message ${agent.name}`}
                   >
+                    {working ? <span className="bevel-intel-sr">Working. </span> : null}
                     <span className="bevel-rail-conversation-title">
                       {agent.name}
                     </span>
@@ -775,16 +828,27 @@ export function BevelRail({
               .map((conv) => {
                 const pin = { kind: 'session' as const, id: conv.sessionId }
                 const isPinned = pinnedKeys.has(pinKey(pin))
+                const working = turnTouches(workingKeys, {
+                  sessionId: conv.sessionId,
+                  agentIds: conv.agentIds,
+                })
                 return (
-                <div key={conv.sessionId} className="bevel-rail-conversation-row">
+                <div
+                  key={conv.sessionId}
+                  className="bevel-rail-conversation-row"
+                  data-working={working ? 'true' : 'false'}
+                >
+                {working ? <span className="bevel-intel-arc" aria-hidden /> : null}
                 <Link
                   href={bevelConversationPath(conv)}
                   onClick={onNavigate}
                   data-active={
                     activeSessionId === conv.sessionId ? 'true' : 'false'
                   }
+                  aria-busy={working || undefined}
                   className="bevel-rail-conversation"
                 >
+                  {working ? <span className="bevel-intel-sr">Working. </span> : null}
                   <span className="bevel-rail-conversation-title">
                     {conversationLabel(conv)}
                   </span>

@@ -42,6 +42,8 @@ export class FleetLobbyState extends Schema {
   @type('number') onlineHumans: number = 0
   @type(['string']) activeSessions = new ArraySchema<string>()
   @type([AgentPresence]) agents = new ArraySchema<AgentPresence>()
+  /** talk:id, channel:slug, session:id — conversations with a live agent turn. */
+  @type(['string']) workingKeys = new ArraySchema<string>()
 }
 
 export class AgentSessionState extends Schema {

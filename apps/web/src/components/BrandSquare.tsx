@@ -20,6 +20,7 @@ export function BrandSquare({
   onClick,
   onContextMenu,
   busy,
+  working,
 }: {
   href: string
   label: string
@@ -33,6 +34,8 @@ export function BrandSquare({
   onClick?: (e: MouseEvent<HTMLAnchorElement>) => void
   onContextMenu?: (e: MouseEvent<HTMLAnchorElement>) => void
   busy?: boolean
+  /** Live agent turn — copper arc, same cue as a working sidebar row. */
+  working?: boolean
 }) {
   const wash = process || processColorForKey(processKey || label)
   const style = { '--tile-process': wash } as CSSProperties
@@ -56,7 +59,8 @@ export function BrandSquare({
     onContextMenu,
     'data-active': active ? 'true' : 'false',
     'data-escalated': escalated ? 'true' : 'false',
-    'aria-busy': busy || undefined,
+    'aria-busy': busy || working || undefined,
+    'data-working': working ? 'true' : 'false',
     title: title || caption || label,
     className: 'bevel-brand-square',
     style,

@@ -62,6 +62,7 @@ export {
   type PersonCandidate,
 } from './lib/mentions'
 export { resolveRealtimeUrl } from './lib/realtime-client'
+export { useWorkingKeys } from './lib/use-working-keys'
 export { formatSpeaker, SYSTEM_SPEAKER } from './lib/system-voice'
 export {
   toChatMsg,
