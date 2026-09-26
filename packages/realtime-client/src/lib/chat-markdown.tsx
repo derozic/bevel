@@ -1,11 +1,15 @@
 import type { ReactNode } from 'react'
 import { parseNugget } from '@bevel/schema'
 import { NuggetCard } from '../components/NuggetCard'
+import { LinkPreviewCard } from '../components/LinkPreviewCard'
 import { extractChatImages } from './chat-images'
+import { firstHttpUrl } from './link-preview'
 
 const FENCE_RE = /^```/
 const LIST_RE = /^[-•*]\s+/
 const MENTION_LINE_RE = /^[@^][a-zA-Z0-9_-]+/
+const CODEISH_RE =
+  /^(import |from |def |class |const |let |var |export |return |if |elif |else:|for |while |try:|except |with |#include |package |fn |pub |using |\{|\}|<\/|[\]];?$|\t| {2,})/
 
 /**
  * Split inline text into code, bold, @soft-mentions, and ^escalations.
@@ -14,7 +18,7 @@ const MENTION_LINE_RE = /^[@^][a-zA-Z0-9_-]+/
  */
 function inlineFormat(text: string, keyPrefix: string): ReactNode[] {
   const segments = text.split(
-    /(`[^`]+`|\*\*[^*]+\*\*|@[a-zA-Z0-9_-]+|\^[a-zA-Z0-9_-]+)/g,
+    /(`[^`]+`|\*\*[^*]+\*\*|@[a-zA-Z0-9_-]+|\^[a-zA-Z0-9_-]+|https?:\/\/[^\s<>"']+)/g,
   )
   return segments
     .filter((seg) => seg.length > 0)
@@ -45,6 +49,20 @@ function inlineFormat(text: string, keyPrefix: string): ReactNode[] {
             title={`@${handle} — soft mention (timeline)`}
           >
             {seg}
+          </a>
+        )
+      }
+      if (/^https?:\/\//i.test(seg)) {
+        const href = seg.replace(/[),.]+$/, '')
+        return (
+          <a
+            key={`${keyPrefix}-u-${i}`}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="fleet-chat-link"
+          >
+            {href}
           </a>
         )
       }
@@ -100,6 +118,8 @@ export function ChatMessageBody({ text }: { text: string }) {
   const lines = body.replace(/\r\n/g, '\n').split('\n')
   const nodes: ReactNode[] = []
   let listItems: ReactNode[] = []
+  let codeLines: string[] = []
+  let inFence = false
   let block = 0
 
   const flushList = () => {
@@ -112,15 +132,50 @@ export function ChatMessageBody({ text }: { text: string }) {
     listItems = []
   }
 
+  const flushCode = () => {
+    if (codeLines.length === 0) return
+    nodes.push(
+      <pre key={`pre-${block++}`} className="fleet-chat-pre">
+        <code>{codeLines.join('\n')}</code>
+      </pre>,
+    )
+    codeLines = []
+  }
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const trimmed = line.trim()
 
-    if (!trimmed || FENCE_RE.test(trimmed) || trimmed === 'text') {
-      if (FENCE_RE.test(trimmed) || trimmed === 'text') continue
+    if (FENCE_RE.test(trimmed)) {
       flushList()
+      if (inFence) {
+        flushCode()
+        inFence = false
+      } else {
+        flushCode()
+        inFence = true
+      }
       continue
     }
+
+    if (inFence) {
+      codeLines.push(line)
+      continue
+    }
+
+    if (!trimmed) {
+      flushList()
+      flushCode()
+      continue
+    }
+
+    if (CODEISH_RE.test(line) || CODEISH_RE.test(trimmed)) {
+      flushList()
+      codeLines.push(line)
+      continue
+    }
+
+    flushCode()
 
     if (LIST_RE.test(trimmed) || MENTION_LINE_RE.test(trimmed)) {
       const content = LIST_RE.test(trimmed)
@@ -135,6 +190,11 @@ export function ChatMessageBody({ text }: { text: string }) {
     }
 
     flushList()
+    const onlyUrl = firstHttpUrl(trimmed)
+    if (onlyUrl && !/\s/.test(trimmed)) {
+      nodes.push(<LinkPreviewCard key={`link-${i}`} url={onlyUrl} />)
+      continue
+    }
     nodes.push(
       <p key={`p-${i}`} className="fleet-chat-paragraph">
         {inlineFormat(line, `p-${i}`)}
@@ -143,6 +203,7 @@ export function ChatMessageBody({ text }: { text: string }) {
   }
 
   flushList()
+  flushCode()
 
   if (nodes.length === 0 && images.length === 0) {
     return <p className="fleet-chat-paragraph">{text}</p>

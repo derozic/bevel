@@ -57,21 +57,18 @@ export default async function PrivateMePage() {
               Just you and your agents
             </h1>
             <p className="text-sm leading-relaxed text-muted">
-              Top-level BEVEL space — no org channels required. Open a direct
-              thread, set your primary agent in preferences, or jump into a
-              product workspace when you need team history.
+              Direct threads live here. Open {primary.name} to start, or pick
+              anyone in the roster below.
             </p>
           </div>
         </header>
 
-        {isApex ? <FirstRunPanel mode="private" /> : null}
-
-        <section className="rounded-2xl border border-accent/25 bg-accent/5 p-5 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+        <section className="public-panel !p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
             Primary agent
           </p>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-lg font-semibold text-foreground">
                 {primary.name}
               </p>
@@ -79,13 +76,15 @@ export default async function PrivateMePage() {
                 {primary.tagline ?? primary.role}
               </p>
             </div>
-            <Button asChild size="md">
+            <Button asChild size="md" className="h-11 rounded-full px-5">
               <Link href={personalAgentTalkPath(personalId)}>
-                Open conversation
+                Talk to {primary.name}
               </Link>
             </Button>
           </div>
         </section>
+
+        {isApex ? <FirstRunPanel mode="private" /> : null}
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
@@ -95,7 +94,7 @@ export default async function PrivateMePage() {
             {agents.map((agent) => (
               <li
                 key={agent.id}
-                className="rounded-xl border border-border bg-surface/60 px-4 py-3"
+                className="rounded-xl border border-border bg-surface/70 px-4 py-3 transition hover:border-accent/40"
               >
                 <div className="flex items-center gap-3">
                   <Link
@@ -112,19 +111,24 @@ export default async function PrivateMePage() {
                   </Link>
                   <Link
                     href={bevelTalkPath(agent.id)}
-                    className="min-w-0 flex-1 transition hover:opacity-90"
+                    className="flex min-w-0 flex-1 items-center gap-3"
                   >
-                    <p className="truncate font-medium text-foreground">
-                      {agent.name}
-                      {agent.id === personalId ? (
-                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-accent">
-                          primary
-                        </span>
-                      ) : null}
-                    </p>
-                    <p className="truncate text-xs text-muted">
-                      {agent.tagline ?? agent.role}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-foreground">
+                        {agent.name}
+                        {agent.id === personalId ? (
+                          <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                            primary
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="truncate text-xs text-muted">
+                        {agent.tagline ?? agent.role}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs font-medium text-accent">
+                      Talk
+                    </span>
                   </Link>
                 </div>
                 <div className="mt-2 pl-12">
