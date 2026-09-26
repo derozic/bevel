@@ -12,7 +12,9 @@ describe('sanitizeAgentError', () => {
     )
     const out = sanitizeAgentError('Loom', err)
     expect(out.code).toBe('module')
-    expect(out.publicMessage).toMatch(/fleet runner/)
+    expect(out.publicMessage).toMatch(/waking up/)
+    expect(out.publicMessage).not.toMatch(/OPENROUTER/i)
+    expect(out.publicMessage).not.toMatch(/operator/i)
     expect(out.publicMessage).not.toMatch(/opt\/bevel/)
     expect(out.detail).not.toMatch(/sk-or-v1/)
     expect(out.detail).toMatch(/\[redacted/)
@@ -24,7 +26,9 @@ describe('sanitizeAgentError', () => {
       new Error('You have no credits remaining. Add credits to continue using the API'),
     )
     expect(out.code).toBe('forbidden')
-    expect(out.publicMessage).toMatch(/credits or key limit/)
+    expect(out.publicMessage).toMatch(/at capacity/)
+    expect(out.publicMessage).not.toMatch(/OpenRouter/i)
+    expect(out.publicMessage).not.toMatch(/operator/i)
   })
 
   it('maps retired-model 404s to routing copy', () => {
@@ -33,7 +37,19 @@ describe('sanitizeAgentError', () => {
       new Error('Request failed with status code 404'),
     )
     expect(out.code).toBe('model')
-    expect(out.publicMessage).toMatch(/model routing/)
+    expect(out.publicMessage).toMatch(/could not finish/)
+    expect(out.publicMessage).not.toMatch(/fleet model/)
+  })
+
+  it('never names env vars on auth misses', () => {
+    const out = sanitizeAgentError(
+      'Hermes',
+      new Error('Request failed with status code 401 Unauthorized OPENROUTER_API_KEY'),
+    )
+    expect(out.code).toBe('auth')
+    expect(out.publicMessage).toMatch(/catching up/)
+    expect(out.publicMessage).not.toMatch(/OPENROUTER/i)
+    expect(out.publicMessage).not.toMatch(/operator/i)
   })
 
   it('falls back to native keys on OpenRouter 403 and auth misses', () => {
@@ -53,8 +69,9 @@ describe('sanitizeAgentError', () => {
     const leaked =
       "Cannot find module '/opt/bevel/dist/runner.js'\nRequire stack:\n- /opt/bevel/services/realtime/dist/agent-dispatch.js"
     const out = publicAgentBubble('Johnny', leaked)
-    expect(out).toMatch(/fleet runner/)
+    expect(out).toMatch(/waking up/)
     expect(out).not.toMatch(/opt\/bevel/)
+    expect(out).not.toMatch(/OPENROUTER/i)
     expect(publicAgentBubble('Johnny', 'pong')).toBe('pong')
   })
 })

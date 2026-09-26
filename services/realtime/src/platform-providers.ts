@@ -176,11 +176,7 @@ export async function dispatchPlatformAgentChat(
     return dispatchViaOpenRouter(id, name, message, history, routerKey)
   }
   if (!key) {
-    return {
-      output: `${name} is not configured on this host. Set ${keyHint(id)} on the realtime process.`,
-      model: DEFAULT_MODELS[id],
-      confidence: 0,
-    }
+    throw new Error(`${name} is not configured (missing ${keyHint(id)})`)
   }
 
   try {
@@ -255,6 +251,7 @@ export async function dispatchFleetNativeFallback(
   const system = fleetFallbackSystemPrompt(agentId)
   const xaiKey = (process.env.GROK_API_KEY || process.env.XAI_API_KEY || '').trim()
   const anthropicKey = (process.env.ANTHROPIC_API_KEY || '').trim()
+  const openaiKey = (process.env.OPENAI_API_KEY || '').trim()
   if (xaiKey) {
     try {
       return await dispatchNativeOpenAi(
@@ -266,16 +263,29 @@ export async function dispatchFleetNativeFallback(
         history,
         agentId,
       )
-    } catch (err) {
-      if (!anthropicKey) throw err
+    } catch {
+      /* try the next native key */
     }
   }
   if (anthropicKey) {
-    return await dispatchNativeClaude(anthropicKey, system, message, history)
+    try {
+      return await dispatchNativeClaude(anthropicKey, system, message, history)
+    } catch {
+      /* try OpenAI */
+    }
   }
-  throw new Error(
-    `${agentId} cannot fall back to a native provider. Set XAI_API_KEY or ANTHROPIC_API_KEY on realtime.`,
-  )
+  if (openaiKey) {
+    return await dispatchNativeOpenAi(
+      'https://api.openai.com/v1/chat/completions',
+      openaiKey,
+      process.env.OPENAI_MODEL?.trim() || 'gpt-4o',
+      system,
+      message,
+      history,
+      agentId,
+    )
+  }
+  throw new Error(`${agentId} native fallback exhausted`)
 }
 
 async function dispatchNativeOpenAi(

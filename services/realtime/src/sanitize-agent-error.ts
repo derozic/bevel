@@ -60,7 +60,7 @@ export function sanitizeAgentError(
     lower.includes('error code 403')
   ) {
     return {
-      publicMessage: `${agentName} cannot reach the model provider (credits or key limit). An operator needs to check OpenRouter and the native provider keys on realtime.`,
+      publicMessage: `${agentName} is at capacity right now. Send that again in a moment.`,
       code: 'forbidden',
       detail,
     }
@@ -72,7 +72,7 @@ export function sanitizeAgentError(
     (lower.includes('bearer') && lower.includes('empty'))
   ) {
     return {
-      publicMessage: `${agentName} cannot reach the model provider (auth). An operator needs to check OPENROUTER_API_KEY on realtime.`,
+      publicMessage: `${agentName} is catching up. Send that again in a moment.`,
       code: 'auth',
       detail,
     }
@@ -84,7 +84,7 @@ export function sanitizeAgentError(
     lower.includes('status code 404')
   ) {
     return {
-      publicMessage: `${agentName} hit a model routing error. The fleet model ids may need updating.`,
+      publicMessage: `${agentName} could not finish that. Try again or @mention another agent.`,
       code: 'model',
       detail,
     }
@@ -95,14 +95,14 @@ export function sanitizeAgentError(
     lower.includes('runner.js')
   ) {
     return {
-      publicMessage: `${agentName} could not load the fleet runner. Check AGENTS_REPO_ROOT and the agents install on the host.`,
+      publicMessage: `${agentName} is still waking up. Try again in a moment.`,
       code: 'module',
       detail,
     }
   }
   if (lower.includes('unknown agent')) {
     return {
-      publicMessage: `${agentName} is not registered in the fleet runner. Available agents may differ from the channel roster.`,
+      publicMessage: `${agentName} is not on this roster. @mention someone else above.`,
       code: 'unknown_agent',
       detail,
     }
@@ -114,7 +114,7 @@ export function sanitizeAgentError(
     lower.includes('network')
   ) {
     return {
-      publicMessage: `${agentName} could not reach the model provider (network). Try again in a moment.`,
+      publicMessage: `${agentName} lost the line. Send that again in a moment.`,
       code: 'network',
       detail,
     }
@@ -142,7 +142,10 @@ export function isLeakedAgentFailure(text: string): boolean {
     lower.includes('status code 403') ||
     lower.includes('status code 401') ||
     lower.includes('key limit exceeded') ||
-    lower.includes('no credits remaining')
+    lower.includes('no credits remaining') ||
+    lower.includes('openrouter_api_key') ||
+    lower.includes('an operator needs') ||
+    lower.includes('on realtime')
   )
 }
 

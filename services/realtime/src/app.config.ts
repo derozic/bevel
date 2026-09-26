@@ -89,6 +89,14 @@ export const server = defineServer({
           sessions: conversationSearchIndex.sessionCount,
         },
         rooms: summarizeRooms(listings),
+        providers: {
+          openrouter: Boolean((process.env.OPENROUTER_API_KEY || '').trim()),
+          openai: Boolean((process.env.OPENAI_API_KEY || '').trim()),
+          anthropic: Boolean((process.env.ANTHROPIC_API_KEY || '').trim()),
+          xai: Boolean(
+            (process.env.GROK_API_KEY || process.env.XAI_API_KEY || '').trim(),
+          ),
+        },
       })
     })
 

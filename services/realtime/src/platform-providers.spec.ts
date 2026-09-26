@@ -33,13 +33,12 @@ describe('platform providers', () => {
     expect(isPlatformAgent('hermes')).toBe(false)
   })
 
-  it('returns a configured-host message when the key is missing', async () => {
+  it('throws when the native key and OpenRouter are both missing', async () => {
     delete process.env.OPENAI_API_KEY
     delete process.env.OPENROUTER_API_KEY
-    const res = await dispatchPlatformAgentChat('chatgpt', 'hello')
-    expect(res.confidence).toBe(0)
-    expect(res.output).toMatch(/OPENAI_API_KEY/)
-    expect(res.output).toMatch(/ChatGPT/)
+    await expect(dispatchPlatformAgentChat('chatgpt', 'hello')).rejects.toThrow(
+      /OPENAI_API_KEY/,
+    )
   })
 
   it('falls back to OpenRouter when the native key is missing', async () => {

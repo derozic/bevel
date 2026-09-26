@@ -70,7 +70,7 @@ export function agentStumbled(agentName: string): string {
 }
 
 export function fleetRateLimited(agentName: string): string {
-  return `the fleet's a little busy right now — ${agentName} will answer as soon as OpenRouter clears us ♡ try again in a moment…`
+  return `${agentName} is a little busy. Send that again in a moment.`
 }
 
 export function workAccessDenied(repo: string): string {
