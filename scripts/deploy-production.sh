@@ -6,6 +6,11 @@
 #   ./scripts/deploy-production.sh HEAD         # current branch tip (must be pushed)
 #   ./scripts/deploy-production.sh abc1234      # specific SHA or ref
 #   BEVEL_DEPLOY_REF=feat/foo ./scripts/deploy-production.sh
+#   BEVEL_DEPLOY_FULL=1 ./scripts/deploy-production.sh HEAD   # always rebuild API + realtime
+#
+# Default is fast: rebuild Next (bevel.is), and only rebuild API / realtime
+# when those trees changed. Stop the web unit during `next build` so systemd
+# cannot crash-loop on a half-written .next.
 #
 # Requires: SSH Host bevel-prod (ubuntu@34.200.88.66, key ~/.ssh/2x4m_ed25519)
 # Never pkill caddy — reload only if Caddyfile changes.
@@ -43,76 +48,104 @@ if git rev-parse --verify "${FULL_REF}" >/dev/null 2>&1; then
   fi
 fi
 
-ssh -o ConnectTimeout=20 "$SSH_HOST" "bash -s" -- "$FULL_REF" <<'REMOTE'
+DEPLOY_FULL="${BEVEL_DEPLOY_FULL:-0}"
+echo "    mode: $([[ "$DEPLOY_FULL" == "1" ]] && echo full || echo fast-web)"
+
+ssh -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=120 "$SSH_HOST" "bash -s" -- "$FULL_REF" "$DEPLOY_FULL" <<'REMOTE'
 set -euo pipefail
 FULL_REF="$1"
+DEPLOY_FULL="${2:-0}"
 
 sudo git config --global --add safe.directory /opt/bevel || true
 
 echo "==> fetch + checkout ($FULL_REF)"
-sudo -u deploy env FULL_REF="$FULL_REF" bash -s <<'INNER'
+META="$(sudo -u deploy env FULL_REF="$FULL_REF" bash -s <<'INNER'
   set -euo pipefail
   cd /opt/bevel
+  OLD_HEAD="$(git rev-parse HEAD)"
   git fetch --prune origin --tags
-  # Also fetch all remote branches so feature SHAs are present
   git fetch origin '+refs/heads/*:refs/remotes/origin/*' || true
   if git cat-file -e "${FULL_REF}^{commit}" 2>/dev/null; then
     git checkout -f "$FULL_REF"
   elif git cat-file -e "origin/${FULL_REF}^{commit}" 2>/dev/null; then
     git checkout -f "origin/${FULL_REF}"
   else
-    echo "ERROR: ref not found after fetch: $FULL_REF"
-    git rev-parse --short origin/main
-    git branch -r | head -20
+    echo "ERROR: ref not found after fetch: $FULL_REF" >&2
+    git rev-parse --short origin/main >&2
+    git branch -r | head -20 >&2
     exit 1
   fi
   git reset --hard HEAD
+  NEW_HEAD="$(git rev-parse HEAD)"
+  echo "OLD_HEAD=${OLD_HEAD}"
+  echo "NEW_HEAD=${NEW_HEAD}"
   echo "HEAD=$(git rev-parse --short HEAD) $(git log -1 --oneline)"
 INNER
+)"
+echo "$META"
+OLD_HEAD="$(echo "$META" | awk -F= '/^OLD_HEAD=/{print $2; exit}')"
+NEW_HEAD="$(echo "$META" | awk -F= '/^NEW_HEAD=/{print $2; exit}')"
+
+CHANGED="$(sudo -u deploy git -C /opt/bevel diff --name-only "$OLD_HEAD" "$NEW_HEAD" || true)"
+NEED_API=0
+NEED_RT=0
+if [[ "$DEPLOY_FULL" == "1" ]]; then
+  NEED_API=1
+  NEED_RT=1
+else
+  echo "$CHANGED" | grep -qE '^(services/api/|packages/schema/|pnpm-lock.yaml|uv.lock)' && NEED_API=1 || true
+  echo "$CHANGED" | grep -qE '^(services/realtime/|packages/realtime|packages/schema/|pnpm-lock.yaml)' && NEED_RT=1 || true
+fi
+echo "    api rebuild: $([[ $NEED_API -eq 1 ]] && echo yes || echo skip)"
+echo "    realtime rebuild: $([[ $NEED_RT -eq 1 ]] && echo yes || echo skip)"
 
 echo "==> free memory for next build if needed"
-# cpu-logind / heavy scrapers have OOM'd next builds before
 if command -v free >/dev/null; then free -h | head -2; fi
 
-echo "==> API (uv + alembic + restart)"
-sudo -u deploy bash -lc '
-  set -euo pipefail
-  cd /opt/bevel/services/api
-  # Load production secrets (same EnvironmentFile as systemd)
-  if [[ -f .env ]]; then set -a; # shellcheck disable=SC1091
-    source .env
-    set +a
-  fi
-  if [[ -f .venv/bin/activate ]]; then source .venv/bin/activate; fi
-  uv sync
-  uv run alembic upgrade head
-'
-sudo systemctl restart bevel-api
-sleep 2
-systemctl is-active bevel-api
+if [[ "$NEED_API" -eq 1 ]]; then
+  echo "==> API (uv + alembic + restart)"
+  sudo -u deploy bash -lc '
+    set -euo pipefail
+    cd /opt/bevel/services/api
+    if [[ -f .env ]]; then set -a
+      source .env
+      set +a
+    fi
+    if [[ -f .venv/bin/activate ]]; then source .venv/bin/activate; fi
+    uv sync
+    uv run alembic upgrade head
+  '
+  sudo systemctl restart bevel-api
+  sleep 2
+  systemctl is-active bevel-api
+else
+  echo "==> API unchanged — skip"
+fi
 
-echo "==> Realtime (pnpm build + restart)"
-sudo -u deploy bash -lc '
-  set -euo pipefail
-  cd /opt/bevel
-  # monorepo install if lock changed
-  if command -v pnpm >/dev/null; then
-    pnpm install --frozen-lockfile || pnpm install
-  fi
-  cd /opt/bevel/services/realtime
-  pnpm install --frozen-lockfile || pnpm install
-  pnpm run build
-'
-sudo systemctl restart bevel-realtime
-sleep 1
-systemctl is-active bevel-realtime
+if [[ "$NEED_RT" -eq 1 ]]; then
+  echo "==> Realtime (pnpm build + restart)"
+  sudo -u deploy bash -lc '
+    set -euo pipefail
+    cd /opt/bevel
+    if command -v pnpm >/dev/null; then
+      pnpm install --frozen-lockfile || pnpm install
+    fi
+    cd /opt/bevel/services/realtime
+    pnpm run build
+  '
+  sudo systemctl restart bevel-realtime
+  sleep 1
+  systemctl is-active bevel-realtime
+else
+  echo "==> Realtime unchanged — skip"
+fi
 
 echo "==> Web (next build + restart 2x4m-bevel)"
-# Next can OOM on 4GB hosts — drop page cache pressure best-effort
+# Stop the unit first so Restart=always cannot boot a half-written .next.
+sudo systemctl stop 2x4m-bevel || true
+sudo systemctl reset-failed 2x4m-bevel || true
 sync || true
-# Stamp git SHA into build-time env so /api/health reports the real deploy.
-# NEXT_PUBLIC_* is inlined at next build; also keep .env.production in sync.
-sudo -u deploy env FULL_REF="$FULL_REF" bash -lc '
+sudo -u deploy bash -lc '
   set -euo pipefail
   cd /opt/bevel
   GIT_SHA="$(git rev-parse --short HEAD)"
@@ -133,18 +166,22 @@ sudo -u deploy env FULL_REF="$FULL_REF" bash -lc '
     fi
   fi
   export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}"
-  pnpm install --frozen-lockfile || pnpm install
   cd apps/web
-  # Prefer next build from package scripts
-  if grep -q "\"build\"" package.json; then
-    pnpm run build
-  else
-    pnpm exec next build
-  fi
+  pnpm run build
 '
-sudo systemctl restart 2x4m-bevel
-sleep 3
+sudo systemctl start 2x4m-bevel
+ok=0
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  if curl -sf -o /dev/null --max-time 2 http://127.0.0.1:41009/api/health; then
+    ok=1
+    break
+  fi
+  sleep 1
+done
 systemctl is-active 2x4m-bevel
+if [[ "$ok" -ne 1 ]]; then
+  echo "WARN: web unit is up but /api/health did not answer yet"
+fi
 
 echo "==> smoke"
 curl -sS -o /dev/null -w "bevel.2x4m.cc %{http_code}\n" https://bevel.2x4m.cc/ || true
