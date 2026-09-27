@@ -5,30 +5,6 @@
 @import "../styles/bevel-workspace.css";
 @import "../styles/daypart.css";
 
-/* Chat body must match product chrome (rail ~13px), not a document scale. */
-.fleet-chat-shell .fleet-chat-bubble,
-.fleet-chat-shell .fleet-chat-msg-body,
-.fleet-chat-shell .fleet-chat-paragraph,
-.fleet-chat-shell .fleet-chat-formatted,
-.fleet-chat-shell .fleet-chat-list,
-.fleet-chat-shell .fleet-chat-list-item,
-.fleet-chat-shell .fleet-chat-input {
-  font-family: var(--bevel-font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.4;
-  letter-spacing: -0.011em;
-}
-
-.fleet-chat-shell .fleet-chat-pre,
-.fleet-chat-shell .fleet-chat-pre code,
-.fleet-chat-shell .fleet-chat-code {
-  font-family: var(--bevel-font-mono), ui-monospace, Menlo, monospace;
-  font-size: 12px;
-  line-height: 1.4;
-  font-weight: 400;
-}
-
 /* Radix puts z-index on Content, not the popper wrapper. z-index:auto
    wrappers paint under later stacking contexts (agent chip row). */
 [data-radix-popper-content-wrapper] {
@@ -669,39 +645,6 @@ body {
   100% {
     transform: translate3d(4%, -3%, 0) scale(1.08);
   }
-}
-
-/* Last-wins lock: chat copy matches the rail, never a CMYK display face. */
-.fleet-chat,
-.fleet-chat .fleet-chat-bubble,
-.fleet-chat .fleet-chat-msg-body,
-.fleet-chat .fleet-chat-paragraph,
-.fleet-chat .fleet-chat-formatted,
-.fleet-chat .fleet-chat-list,
-.fleet-chat .fleet-chat-list-item,
-.fleet-chat .fleet-chat-input,
-.fleet-chat p {
-  font-family: var(--bevel-font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
-  font-size: 13px !important;
-  font-weight: 400 !important;
-  line-height: 1.35 !important;
-  letter-spacing: -0.011em !important;
-}
-
-.fleet-chat .fleet-chat-msg-label {
-  font-size: 10px !important;
-  font-weight: 650 !important;
-  letter-spacing: 0.06em !important;
-  line-height: 1.2 !important;
-}
-
-.fleet-chat .fleet-chat-pre,
-.fleet-chat .fleet-chat-pre code,
-.fleet-chat .fleet-chat-code {
-  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace !important;
-  font-size: 12px !important;
-  font-weight: 400 !important;
-  line-height: 1.4 !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

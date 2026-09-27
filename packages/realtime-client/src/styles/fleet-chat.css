@@ -1,14 +1,33 @@
 @import './nuggets.css';
 
-/* Fleet chat — conversational thread, theme-aware (day-part tokens) */
+/* Slack-like thread type: Lato 15 / 22, message blocks not iMessage bubbles. */
+
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/lato/lato-latin-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/lato/lato-latin-700.woff2') format('woff2');
+}
 
 .fleet-chat {
+  --fleet-chat-font: Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --fleet-chat-size: 15px;
+  --fleet-chat-leading: 22px;
   color: var(--ink);
-  font-family: var(--bevel-font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 13px;
+  font-family: var(--fleet-chat-font);
+  font-size: var(--fleet-chat-size);
   font-weight: 400;
-  line-height: 1.35;
-  letter-spacing: -0.011em;
+  line-height: var(--fleet-chat-leading);
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -367,10 +386,10 @@
 .fleet-chat-thread {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem 0.75rem 0.75rem;
+  padding: 8px 0 12px;
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0;
 }
 
 @media (min-width: 1200px) {
@@ -382,15 +401,6 @@
 @media (min-width: 2000px) {
   .fleet-chat--fill .fleet-chat-thread {
     padding-inline: clamp(1.5rem, 8vw, 12rem);
-  }
-
-  .fleet-chat--fill .fleet-chat-msg-row--agent {
-    max-width: min(44rem, 70%);
-  }
-
-  .fleet-chat--fill .fleet-chat-msg-row--human {
-    margin-left: auto;
-    max-width: min(32rem, 55%);
   }
 
   .fleet-chat--fill .fleet-chat-header,
@@ -915,10 +925,17 @@
   position: relative;
   z-index: 0;
   display: flex;
-  align-items: flex-end;
-  gap: 0.375rem;
-  max-width: min(36rem, 88%);
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  padding: 0.5rem 1.25rem;
+  margin: 0;
   animation: fleet-chat-in 0.28s ease-out both;
+}
+
+.fleet-chat-msg-row:hover {
+  background: color-mix(in srgb, var(--ink) 3.5%, transparent);
 }
 
 .fleet-chat-msg-row:hover,
@@ -938,15 +955,12 @@
   }
 }
 
-.fleet-chat-msg-row--human {
-  margin-left: auto;
-  flex-direction: row-reverse;
-  max-width: min(28rem, 85%);
-}
-
+.fleet-chat-msg-row--human,
 .fleet-chat-msg-row--agent {
-  margin-right: auto;
-  max-width: min(42rem, 92%);
+  margin-left: 0;
+  margin-right: 0;
+  flex-direction: row;
+  max-width: 100%;
 }
 
 .fleet-chat-msg-row--system {
@@ -981,40 +995,37 @@
 
 .fleet-chat-bubble {
   min-width: 0;
-  flex: 0 1 auto;
-  border-radius: 1rem;
-  padding: 0.5rem 0.75rem;
-  font-family: var(--bevel-font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 13px;
-  line-height: 1.4;
+  flex: 1 1 auto;
+  max-width: 46rem;
+  border-radius: 0;
+  padding: 0;
+  font-family: var(--fleet-chat-font);
+  font-size: var(--fleet-chat-size);
+  line-height: var(--fleet-chat-leading);
   font-weight: 400;
-  letter-spacing: -0.011em;
+  letter-spacing: 0;
+  background: transparent;
+  border: none;
 }
 
-.fleet-chat-bubble--human {
-  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
-  background: color-mix(in srgb, var(--ink) 4%, var(--surface));
-  border-bottom-right-radius: 0.25rem;
-}
-
+.fleet-chat-bubble--human,
 .fleet-chat-bubble--agent {
-  max-width: 36rem;
-  border: 1px solid color-mix(in srgb, var(--msg-accent, var(--ink)) 18%, transparent);
-  border-left: 2px solid var(--msg-accent, var(--ink));
-  background: color-mix(in srgb, var(--msg-accent, var(--ink)) 5%, var(--cream));
-  border-bottom-left-radius: 0.25rem;
+  border: none;
+  background: transparent;
+  max-width: 46rem;
 }
 
 .fleet-chat-msg-label {
-  font-size: 0.5625rem;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--sticker-subtle);
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.2;
+  color: var(--ink);
 }
 
 .fleet-chat-msg-row--human .fleet-chat-msg-label {
-  text-align: right;
+  text-align: left;
 }
 
 .fleet-chat-msg-body {
@@ -1033,7 +1044,7 @@
 }
 
 .fleet-chat-msg-row--human .fleet-chat-msg-stack {
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .fleet-chat-gestures {
@@ -1670,15 +1681,15 @@ html[data-bevel-native='1'] .fleet-chat-gesture-row .fleet-chat-gesture-icon {
 }
 
 .fleet-chat-pre {
-  margin: 0.15rem 0 0;
+  margin: 0.25rem 0 0;
   max-width: 100%;
   overflow-x: auto;
-  padding: 0.45rem 0.6rem;
-  border-radius: 0.45rem;
+  padding: 8px 12px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--ink) 6%, var(--surface));
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
-  line-height: 1.4;
+  font-family: Monaco, Menlo, Consolas, ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.458;
   white-space: pre;
 }
 
@@ -1758,8 +1769,9 @@ html[data-bevel-native='1'] .fleet-chat-gesture-row .fleet-chat-gesture-icon {
 
 .fleet-chat-avatar,
 .fleet-chat-avatar-fallback {
-  height: 2.25rem;
-  width: 2.25rem;
+  height: 36px;
+  width: 36px;
+  border-radius: 8px;
 }
 
 /* Keeps bubble alignment when avatars are hidden via prefs */
@@ -1769,8 +1781,9 @@ html[data-bevel-native='1'] .fleet-chat-gesture-row .fleet-chat-gesture-icon {
 }
 
 .fleet-human-avatar[data-size='md'] {
-  height: 1.75rem;
-  width: 1.75rem;
+  height: 36px;
+  width: 36px;
+  border-radius: 8px;
 }
 
 .fleet-human-avatar[data-size='lg'] {
@@ -1912,14 +1925,14 @@ html[data-bevel-native='1'] .fleet-chat-gesture-row .fleet-chat-gesture-icon {
 
 .fleet-chat-input {
   width: 100%;
-  min-height: 2.75rem;
+  min-height: 42px;
   max-height: 10rem;
-  padding: 0.65rem 1.05rem;
-  font-size: 0.8125rem;
-  font-family: inherit;
-  line-height: 1.45;
-  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
-  border-radius: 1.1rem;
+  padding: 9px 12px;
+  font-size: 15px;
+  font-family: var(--fleet-chat-font);
+  line-height: 22px;
+  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  border-radius: 8px;
   background: var(--surface);
   color: var(--ink);
   box-sizing: border-box;

@@ -23,6 +23,8 @@ import {
   type SchemaMessage,
 } from '../lib/colyseus-messages'
 import { ChatMessageBody } from '../lib/chat-markdown'
+import { firstHttpUrl } from '../lib/link-preview'
+import { LinkPreviewCard } from './LinkPreviewCard'
 import {
   MAX_CHAT_IMAGES,
   chatImageMarkdown,
@@ -455,9 +457,7 @@ function MessageRow({
             onToggle={onGesture ? (kind) => onGesture(m.id, kind) : undefined}
             onOpenDock={onOpenDock}
           >
-            {!isSelf ? (
-              <p className="fleet-chat-msg-label">{label}</p>
-            ) : null}
+            <p className="fleet-chat-msg-label">{isSelf ? 'You' : label}</p>
             <div className="fleet-chat-msg-body">
               {highlightQuery?.trim() ? (
                 <p className="whitespace-pre-wrap">
@@ -641,7 +641,7 @@ export function FleetChat({
   const [pendingImages, setPendingImages] = useState<PendingChatImage[]>([])
   const [attachBusy, setAttachBusy] = useState(false)
   const [dropping, setDropping] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [agentIds, setAgentIds] = useState<string[]>(() =>
     bootSnapshot?.agentIds?.length ? bootSnapshot.agentIds : initialAgents
@@ -1399,11 +1399,29 @@ export function FleetChat({
     })
   }
 
-  function handleClipboardPaste(event: React.ClipboardEvent) {
+  function handleClipboardPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
     const files = collectImageFiles(event.clipboardData)
-    if (files.length === 0) return
+    if (files.length > 0) {
+      event.preventDefault()
+      addImageFiles(files)
+      return
+    }
+    const text = event.clipboardData.getData('text/plain')
+    if (!text) return
     event.preventDefault()
-    addImageFiles(files)
+    const el = event.currentTarget
+    const start = el.selectionStart ?? input.length
+    const end = el.selectionEnd ?? start
+    const next = `${input.slice(0, start)}${text}${input.slice(end)}`
+    const caret = start + text.length
+    setInput(next)
+    setCaret(caret)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(caret, caret)
+      el.style.height = 'auto'
+      el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    })
   }
 
   useEffect(() => {
@@ -1868,6 +1886,12 @@ export function FleetChat({
           </div>
         ) : null}
 
+        {firstHttpUrl(input) ? (
+          <div className="bevel-link-card-slot">
+            <LinkPreviewCard url={firstHttpUrl(input) as string} />
+          </div>
+        ) : null}
+
         <div
           className="fleet-chat-composer"
           data-mentioning={liveMentions.length > 0 ? 'true' : 'false'}
@@ -1984,14 +2008,19 @@ export function FleetChat({
                 })}
               </ul>
             ) : null}
-            <input
+            <textarea
               ref={inputRef}
+              rows={1}
               value={input}
+              onPaste={handleClipboardPaste}
               onChange={(e) => {
                 setInput(e.target.value)
                 setCaret(e.target.selectionStart ?? e.target.value.length)
                 setMentionHighlight(0)
                 bumpPresence(true)
+                const el = e.currentTarget
+                el.style.height = 'auto'
+                el.style.height = `${Math.min(el.scrollHeight, 160)}px`
               }}
               onSelect={(e) => {
                 const t = e.currentTarget
