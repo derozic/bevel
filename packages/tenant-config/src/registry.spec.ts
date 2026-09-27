@@ -23,6 +23,7 @@ function tenant(partial: Partial<Tenant> & Pick<Tenant, 'host'>): Tenant {
       presenceSms: false,
       imessage: false,
       imessageInbox: false,
+      chatVideo: false,
       asyncStreams: true,
       liveSessions: true,
       analytics: true,
