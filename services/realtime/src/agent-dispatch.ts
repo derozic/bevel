@@ -145,7 +145,6 @@ export async function dispatchAgentWork(
       workRepo,
     })
   } catch (err) {
-    if (!shouldFallbackToNative(err)) throw err
     try {
       return await dispatchFleetNativeFallback(agentId, message, history)
     } catch {
