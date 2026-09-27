@@ -8,6 +8,15 @@ export const ALLOWED_CHAT_IMAGE_TYPES = new Set([
   'image/gif',
 ])
 
+const CONVERTIBLE_CHAT_IMAGE_TYPES = new Set([
+  'image/tiff',
+  'image/tif',
+  'image/heic',
+  'image/heif',
+  'image/bmp',
+  'image/x-png',
+])
+
 const SAFE_SRC_RE =
   /^\/api\/chat\/images\/[a-z0-9]{8,40}\.(png|jpe?g|webp|gif)$/i
 const IMAGE_MD_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
@@ -58,7 +67,49 @@ export function extractChatImages(text: string): {
 export function isAllowedChatImageFile(file: File): boolean {
   if (file.size <= 0 || file.size > MAX_CHAT_IMAGE_BYTES) return false
   if (ALLOWED_CHAT_IMAGE_TYPES.has(file.type)) return true
+  if (CONVERTIBLE_CHAT_IMAGE_TYPES.has(file.type)) return true
+  if (!file.type && /\.(png|jpe?g|webp|gif|tiff?|heic|bmp)$/i.test(file.name || '')) {
+    return true
+  }
   return /\.(png|jpe?g|webp|gif)$/i.test(file.name)
+}
+
+function extForMime(type: string): string {
+  if (type === 'image/jpeg') return 'jpg'
+  if (type === 'image/webp') return 'webp'
+  if (type === 'image/gif') return 'gif'
+  return 'png'
+}
+
+/** macOS/WKWebView often pastes TIFF or a File with an empty type. Draw to PNG. */
+export async function normalizeChatImageFile(file: File): Promise<File | null> {
+  if (file.size <= 0 || file.size > MAX_CHAT_IMAGE_BYTES) return null
+  if (ALLOWED_CHAT_IMAGE_TYPES.has(file.type)) {
+    if (file.name && /\.(png|jpe?g|webp|gif)$/i.test(file.name)) return file
+    return new File([file], `paste.${extForMime(file.type)}`, {
+      type: file.type,
+      lastModified: file.lastModified,
+    })
+  }
+  try {
+    const bitmap = await createImageBitmap(file)
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0)
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/png'),
+    )
+    bitmap.close()
+    if (!blob || blob.size > MAX_CHAT_IMAGE_BYTES) return null
+    const base = (file.name || 'paste').replace(/\.[^.]+$/, '') || 'paste'
+    return new File([blob], `${base}.png`, { type: 'image/png' })
+  } catch {
+    if (ALLOWED_CHAT_IMAGE_TYPES.has(file.type)) return file
+    return null
+  }
 }
 
 export function collectImageFiles(data: DataTransfer | null): File[] {
@@ -75,7 +126,7 @@ export function collectImageFiles(data: DataTransfer | null): File[] {
   if (data.items?.length) {
     for (const item of Array.from(data.items)) {
       if (item.kind !== 'file') continue
-      if (item.type && !item.type.startsWith('image/')) continue
+      if (item.type && !item.type.startsWith('image/') && item.type !== '') continue
       push(item.getAsFile())
     }
   }
@@ -83,4 +134,36 @@ export function collectImageFiles(data: DataTransfer | null): File[] {
     for (const file of Array.from(data.files)) push(file)
   }
   return out
+}
+
+export function clipboardHasImage(data: DataTransfer | null): boolean {
+  if (!data) return false
+  if (collectImageFiles(data).length > 0) return true
+  return Array.from(data.items || []).some(
+    (item) =>
+      item.type.startsWith('image/') ||
+      (item.kind === 'file' && (!item.type || item.type.startsWith('image/'))),
+  )
+}
+
+export async function readImagesFromClipboard(): Promise<File[]> {
+  const read = navigator.clipboard?.read
+  if (!read) return []
+  try {
+    const items = await read.call(navigator.clipboard)
+    const files: File[] = []
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith('image/'))
+      if (!type) continue
+      const blob = await item.getType(type)
+      files.push(
+        new File([blob], `paste.${extForMime(blob.type || type)}`, {
+          type: blob.type || type,
+        }),
+      )
+    }
+    return files
+  } catch {
+    return []
+  }
 }

@@ -28,9 +28,12 @@ import { LinkPreviewCard } from './LinkPreviewCard'
 import {
   MAX_CHAT_IMAGES,
   chatImageMarkdown,
+  clipboardHasImage,
   collectImageFiles,
   hasChatImageMarkdown,
   isAllowedChatImageFile,
+  normalizeChatImageFile,
+  readImagesFromClipboard,
 } from '../lib/chat-images'
 import {
   applyMention,
@@ -1374,11 +1377,21 @@ export function FleetChat({
     })
   }
 
-  function addImageFiles(files: File[]) {
+  async function addImageFiles(files: File[]) {
     if (files.length === 0) return
+    const normalized = (
+      await Promise.all(files.map((file) => normalizeChatImageFile(file)))
+    ).filter((file): file is File => Boolean(file))
+    if (normalized.length === 0) {
+      setIssue({
+        title: 'Could not attach image',
+        hint: 'Use PNG, JPEG, WebP, or GIF (or paste a screenshot).',
+      })
+      return
+    }
     setPendingImages((prev) => {
       const room = Math.max(0, MAX_CHAT_IMAGES - prev.length)
-      const next = files.filter(isAllowedChatImageFile).slice(0, room)
+      const next = normalized.filter(isAllowedChatImageFile).slice(0, room)
       if (next.length === 0) return prev
       return [
         ...prev,
@@ -1399,30 +1412,53 @@ export function FleetChat({
     })
   }
 
+  async function ingestPastedImages(files: File[]) {
+    if (files.length === 0) return false
+    await addImageFiles(files)
+    return true
+  }
+
   function handleClipboardPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const files = collectImageFiles(event.clipboardData)
-    if (files.length > 0) {
+    const dt = event.clipboardData
+    const files = collectImageFiles(dt)
+    if (files.length > 0 || clipboardHasImage(dt)) {
       event.preventDefault()
-      addImageFiles(files)
+      void (async () => {
+        const fromEvent = files.length > 0 ? files : []
+        const ok = await ingestPastedImages(fromEvent)
+        if (!ok || fromEvent.length === 0) {
+          await ingestPastedImages(await readImagesFromClipboard())
+        }
+      })()
       return
     }
-    const text = event.clipboardData.getData('text/plain')
-    if (!text) return
-    event.preventDefault()
-    const el = event.currentTarget
-    const start = el.selectionStart ?? input.length
-    const end = el.selectionEnd ?? start
-    const next = `${input.slice(0, start)}${text}${input.slice(end)}`
-    const caret = start + text.length
-    setInput(next)
-    setCaret(caret)
-    requestAnimationFrame(() => {
-      el.focus()
-      el.setSelectionRange(caret, caret)
-      el.style.height = 'auto'
-      el.style.height = `${Math.min(el.scrollHeight, 160)}px`
-    })
   }
+
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        inputRef.current &&
+        target !== inputRef.current &&
+        target.closest('input, [contenteditable="true"]')
+      ) {
+        return
+      }
+      if (!clipboardHasImage(event.clipboardData)) return
+      event.preventDefault()
+      const files = collectImageFiles(event.clipboardData)
+      void (async () => {
+        if (files.length > 0) {
+          await ingestPastedImages(files)
+          return
+        }
+        await ingestPastedImages(await readImagesFromClipboard())
+      })()
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -1895,6 +1931,24 @@ export function FleetChat({
         <div
           className="fleet-chat-composer"
           data-mentioning={liveMentions.length > 0 ? 'true' : 'false'}
+          data-dropping={dropping ? 'true' : 'false'}
+          onDragEnter={(e) => {
+            e.preventDefault()
+            setDropping(true)
+          }}
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'copy'
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget.contains(e.relatedTarget as Node)) return
+            setDropping(false)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDropping(false)
+            void addImageFiles(collectImageFiles(e.dataTransfer))
+          }}
         >
           {fleet.canPutOnWork ? (
             <>
@@ -1924,7 +1978,44 @@ export function FleetChat({
             </>
           ) : null}
           <HumanAvatar name={displayName} avatarUrl={fleet.avatarUrl} size="sm" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/tiff"
+            multiple
+            hidden
+            onChange={(e) => {
+              const list = e.currentTarget.files
+              if (list?.length) void addImageFiles(Array.from(list))
+              e.currentTarget.value = ''
+            }}
+          />
+          <button
+            type="button"
+            className="fleet-chat-attach"
+            aria-label="Attach image"
+            title="Paste or attach an image"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <PhotoIcon className="h-4 w-4" />
+          </button>
           <div className="fleet-chat-composer-field">
+            {pendingImages.length > 0 ? (
+              <ul className="fleet-chat-pending-images">
+                {pendingImages.map((img) => (
+                  <li key={img.id}>
+                    <img src={img.previewUrl} alt="" />
+                    <button
+                      type="button"
+                      aria-label="Remove image"
+                      onClick={() => removePendingImage(img.id)}
+                    >
+                      <XMarkIcon className="h-3 w-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {mentionDraft && mentionCandidates.length > 0 ? (
               <ul
                 className="fleet-chat-mention-menu"
@@ -2089,7 +2180,12 @@ export function FleetChat({
           <button
             type="button"
             onClick={() => void send()}
-            disabled={!connected || !input.trim() || ticketBusy}
+            disabled={
+              !connected ||
+              ticketBusy ||
+              attachBusy ||
+              (!input.trim() && pendingImages.length === 0)
+            }
             className="fleet-chat-send btn-pop"
             aria-label="Send message"
           >

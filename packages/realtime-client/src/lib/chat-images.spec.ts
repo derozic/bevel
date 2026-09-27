@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   chatImageMarkdown,
+  collectImageFiles,
   extractChatImages,
   hasChatImageMarkdown,
+  isAllowedChatImageFile,
   isSafeChatImageSrc,
 } from './chat-images'
 
@@ -30,5 +32,32 @@ describe('chat images', () => {
     const { body, images } = extractChatImages('![x](https://evil.example/a.png)')
     expect(images).toEqual([])
     expect(body).toContain('https://evil.example/a.png')
+  })
+
+  it('accepts screenshot paste files including tiff and empty type', () => {
+    const png = new File([new Uint8Array([1, 2, 3, 4])], 'image.png', {
+      type: 'image/png',
+    })
+    const tiff = new File([new Uint8Array([1, 2, 3, 4, 5])], 'image.tiff', {
+      type: 'image/tiff',
+    })
+    const unnamed = new File([new Uint8Array([9, 8, 7, 6])], 'image.png', {
+      type: '',
+    })
+    expect(isAllowedChatImageFile(png)).toBe(true)
+    expect(isAllowedChatImageFile(tiff)).toBe(true)
+    expect(isAllowedChatImageFile(unnamed)).toBe(true)
+
+    const dt = {
+      items: [
+        {
+          kind: 'file',
+          type: 'image/png',
+          getAsFile: () => png,
+        },
+      ],
+      files: [png],
+    } as unknown as DataTransfer
+    expect(collectImageFiles(dt).map((f) => f.name)).toEqual(['image.png'])
   })
 })

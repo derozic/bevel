@@ -1909,6 +1909,68 @@ html[data-bevel-native='1'] .fleet-chat-gesture-row .fleet-chat-gesture-icon {
   background: color-mix(in srgb, var(--cream) 30%, var(--surface));
 }
 
+.fleet-chat-composer[data-dropping='true'] {
+  outline: 2px dashed color-mix(in srgb, var(--bevel-accent) 55%, transparent);
+  outline-offset: -6px;
+}
+
+.fleet-chat-attach {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sticker-muted, var(--bevel-text-muted));
+  cursor: pointer;
+}
+
+.fleet-chat-attach:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+
+.fleet-chat-pending-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  list-style: none;
+}
+
+.fleet-chat-pending-images li {
+  position: relative;
+}
+
+.fleet-chat-pending-images img {
+  display: block;
+  height: 56px;
+  width: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.fleet-chat-pending-images button {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  display: inline-flex;
+  height: 1.1rem;
+  width: 1.1rem;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--cream, #fff);
+  cursor: pointer;
+}
+
 .fleet-chat-input {
   width: 100%;
   min-height: 2.75rem;
