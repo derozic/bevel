@@ -29,6 +29,7 @@ import {
   MAX_CHAT_IMAGES,
   chatImageMarkdown,
   clipboardHasImage,
+  clipboardPlainText,
   collectImageFiles,
   hasChatImageMarkdown,
   isAllowedChatImageFile,
@@ -1420,18 +1421,18 @@ export function FleetChat({
 
   function handleClipboardPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
     const dt = event.clipboardData
+    const text = clipboardPlainText(dt)
     const files = collectImageFiles(dt)
-    if (files.length > 0 || clipboardHasImage(dt)) {
-      event.preventDefault()
-      void (async () => {
-        const fromEvent = files.length > 0 ? files : []
-        const ok = await ingestPastedImages(fromEvent)
-        if (!ok || fromEvent.length === 0) {
-          await ingestPastedImages(await readImagesFromClipboard())
-        }
-      })()
+    if (files.length > 0) {
+      if (!text) event.preventDefault()
+      void ingestPastedImages(files)
       return
     }
+    if (text) return
+    event.preventDefault()
+    void (async () => {
+      await ingestPastedImages(await readImagesFromClipboard())
+    })()
   }
 
   useEffect(() => {
@@ -1445,9 +1446,14 @@ export function FleetChat({
       ) {
         return
       }
-      if (!clipboardHasImage(event.clipboardData)) return
-      event.preventDefault()
+      const text = clipboardPlainText(event.clipboardData)
       const files = collectImageFiles(event.clipboardData)
+      if (text) {
+        if (files.length > 0) void ingestPastedImages(files)
+        return
+      }
+      if (files.length === 0 && !clipboardHasImage(event.clipboardData)) return
+      event.preventDefault()
       void (async () => {
         if (files.length > 0) {
           await ingestPastedImages(files)

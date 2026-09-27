@@ -126,24 +126,26 @@ export function collectImageFiles(data: DataTransfer | null): File[] {
   if (data.items?.length) {
     for (const item of Array.from(data.items)) {
       if (item.kind !== 'file') continue
-      if (item.type && !item.type.startsWith('image/') && item.type !== '') continue
+      if (item.type && !item.type.startsWith('image/')) continue
       push(item.getAsFile())
     }
   }
   if (out.length === 0 && data.files?.length) {
-    for (const file of Array.from(data.files)) push(file)
+    for (const file of Array.from(data.files)) {
+      if (file.type && !file.type.startsWith('image/')) continue
+      push(file)
+    }
   }
   return out
 }
 
+export function clipboardPlainText(data: DataTransfer | null): string {
+  if (!data) return ''
+  return (data.getData('text/plain') || data.getData('text/uri-list') || '').trim()
+}
+
 export function clipboardHasImage(data: DataTransfer | null): boolean {
-  if (!data) return false
-  if (collectImageFiles(data).length > 0) return true
-  return Array.from(data.items || []).some(
-    (item) =>
-      item.type.startsWith('image/') ||
-      (item.kind === 'file' && (!item.type || item.type.startsWith('image/'))),
-  )
+  return collectImageFiles(data).length > 0
 }
 
 export async function readImagesFromClipboard(): Promise<File[]> {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   chatImageMarkdown,
+  clipboardHasImage,
+  clipboardPlainText,
   collectImageFiles,
   extractChatImages,
   hasChatImageMarkdown,
@@ -59,5 +61,17 @@ describe('chat images', () => {
       files: [png],
     } as unknown as DataTransfer
     expect(collectImageFiles(dt).map((f) => f.name)).toEqual(['image.png'])
+  })
+
+  it('does not treat a URL clipboard as an image', () => {
+    const dt = {
+      items: [{ kind: 'string', type: 'text/plain', getAsFile: () => null }],
+      files: [],
+      getData: (kind: string) =>
+        kind === 'text/plain' ? 'https://bevel.is/talk/hermes' : '',
+    } as unknown as DataTransfer
+    expect(collectImageFiles(dt)).toEqual([])
+    expect(clipboardHasImage(dt)).toBe(false)
+    expect(clipboardPlainText(dt)).toBe('https://bevel.is/talk/hermes')
   })
 })
