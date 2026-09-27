@@ -44,6 +44,7 @@ export type FleetContextValue = {
   githubLogin?: string | null
   onLinkGitHub?: () => void
   ticketApiPath?: string
+  canAttachVideo?: boolean
 }
 
 const FleetContext = createContext<FleetContextValue | null>(null)
@@ -76,6 +77,7 @@ export function FleetProvider({
   githubLogin,
   onLinkGitHub,
   ticketApiPath = '/api/github/tickets',
+  canAttachVideo = false,
 }: {
   children: ReactNode
   realtimeUrl?: string
@@ -104,6 +106,7 @@ export function FleetProvider({
   githubLogin?: string | null
   onLinkGitHub?: () => void
   ticketApiPath?: string
+  canAttachVideo?: boolean
 }) {
   const resolvedRealtimeUrl = useMemo(
     () => realtimeUrl ?? resolveRealtimeUrl(),
@@ -137,6 +140,7 @@ export function FleetProvider({
       githubLogin,
       onLinkGitHub,
       ticketApiPath,
+      canAttachVideo,
     }),
     [
       resolvedRealtimeUrl,
@@ -165,6 +169,7 @@ export function FleetProvider({
       githubLogin,
       onLinkGitHub,
       ticketApiPath,
+      canAttachVideo,
     ]
   )
   return <FleetContext.Provider value={value}>{children}</FleetContext.Provider>

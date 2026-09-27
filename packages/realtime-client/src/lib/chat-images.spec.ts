@@ -26,7 +26,7 @@ describe('chat images', () => {
       `look\n\n${chatImageMarkdown('shot.png', src)}\n`,
     )
     expect(body).toBe('look')
-    expect(images).toEqual([{ alt: 'shot.png', src }])
+    expect(images).toEqual([{ alt: 'shot.png', src, kind: 'image' }])
     expect(hasChatImageMarkdown(`x ${chatImageMarkdown('a', src)}`)).toBe(true)
   })
 

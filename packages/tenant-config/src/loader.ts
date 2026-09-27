@@ -207,6 +207,7 @@ export function compileTenant(
     ['presence_sms', 'presenceSms'],
     ['imessage', 'imessage'],
     ['imessage_inbox', 'imessageInbox'],
+    ['chat_video', 'chatVideo'],
     ['sso_saml', 'ssoSaml'],
     ['audit_log', 'auditLog'],
     ['dedicated_support', 'dedicatedSupport'],

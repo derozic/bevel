@@ -66,6 +66,7 @@ export const DeclarativeFeaturesSchema = z.object({
   presence_sms: z.boolean().optional(),
   imessage: z.boolean().optional(),
   imessage_inbox: z.boolean().optional(),
+  chat_video: z.boolean().optional(),
   sso_saml: z.boolean().optional(),
   audit_log: z.boolean().optional(),
   dedicated_support: z.boolean().optional(),

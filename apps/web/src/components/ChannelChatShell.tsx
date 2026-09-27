@@ -13,6 +13,7 @@ import {
 } from '@/lib/bevel'
 import { UserMenu } from '@/components/UserMenu'
 import { ChatHeaderTools } from '@/components/ChatHeaderTools'
+import { ConversationLinkButton } from '@/components/ConversationLinkButton'
 import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 import {
   ensureNotificationPermission,
@@ -85,6 +86,12 @@ export function ChannelChatShell({
   const [canPutOnWork, setCanPutOnWork] = useState(
     () => Boolean(session?.canPutOnWork),
   )
+  const [canAttachVideo, setCanAttachVideo] = useState(false)
+  useEffect(() => {
+    setCanAttachVideo(
+      document.documentElement.getAttribute('data-chat-video') === 'true',
+    )
+  }, [])
   const [workMeta, setWorkMeta] = useState<WorkAccessMeta | null>(() =>
     session?.githubLogin
       ? {
@@ -216,6 +223,7 @@ export function ChannelChatShell({
       sessionTitle={sessionTitle}
       showPoweredBy={false}
       canPutOnWork={resolvedCanPutOnWork}
+      canAttachVideo={canAttachVideo}
       workRepo={selectedWorkRepo ?? defaultRepo}
       workRepos={workRepos}
       selectedWorkRepo={selectedWorkRepo ?? defaultRepo}
@@ -245,6 +253,15 @@ export function ChannelChatShell({
         onChannelToggle={onChannelToggle}
         userMenu={
           <>
+            <ConversationLinkButton
+              targetKind={roomMode === 'channel' ? 'channel' : 'session'}
+              targetId={roomMode === 'channel' ? channelSlug : sessionId || channelSlug}
+              title={
+                sessionTitle ||
+                (roomMode === 'channel' ? `~${channelSlug}` : 'Conversation')
+              }
+              agentIds={initialAgents}
+            />
             <ChatHeaderTools />
             <UserMenu size="sm" align="end" />
           </>

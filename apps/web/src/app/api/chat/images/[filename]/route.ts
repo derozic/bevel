@@ -15,6 +15,9 @@ const CONTENT_TYPE: Record<string, string> = {
   jpeg: 'image/jpeg',
   webp: 'image/webp',
   gif: 'image/gif',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
 }
 
 export async function GET(

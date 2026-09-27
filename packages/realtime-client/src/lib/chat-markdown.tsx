@@ -88,23 +88,36 @@ function inlineFormat(text: string, keyPrefix: string): ReactNode[] {
 function ChatImageStrip({
   images,
 }: {
-  images: Array<{ alt: string; src: string }>
+  images: Array<{ alt: string; src: string; kind: 'image' | 'video' }>
 }) {
   if (images.length === 0) return null
   return (
     <div className="fleet-chat-msg-images">
-      {images.map((img) => (
-        <a
-          key={img.src}
-          href={img.src}
-          target="_blank"
-          rel="noreferrer"
-          className="fleet-chat-msg-image-link"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img.src} alt={img.alt} className="fleet-chat-msg-image" />
-        </a>
-      ))}
+      {images.map((img) =>
+        img.kind === 'video' ? (
+          <video
+            key={img.src}
+            className="fleet-chat-msg-video"
+            src={img.src}
+            controls
+            playsInline
+            preload="metadata"
+          >
+            {img.alt}
+          </video>
+        ) : (
+          <a
+            key={img.src}
+            href={img.src}
+            target="_blank"
+            rel="noreferrer"
+            className="fleet-chat-msg-image-link"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={img.src} alt={img.alt} className="fleet-chat-msg-image" />
+          </a>
+        ),
+      )}
     </div>
   )
 }

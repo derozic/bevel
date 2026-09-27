@@ -17,13 +17,27 @@ const CONVERTIBLE_CHAT_IMAGE_TYPES = new Set([
   'image/x-png',
 ])
 
+export const MAX_CHAT_VIDEO_BYTES = 32 * 1024 * 1024
+export const MAX_CHAT_VIDEO_SECONDS = 30
+
+export const ALLOWED_CHAT_VIDEO_TYPES = new Set([
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+])
+
 const SAFE_SRC_RE =
-  /^\/api\/chat\/images\/[a-z0-9]{8,40}\.(png|jpe?g|webp|gif)$/i
+  /^\/api\/chat\/images\/[a-z0-9]{8,40}\.(png|jpe?g|webp|gif|mp4|webm|mov)$/i
 const IMAGE_MD_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
 
 export type ChatImageRef = {
   alt: string
   src: string
+  kind: 'image' | 'video'
+}
+
+export function isChatVideoSrc(src: string): boolean {
+  return /\.(mp4|webm|mov)$/i.test(src.split('?')[0] || '')
 }
 
 export function isSafeChatImageSrc(src: string): boolean {
@@ -54,8 +68,9 @@ export function extractChatImages(text: string): {
       const clean = String(src || '').trim()
       if (!isSafeChatImageSrc(clean)) return _full
       images.push({
-        alt: String(alt || '').trim() || 'image',
+        alt: String(alt || '').trim() || (isChatVideoSrc(clean) ? 'clip' : 'image'),
         src: clean,
+        kind: isChatVideoSrc(clean) ? 'video' : 'image',
       })
       return ''
     })
@@ -146,6 +161,66 @@ export function clipboardPlainText(data: DataTransfer | null): string {
 
 export function clipboardHasImage(data: DataTransfer | null): boolean {
   return collectImageFiles(data).length > 0
+}
+
+export function isAllowedChatVideoFile(file: File): boolean {
+  if (file.size <= 0 || file.size > MAX_CHAT_VIDEO_BYTES) return false
+  if (ALLOWED_CHAT_VIDEO_TYPES.has(file.type)) return true
+  return /\.(mp4|webm|mov)$/i.test(file.name)
+}
+
+export function collectVideoFiles(data: DataTransfer | null): File[] {
+  if (!data) return []
+  const out: File[] = []
+  const seen = new Set<string>()
+  const push = (file: File | null) => {
+    if (!file || !isAllowedChatVideoFile(file)) return
+    const key = `${file.name}:${file.size}:${file.lastModified}`
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push(file)
+  }
+  if (data.items?.length) {
+    for (const item of Array.from(data.items)) {
+      if (item.kind !== 'file') continue
+      if (item.type && !item.type.startsWith('video/')) continue
+      push(item.getAsFile())
+    }
+  }
+  if (out.length === 0 && data.files?.length) {
+    for (const file of Array.from(data.files)) {
+      if (file.type && !file.type.startsWith('video/')) continue
+      push(file)
+    }
+  }
+  return out
+}
+
+export function videoDurationSeconds(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const el = document.createElement('video')
+    el.preload = 'metadata'
+    el.onloadedmetadata = () => {
+      const d = el.duration
+      URL.revokeObjectURL(url)
+      resolve(Number.isFinite(d) ? d : 0)
+    }
+    el.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Could not read that clip'))
+    }
+    el.src = url
+  })
+}
+
+export async function normalizeChatVideoFile(file: File): Promise<File | null> {
+  if (!isAllowedChatVideoFile(file)) return null
+  const duration = await videoDurationSeconds(file)
+  if (duration > MAX_CHAT_VIDEO_SECONDS) {
+    throw new Error(`Clips are ${MAX_CHAT_VIDEO_SECONDS} seconds max`)
+  }
+  return file
 }
 
 export async function readImagesFromClipboard(): Promise<File[]> {

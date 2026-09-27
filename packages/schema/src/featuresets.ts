@@ -117,6 +117,7 @@ export const FEATURE_FLAG_IDS = [
   'presenceSms',
   'imessage',
   'imessageInbox',
+  'chatVideo',
   // Team+
   'liveMedia',
   'ssoSaml',
@@ -258,6 +259,13 @@ export const FEATURE_CATALOG: Record<FeatureFlagId, FeatureFlagDefinition> = {
     description: 'Enterprise full-history search + RAG over the owner inbox',
     minPlan: 'enterprise',
     release: 'beta',
+    paidOnly: true,
+  }),
+  chatVideo: def({
+    id: 'chatVideo',
+    label: 'Short video in chat',
+    description: 'Attach clips up to 30 seconds in threads (Pro)',
+    minPlan: 'pro',
     paidOnly: true,
   }),
   liveMedia: def({
@@ -572,6 +580,7 @@ export function toLegacyFeaturesObject(
   presenceSms: boolean
   imessage: boolean
   imessageInbox: boolean
+  chatVideo: boolean
   agentMemory: boolean
   agentTrace: boolean
   voiceRooms: boolean
@@ -597,6 +606,7 @@ export function toLegacyFeaturesObject(
     presenceSms: set.presenceSms,
     imessage: set.imessage,
     imessageInbox: set.imessageInbox,
+    chatVideo: set.chatVideo,
     agentMemory: set.agentMemory,
     agentTrace: set.agentTrace,
     voiceRooms: set.voiceRooms,

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import type { CSSProperties, ReactNode } from 'react'
+import { hasFeature } from '@bevel/schema'
 import {
   fetchCmykBrandKitTheme,
   getTenantFromRequest,
@@ -64,6 +65,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       data-tenant-logos={logosAttr}
       data-tenant-plan={tenant?.plan ?? 'free'}
       data-feature-access={tenant?.featureAccess ?? 'stable'}
+      data-chat-video={
+        tenant && hasFeature(tenant, 'chatVideo') ? 'true' : undefined
+      }
       data-theme={tenant?.theme.mode === 'light' ? 'day' : undefined}
       // Theme attrs + browser extensions (e.g. ColorZilla cz-shortcut-listen) may
       // differ between SSR HTML and the hydrated DOM — ignore those mismatches.

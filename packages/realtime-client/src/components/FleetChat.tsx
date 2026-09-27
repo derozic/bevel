@@ -33,7 +33,10 @@ import {
   collectImageFiles,
   hasChatImageMarkdown,
   isAllowedChatImageFile,
+  isAllowedChatVideoFile,
+  collectVideoFiles,
   normalizeChatImageFile,
+  normalizeChatVideoFile,
   readImagesFromClipboard,
 } from '../lib/chat-images'
 import {
@@ -107,6 +110,7 @@ type PendingChatImage = {
   id: string
   file: File
   previewUrl: string
+  kind: 'image' | 'video'
 }
 
 async function uploadChatImage(file: File): Promise<{ url: string; name: string }> {
@@ -1380,19 +1384,45 @@ export function FleetChat({
 
   async function addImageFiles(files: File[]) {
     if (files.length === 0) return
-    const normalized = (
-      await Promise.all(files.map((file) => normalizeChatImageFile(file)))
-    ).filter((file): file is File => Boolean(file))
-    if (normalized.length === 0) {
+    const imageFiles = files.filter(
+      (f) => isAllowedChatImageFile(f) && !isAllowedChatVideoFile(f),
+    )
+    const videoFiles = files.filter(isAllowedChatVideoFile)
+    if (videoFiles.length > 0 && !fleet.canAttachVideo) {
       setIssue({
-        title: 'Could not attach image',
-        hint: 'Use PNG, JPEG, WebP, or GIF (or paste a screenshot).',
+        title: 'Short clips are on Pro',
+        hint: 'Upgrade to attach MP4, WebM, or MOV up to 30 seconds.',
+      })
+    }
+    const allowedVideos = fleet.canAttachVideo ? videoFiles : []
+    let videos: File[] = []
+    try {
+      videos = (
+        await Promise.all(allowedVideos.map((file) => normalizeChatVideoFile(file)))
+      ).filter((file): file is File => Boolean(file))
+    } catch (err) {
+      setIssue({
+        title: 'Clip too long',
+        hint: err instanceof Error ? err.message : 'Clips are 30 seconds max.',
+      })
+    }
+    const images = (
+      await Promise.all(imageFiles.map((file) => normalizeChatImageFile(file)))
+    ).filter((file): file is File => Boolean(file))
+    const normalized = [...images, ...videos]
+    if (normalized.length === 0) {
+      if (videoFiles.length > 0 && !fleet.canAttachVideo) return
+      setIssue({
+        title: 'Could not attach',
+        hint: fleet.canAttachVideo
+          ? 'Use PNG, JPEG, WebP, GIF, or a short MP4/WebM/MOV.'
+          : 'Use PNG, JPEG, WebP, or GIF (or paste a screenshot).',
       })
       return
     }
     setPendingImages((prev) => {
       const room = Math.max(0, MAX_CHAT_IMAGES - prev.length)
-      const next = normalized.filter(isAllowedChatImageFile).slice(0, room)
+      const next = normalized.slice(0, room)
       if (next.length === 0) return prev
       return [
         ...prev,
@@ -1400,6 +1430,7 @@ export function FleetChat({
           id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           file,
           previewUrl: URL.createObjectURL(file),
+          kind: isAllowedChatVideoFile(file) ? ('video' as const) : ('image' as const),
         })),
       ]
     })
@@ -1953,7 +1984,10 @@ export function FleetChat({
           onDrop={(e) => {
             e.preventDefault()
             setDropping(false)
-            void addImageFiles(collectImageFiles(e.dataTransfer))
+            void addImageFiles([
+              ...collectImageFiles(e.dataTransfer),
+              ...collectVideoFiles(e.dataTransfer),
+            ])
           }}
         >
           {fleet.canPutOnWork ? (
@@ -1987,7 +2021,11 @@ export function FleetChat({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif,image/tiff"
+            accept={
+              fleet.canAttachVideo
+                ? 'image/png,image/jpeg,image/webp,image/gif,image/tiff,video/mp4,video/webm,video/quicktime'
+                : 'image/png,image/jpeg,image/webp,image/gif,image/tiff'
+            }
             multiple
             hidden
             onChange={(e) => {
@@ -2000,7 +2038,11 @@ export function FleetChat({
             type="button"
             className="fleet-chat-attach"
             aria-label="Attach image"
-            title="Paste or attach an image"
+            title={
+              fleet.canAttachVideo
+                ? 'Paste an image or attach a short clip (Pro, 30s)'
+                : 'Paste or attach an image'
+            }
             onClick={() => fileInputRef.current?.click()}
           >
             <PhotoIcon className="h-4 w-4" />
@@ -2010,7 +2052,11 @@ export function FleetChat({
               <ul className="fleet-chat-pending-images">
                 {pendingImages.map((img) => (
                   <li key={img.id}>
-                    <img src={img.previewUrl} alt="" />
+                    {img.kind === 'video' ? (
+                      <video src={img.previewUrl} muted playsInline />
+                    ) : (
+                      <img src={img.previewUrl} alt="" />
+                    )}
                     <button
                       type="button"
                       aria-label="Remove image"

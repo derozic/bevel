@@ -41,4 +41,10 @@ describe('feature catalog', () => {
     expect(set.channels).toBe(true)
     expect(set.directMessages).toBe(true)
   })
+
+  it('short chat video is Pro+', () => {
+    expect(defaultFeaturesForPlan('free', 'stable').chatVideo).toBe(false)
+    expect(defaultFeaturesForPlan('trial', 'stable').chatVideo).toBe(true)
+    expect(defaultFeaturesForPlan('pro', 'stable').chatVideo).toBe(true)
+  })
 })
