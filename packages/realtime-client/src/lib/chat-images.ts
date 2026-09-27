@@ -6,6 +6,7 @@ export const ALLOWED_CHAT_IMAGE_TYPES = new Set([
   'image/jpeg',
   'image/webp',
   'image/gif',
+  'image/svg+xml',
 ])
 
 const CONVERTIBLE_CHAT_IMAGE_TYPES = new Set([
@@ -27,7 +28,7 @@ export const ALLOWED_CHAT_VIDEO_TYPES = new Set([
 ])
 
 const SAFE_SRC_RE =
-  /^\/api\/chat\/images\/[a-z0-9]{8,40}\.(png|jpe?g|webp|gif|mp4|webm|mov)$/i
+  /^\/api\/chat\/images\/[a-z0-9]{8,40}\.(png|jpe?g|webp|gif|svg|mp4|webm|mov)$/i
 const IMAGE_MD_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
 
 export type ChatImageRef = {
@@ -83,10 +84,10 @@ export function isAllowedChatImageFile(file: File): boolean {
   if (file.size <= 0 || file.size > MAX_CHAT_IMAGE_BYTES) return false
   if (ALLOWED_CHAT_IMAGE_TYPES.has(file.type)) return true
   if (CONVERTIBLE_CHAT_IMAGE_TYPES.has(file.type)) return true
-  if (!file.type && /\.(png|jpe?g|webp|gif|tiff?|heic|bmp)$/i.test(file.name || '')) {
+  if (!file.type && /\.(png|jpe?g|webp|gif|svg|tiff?|heic|bmp)$/i.test(file.name || '')) {
     return true
   }
-  return /\.(png|jpe?g|webp|gif)$/i.test(file.name)
+  return /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)
 }
 
 function extForMime(type: string): string {
@@ -99,8 +100,14 @@ function extForMime(type: string): string {
 /** macOS/WKWebView often pastes TIFF or a File with an empty type. Draw to PNG. */
 export async function normalizeChatImageFile(file: File): Promise<File | null> {
   if (file.size <= 0 || file.size > MAX_CHAT_IMAGE_BYTES) return null
+  if (file.type === 'image/svg+xml' || /\.svg$/i.test(file.name)) {
+    return new File([file], file.name?.endsWith('.svg') ? file.name : 'mark.svg', {
+      type: 'image/svg+xml',
+      lastModified: file.lastModified,
+    })
+  }
   if (ALLOWED_CHAT_IMAGE_TYPES.has(file.type)) {
-    if (file.name && /\.(png|jpe?g|webp|gif)$/i.test(file.name)) return file
+    if (file.name && /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)) return file
     return new File([file], `paste.${extForMime(file.type)}`, {
       type: file.type,
       lastModified: file.lastModified,

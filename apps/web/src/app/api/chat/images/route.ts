@@ -12,8 +12,10 @@ import {
   extForChatImage,
   isAllowedChatImageMime,
   isAllowedChatVideoMime,
+  isChatSvgExt,
   isChatVideoExt,
 } from '@/lib/chat-image-store'
+import { sanitizeSvg, SVG_MAX_BYTES } from '@/lib/sanitize-svg'
 
 export const runtime = 'nodejs'
 
@@ -80,7 +82,16 @@ export async function POST(request: Request) {
     }
     if (!ext || (file.type && !isAllowedChatImageMime(file.type) && !ext)) {
       return NextResponse.json(
-        { error: 'Use PNG, JPEG, WebP, GIF, or a short MP4/WebM/MOV' },
+        { error: 'Use PNG, JPEG, WebP, GIF, SVG, or a short MP4/WebM/MOV' },
+        { status: 400 },
+      )
+    }
+    if (
+      (isChatSvgExt(ext) || file.type === 'image/svg+xml') &&
+      file.size > SVG_MAX_BYTES
+    ) {
+      return NextResponse.json(
+        { error: 'SVG must be under 512 KB' },
         { status: 400 },
       )
     }
@@ -89,7 +100,19 @@ export async function POST(request: Request) {
   const id = randomBytes(12).toString('hex')
   const filename = `${id}${ext}`
   const dir = await ensureChatImagesDir()
-  const bytes = Buffer.from(await file.arrayBuffer())
+  let bytes: Buffer
+  if (isChatSvgExt(ext) || file.type === 'image/svg+xml') {
+    const clean = sanitizeSvg(await file.text())
+    if (!clean) {
+      return NextResponse.json(
+        { error: 'That SVG did not pass the safety lint' },
+        { status: 400 },
+      )
+    }
+    bytes = Buffer.from(clean, 'utf8')
+  } else {
+    bytes = Buffer.from(await file.arrayBuffer())
+  }
   await writeFile(join(dir, filename), bytes)
 
   const name = (file.name || (isVideo ? 'clip' : 'image'))

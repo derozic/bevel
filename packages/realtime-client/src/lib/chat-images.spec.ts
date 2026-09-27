@@ -18,6 +18,7 @@ describe('chat images', () => {
     expect(isSafeChatImageSrc('javascript:alert(1)')).toBe(false)
     expect(isSafeChatImageSrc('/api/chat/images/../secret.png')).toBe(false)
     expect(isSafeChatImageSrc('/api/chat/images/abc.svg')).toBe(false)
+    expect(isSafeChatImageSrc('/api/chat/images/abc123def456.svg')).toBe(true)
   })
 
   it('lifts markdown images out of the message body', () => {
@@ -46,9 +47,13 @@ describe('chat images', () => {
     const unnamed = new File([new Uint8Array([9, 8, 7, 6])], 'image.png', {
       type: '',
     })
+    const svg = new File([new Uint8Array([1, 2, 3, 4])], 'mark.svg', {
+      type: 'image/svg+xml',
+    })
     expect(isAllowedChatImageFile(png)).toBe(true)
     expect(isAllowedChatImageFile(tiff)).toBe(true)
     expect(isAllowedChatImageFile(unnamed)).toBe(true)
+    expect(isAllowedChatImageFile(svg)).toBe(true)
 
     const dt = {
       items: [

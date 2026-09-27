@@ -2100,6 +2100,39 @@ html[data-bevel-native='1'] .fleet-chat-gesture-row .fleet-chat-gesture-icon {
   overflow: hidden;
 }
 
+.bevel-link-card-cta {
+  margin: 0.3rem 0 0;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9a3412;
+}
+
+.bevel-link-card[data-kind='preso'] .bevel-link-card-mark {
+  background: #1a1410;
+}
+
+.bevel-link-card[data-kind='plink'] .bevel-link-card-mark {
+  background: #a21caf;
+}
+
+.bevel-link-card[data-kind='neuron'] .bevel-link-card-mark {
+  background: #5b21b6;
+}
+
+.bevel-link-card[data-kind='olimbic'] .bevel-link-card-mark {
+  background: #0f766e;
+}
+
+.bevel-link-card[data-kind='leaderboard'] .bevel-link-card-mark {
+  background: #b45309;
+}
+
+.bevel-link-card[data-kind='highlight'] .bevel-link-card-mark {
+  background: #9a3412;
+}
+
 .bevel-link-card-brain {
   height: 2rem;
   padding: 0 0.75rem;

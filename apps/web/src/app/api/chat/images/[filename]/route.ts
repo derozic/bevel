@@ -15,6 +15,7 @@ const CONTENT_TYPE: Record<string, string> = {
   jpeg: 'image/jpeg',
   webp: 'image/webp',
   gif: 'image/gif',
+  svg: 'image/svg+xml; charset=utf-8',
   mp4: 'video/mp4',
   webm: 'video/webm',
   mov: 'video/quicktime',
@@ -38,13 +39,18 @@ export async function GET(
   try {
     const bytes = await readFile(join(chatImagesDir(), safe))
     const ext = safe.split('.').pop()?.toLowerCase() || 'png'
+    const headers: Record<string, string> = {
+      'Content-Type': CONTENT_TYPE[ext] || 'application/octet-stream',
+      'Cache-Control': 'private, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+    }
+    if (ext === 'svg') {
+      headers['Content-Security-Policy'] = "default-src 'none'; sandbox"
+      headers['Content-Disposition'] = 'inline'
+    }
     return new NextResponse(bytes, {
       status: 200,
-      headers: {
-        'Content-Type': CONTENT_TYPE[ext] || 'application/octet-stream',
-        'Cache-Control': 'private, max-age=31536000, immutable',
-        'X-Content-Type-Options': 'nosniff',
-      },
+      headers,
     })
   } catch {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })

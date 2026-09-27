@@ -50,7 +50,11 @@ export function LinkPreviewCard({ url }: { url: string }) {
   }
 
   return (
-    <article className="bevel-link-card" data-loading={loading ? 'true' : 'false'}>
+    <article
+      className="bevel-link-card"
+      data-loading={loading ? 'true' : 'false'}
+      data-kind={preview?.kind || 'generic'}
+    >
       <span className="bevel-link-card-orbit" aria-hidden>
         <span />
       </span>
@@ -63,12 +67,23 @@ export function LinkPreviewCard({ url }: { url: string }) {
         </span>
       )}
       <div className="bevel-link-card-copy">
-        <p className="bevel-link-card-site">{loading ? 'Reading the page' : site}</p>
-        <a href={url} target="_blank" rel="noreferrer" className="bevel-link-card-title">
+        <p className="bevel-link-card-site">
+          {loading ? 'Reading the page' : preview?.kicker || site}
+        </p>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="bevel-link-card-title"
+          aria-label={preview?.cta ? `${preview.cta}: ${preview.title || site}` : undefined}
+        >
           {preview?.title || site}
         </a>
         {preview?.description ? (
           <p className="bevel-link-card-desc">{preview.description}</p>
+        ) : null}
+        {preview?.cta && preview.kind !== 'generic' ? (
+          <p className="bevel-link-card-cta">{preview.cta}</p>
         ) : null}
       </div>
       <button type="button" className="bevel-link-card-brain" data-state={brain} onClick={() => void save()}>

@@ -2023,8 +2023,8 @@ export function FleetChat({
             type="file"
             accept={
               fleet.canAttachVideo
-                ? 'image/png,image/jpeg,image/webp,image/gif,image/tiff,video/mp4,video/webm,video/quicktime'
-                : 'image/png,image/jpeg,image/webp,image/gif,image/tiff'
+                ? 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml,image/tiff,video/mp4,video/webm,video/quicktime'
+                : 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml,image/tiff'
             }
             multiple
             hidden
