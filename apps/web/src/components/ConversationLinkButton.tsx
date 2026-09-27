@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { LinkIcon } from '@heroicons/react/24/outline'
-import { usePreferencesOptional } from '@/components/preferences/PreferencesProvider'
 
 export function ConversationLinkButton({
   targetKind,
@@ -15,8 +14,6 @@ export function ConversationLinkButton({
   title: string
   agentIds: string[]
 }) {
-  const prefs = usePreferencesOptional()
-  const access = prefs?.prefs.domains
   const [open, setOpen] = useState(false)
   const [expire, setExpire] = useState(true)
   const [pinOn, setPinOn] = useState(false)
@@ -27,10 +24,6 @@ export function ConversationLinkButton({
   const [busy, setBusy] = useState(false)
 
   async function createLink() {
-    if ((access?.verify ?? 'single') === 'double' && !pinOn) {
-      setError('Double verification needs a PIN as well as sign-in')
-      return
-    }
     if (pinOn && pin.length !== pinLength) {
       setError(`Enter a ${pinLength}-digit code`)
       return
@@ -49,8 +42,8 @@ export function ConversationLinkButton({
           expireInDays: expire ? 7 : null,
           pin: pinOn ? pin : null,
           pinLength: pinOn ? pinLength : null,
-          allowOutside: access?.allowOutside ?? false,
-          verify: access?.verify ?? 'single',
+          allowOutside: false,
+          verify: pinOn ? 'double' : 'single',
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
