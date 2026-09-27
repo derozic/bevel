@@ -927,6 +927,12 @@ export class FleetChannel extends Room {
           code: sanitized.code,
           detail: sanitized.detail,
         })
+        const last = [...this.state.messages]
+          .reverse()
+          .find((m) => m.agentId === target && m.speakerType === 'agent')
+        if (last?.body === sanitized.publicMessage) {
+          continue
+        }
         await this.pushAgentReply(target, agentName, sanitized.publicMessage, {
           ...workMeta,
           status: 'error',

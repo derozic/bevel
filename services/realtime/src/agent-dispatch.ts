@@ -8,7 +8,7 @@ import {
   dispatchPlatformAgentChat,
   isPlatformAgent,
 } from './platform-providers.js'
-import { shouldFallbackToNative } from './sanitize-agent-error.js'
+import { isLeakedAgentFailure } from './sanitize-agent-error.js'
 
 const require = createRequire(import.meta.url)
 
@@ -78,8 +78,8 @@ export async function dispatchAgentChat(
   if (typeof runAgentChat !== 'function') {
     throw new Error('Fleet runner is missing runAgentChat')
   }
-  try {
-    return await runAgentChat(agentId, message, history, {
+  const run = () =>
+    runAgentChat(agentId, message, history, {
       metadata: {
         personalAgent: opts.personalAgent === true,
         solo: opts.personalAgent === true,
@@ -89,14 +89,37 @@ export async function dispatchAgentChat(
         fleet: opts.personalAgent !== true,
       },
     })
+
+  try {
+    const res = await run()
+    if (!looksLikeProviderFailure(res.output, res.confidence)) return res
+    console.warn('[dispatch] OpenRouter path failed in-band; cascading to native LLM', {
+      agentId,
+    })
+    return await dispatchFleetNativeFallback(agentId, message, history)
   } catch (err) {
-    if (!shouldFallbackToNative(err)) throw err
     try {
+      console.warn('[dispatch] OpenRouter unavailable; cascading to native LLM', {
+        agentId,
+      })
       return await dispatchFleetNativeFallback(agentId, message, history)
     } catch {
       throw err
     }
   }
+}
+
+function looksLikeProviderFailure(output?: string, confidence?: number): boolean {
+  const text = output || ''
+  if (isLeakedAgentFailure(text)) return true
+  if (
+    /cannot reach the model provider|openrouter_api_key|not configured on this host|unauthorized|status code 401|status code 403/i.test(
+      text,
+    )
+  ) {
+    return true
+  }
+  return confidence === 0 && /not configured|cannot reach|missing/i.test(text)
 }
 
 export async function dispatchAgentWork(
