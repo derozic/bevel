@@ -1,0 +1,148 @@
+.bevel-join {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 3rem 1.25rem 4rem;
+  background: #f3eee6;
+  color: #1a1410;
+  text-align: center;
+}
+
+.bevel-join h1 {
+  margin: 0.4rem 0 0;
+  font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.bevel-join-lead,
+.bevel-join-copy {
+  margin: 0;
+  max-width: 34rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: #5c564e;
+}
+
+.bevel-join-copy a {
+  color: #1a1410;
+}
+
+.bevel-join-orbit {
+  position: relative;
+  width: 4.5rem;
+  height: 4.5rem;
+  display: grid;
+  place-items: center;
+}
+
+.bevel-join-mark {
+  width: 3.1rem;
+  height: 3.1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.9rem;
+  background: #1a1410;
+  color: #f3eee6;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.bevel-join-comet {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  padding: 2px;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.bevel-join-orbit[data-live='true'] .bevel-join-comet::before {
+  content: '';
+  position: absolute;
+  inset: -140%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 250deg,
+    color-mix(in srgb, #e85d04 40%, transparent) 310deg,
+    #f6e2d4 338deg,
+    #e85d04 356deg,
+    transparent 360deg
+  );
+  animation: bevel-join-spin 2.4s linear infinite;
+}
+
+@keyframes bevel-join-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bevel-join-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+
+.bevel-join-pin label {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5c564e;
+}
+
+.bevel-join-pin input {
+  width: 9rem;
+  border: 0;
+  border-bottom: 2px solid #1a1410;
+  background: transparent;
+  text-align: center;
+  font-size: 1.6rem;
+  letter-spacing: 0.35em;
+  color: #1a1410;
+}
+
+.bevel-join-pin button {
+  height: 2.4rem;
+  padding: 0 1.2rem;
+  border: 0;
+  border-radius: 999px;
+  background: #1a1410;
+  color: #f3eee6;
+  font-weight: 650;
+}
+
+.bevel-join-pin button:disabled {
+  opacity: 0.5;
+}
+
+.bevel-join-pin p {
+  margin: 0;
+  color: #9a3412;
+  font-size: 0.85rem;
+}
+
+.bevel-join-auth {
+  width: min(28rem, 100%);
+  margin-top: 0.8rem;
+  text-align: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bevel-join-orbit[data-live='true'] .bevel-join-comet::before {
+    animation: none;
+  }
+
+  .bevel-join-comet {
+    box-shadow: inset 0 0 0 2px #e85d04;
+  }
+}

@@ -77,6 +77,91 @@ export function unfurlMeta(kind: BevelUnfurlKind): { kicker: string; cta: string
   return KIND_META[kind]
 }
 
+function humanSegment(raw: string): string {
+  try {
+    return decodeURIComponent(raw)
+      .replace(/^@/, '')
+      .replace(/[-_]+/g, ' ')
+      .trim()
+  } catch {
+    return raw.replace(/[-_]+/g, ' ').trim()
+  }
+}
+
+/** Title from a first-party path when Open Graph is empty or just the host. */
+export function titleFromBevelUrl(url: string, kind: BevelUnfurlKind): string {
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^www\./, '')
+    const parts = u.pathname.split('/').filter(Boolean)
+    if (kind === 'neuron') {
+      const i = parts.findIndex((p) => p === 'n' || p === 'neuron' || p === 'neurons')
+      if (i >= 0 && parts[i + 1]) return humanSegment(parts[i + 1])
+    }
+    if (kind === 'plink' && parts[0] === 'p' && parts[1]) return humanSegment(parts[1])
+    if (kind !== 'generic' && parts.length) return humanSegment(parts[parts.length - 1])
+    return host
+  } catch {
+    return url
+  }
+}
+
+export function firstPartyBlurb(kind: BevelUnfurlKind): string {
+  switch (kind) {
+    case 'preso':
+      return 'A Preso deck'
+    case 'plink':
+      return 'A Preso Plink'
+    case 'neuron':
+      return 'A 2ndbrain neuron'
+    case 'olimbic':
+      return 'An Olimbic profile'
+    case 'leaderboard':
+      return 'Live standings'
+    case 'highlight':
+      return 'A game highlight'
+    default:
+      return ''
+  }
+}
+
+const BLOCKED_HOST_SUFFIXES = [
+  '.local',
+  '.internal',
+  '.localhost',
+  '.lvh.me',
+  '.nip.io',
+  '.sslip.io',
+] as const
+
+/** Fail-closed SSRF gate for the unfurl fetch. Loopback aliases never leave this box. */
+export function previewableUrl(raw: string): URL | null {
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+  const host = url.hostname.toLowerCase()
+  if (
+    host === 'localhost' ||
+    host === 'lvh.me' ||
+    host === '0.0.0.0' ||
+    host === '::1'
+  ) {
+    return null
+  }
+  if (BLOCKED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) return null
+  if (
+    /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+  ) {
+    return null
+  }
+  return url
+}
+
 export function firstHttpUrl(text: string): string | null {
   const match = text.match(URL_RE)
   if (!match) return null

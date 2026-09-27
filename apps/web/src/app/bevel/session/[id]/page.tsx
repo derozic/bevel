@@ -10,6 +10,7 @@ import {
   bevelSessionPath,
 } from '@/lib/bevel'
 import { fetchSessionSummaries } from '@/lib/realtime-server'
+import { joinPassMatches, readJoinPass } from '@/lib/join-pass'
 
 export async function generateMetadata({
   params,
@@ -36,10 +37,9 @@ export default async function BevelResumeSessionPage({
   const { id: sessionId } = await params
   const { msg, q } = await searchParams
 
-  if (!session?.user) {
-    redirect(
-      `/login?callbackUrl=${encodeURIComponent(bevelSessionPath(sessionId))}`
-    )
+  const sessionHref = bevelSessionPath(sessionId)
+  if (!session?.user && !joinPassMatches(await readJoinPass(), sessionHref)) {
+    redirect(`/login?callbackUrl=${encodeURIComponent(sessionHref)}`)
   }
 
   const summaries = await fetchSessionSummaries().catch(() => [])

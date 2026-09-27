@@ -22,7 +22,9 @@ Same-origin filename regex is the only src the client will lift out of markdown 
 
 ## Unfurls
 
-`GET /api/link-preview?url=` scrapes Open Graph for **generic** public https URLs after an SSRF deny list (loopback, RFC1918, `.internal`, `.local`). The crawler User-Agent is `BevelLinkPreview/1.0` so Magenta can keep preview hits out of visitor counts.
+`GET /api/link-preview?url=` scrapes Open Graph for **generic** public https URLs after an SSRF deny list (loopback, RFC1918, `.internal`, `.local`, `.lvh.me`, nip.io). The crawler User-Agent is `BevelLinkPreview/1.0` so Magenta can keep preview hits out of visitor counts.
+
+When OG is empty, first-party cards still unfurl: title comes from the path (`/n/demo-neuron` → “demo neuron”), description from the kind blurb. **2ndbrain +** on the card POSTs `/api/brain/clip` and ingests an organism nugget onto the 2ndbrain `clips` track.
 
 First-party hosts skip “it is a webpage” and get a typed kicker + CTA:
 

@@ -8,6 +8,7 @@ import {
   bevelTalkPath,
 } from '@/lib/bevel'
 import { parseChatAgentsParam } from '@/lib/chat-agents'
+import { joinPassMatches, readJoinPass } from '@/lib/join-pass'
 import { sessionActorId } from '@/lib/session-user'
 import { NATIVE_COMPLETE_PATH, isNativeLoginPending } from '@/lib/auth-native'
 
@@ -42,12 +43,17 @@ export async function AgentBevelSessionView({
   const agentNames = agentIds.map((id) => getAgentById(id)?.name ?? id)
   const sessionTitle = bevelConversationTitle(agentNames)
 
-  const actorId = sessionActorId(session)
+  const pass = await readJoinPass()
+  const pinGuest = joinPassMatches(pass, callbackPath.split('?')[0] || callbackPath)
+  let actorId = sessionActorId(session)
   if (await isNativeLoginPending()) {
     redirect(NATIVE_COMPLETE_PATH)
   }
   // Email-only sessions must not redirect to /login — login sees email and
   // sends them right back here (full-page flicker).
+  if (!actorId && pinGuest && pass) {
+    actorId = `pin:${pass.linkId}`
+  }
   if (!actorId) {
     redirect(`/login?callbackUrl=${encodeURIComponent(callbackPath)}`)
   }

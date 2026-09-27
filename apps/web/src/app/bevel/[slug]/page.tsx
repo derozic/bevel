@@ -12,6 +12,7 @@ import {
   normalizeBevelChannelSlug,
 } from '@/lib/bevel'
 import { resolveChatAgents } from '@/lib/chat-agents'
+import { joinPassMatches, readJoinPass } from '@/lib/join-pass'
 
 export async function generateMetadata({
   params,
@@ -52,10 +53,9 @@ export default async function BevelChannelPage({
   const initialAgents = resolveChatAgents(agentsParam)
   const channelSlug = normalizeBevelChannelSlug(slug)
 
-  if (!session?.user) {
-    redirect(
-      `/login?callbackUrl=${encodeURIComponent(bevelChannelPath(channelSlug))}`,
-    )
+  const channelHref = bevelChannelPath(channelSlug)
+  if (!session?.user && !joinPassMatches(await readJoinPass(), channelHref)) {
+    redirect(`/login?callbackUrl=${encodeURIComponent(channelHref)}`)
   }
 
   return (
