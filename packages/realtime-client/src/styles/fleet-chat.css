@@ -1,33 +1,17 @@
 @import './nuggets.css';
 
-/* Slack-like thread type: Lato 15 / 22, message blocks not iMessage bubbles. */
-
-@font-face {
-  font-family: 'Lato';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/lato/lato-latin-400.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Lato';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/fonts/lato/lato-latin-700.woff2') format('woff2');
-}
+/* BEVEL thread: same Inter as the product, 14/20, crease on agents. */
 
 .fleet-chat {
-  --fleet-chat-font: Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --fleet-chat-size: 15px;
-  --fleet-chat-leading: 22px;
+  --fleet-chat-font: var(--bevel-font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
+  --fleet-chat-size: 14px;
+  --fleet-chat-leading: 20px;
   color: var(--ink);
   font-family: var(--fleet-chat-font);
   font-size: var(--fleet-chat-size);
   font-weight: 400;
   line-height: var(--fleet-chat-leading);
-  letter-spacing: 0;
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -996,32 +980,34 @@
 .fleet-chat-bubble {
   min-width: 0;
   flex: 1 1 auto;
-  max-width: 46rem;
+  max-width: 40rem;
   border-radius: 0;
-  padding: 0;
+  padding: 0 0 0 0.7rem;
   font-family: var(--fleet-chat-font);
   font-size: var(--fleet-chat-size);
   line-height: var(--fleet-chat-leading);
   font-weight: 400;
-  letter-spacing: 0;
+  letter-spacing: -0.011em;
   background: transparent;
   border: none;
 }
 
-.fleet-chat-bubble--human,
+.fleet-chat-bubble--human {
+  border-left: 2px solid color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
 .fleet-chat-bubble--agent {
-  border: none;
-  background: transparent;
-  max-width: 46rem;
+  max-width: 40rem;
+  border-left: 2px solid var(--msg-accent, var(--bevel-accent));
 }
 
 .fleet-chat-msg-label {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   text-transform: none;
   line-height: 1.2;
-  color: var(--ink);
+  color: var(--sticker-muted, var(--bevel-text-muted));
 }
 
 .fleet-chat-msg-row--human .fleet-chat-msg-label {
@@ -1925,14 +1911,15 @@ html[data-bevel-native='1'] .fleet-chat-gesture-row .fleet-chat-gesture-icon {
 
 .fleet-chat-input {
   width: 100%;
-  min-height: 42px;
+  min-height: 2.75rem;
   max-height: 10rem;
-  padding: 9px 12px;
-  font-size: 15px;
+  padding: 0.6rem 0.9rem;
+  font-size: 14px;
   font-family: var(--fleet-chat-font);
-  line-height: 22px;
-  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
-  border-radius: 8px;
+  line-height: 20px;
+  letter-spacing: -0.011em;
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
   box-sizing: border-box;
