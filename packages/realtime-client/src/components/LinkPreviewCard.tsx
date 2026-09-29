@@ -63,7 +63,7 @@ export function LinkPreviewCard({ url }: { url: string }) {
         <img className="bevel-link-card-image" src={preview.image} alt="" />
       ) : (
         <span className="bevel-link-card-mark" aria-hidden>
-          {site.slice(0, 1).toUpperCase()}
+          {(preview?.kicker || site).slice(0, 1).toUpperCase()}
         </span>
       )}
       <div className="bevel-link-card-copy">

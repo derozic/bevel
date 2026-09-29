@@ -3,9 +3,11 @@ import {
   classifyBevelUrl,
   firstHttpUrl,
   firstPartyBlurb,
+  looksLikeSiteTitle,
   previewableUrl,
   siteLabel,
   titleFromBevelUrl,
+  unfurlEnvelope,
   unfurlMeta,
 } from './link-preview'
 
@@ -53,5 +55,45 @@ describe('link preview', () => {
     expect(previewableUrl('https://127.0.0.1/secret')).toBeNull()
     expect(previewableUrl('https://bevel.2ndbrain.lvh.me/n/x')).toBeNull()
     expect(previewableUrl('http://10.0.0.4/admin')).toBeNull()
+  })
+
+  it('treats homepage product titles as empty Open Graph', () => {
+    expect(
+      looksLikeSiteTitle('2nd Brain - Your AI-Powered Second Brain', 'neuron', '2ndbra.in'),
+    ).toBe(true)
+    expect(looksLikeSiteTitle('OLIMBIC · Weekly body contests', 'olimbic', 'olimbic.games')).toBe(
+      true,
+    )
+    expect(looksLikeSiteTitle('Magenta — First-party analytics you own', 'plink', 'magenta.ac')).toBe(
+      true,
+    )
+    expect(looksLikeSiteTitle('Raise round', 'preso', 'pres0.com')).toBe(false)
+    expect(looksLikeSiteTitle('demo neuron | 2ndBrain', 'neuron', '2ndbra.in')).toBe(false)
+  })
+
+  it('uses the path title when first-party OG is site-wide marketing copy', () => {
+    const neuron = unfurlEnvelope({
+      url: 'https://2ndbra.in/n/demo-neuron',
+      title: '2nd Brain - Your AI-Powered Second Brain',
+      description:
+        'Transform your digital knowledge into an intelligent companion. Save everything, recall anything.',
+      image: null,
+    })
+    expect(neuron).toMatchObject({
+      kind: 'neuron',
+      kicker: '2ndbrain',
+      cta: 'Open neuron',
+      title: 'demo neuron',
+      description: 'A 2ndbrain neuron',
+    })
+
+    const preso = unfurlEnvelope({
+      url: 'https://bevel.pres0.com/decks/raise',
+      title: 'Q3 fundraising',
+      description: 'Twelve slides on the round',
+      image: null,
+    })
+    expect(preso.title).toBe('Q3 fundraising')
+    expect(preso.description).toBe('Twelve slides on the round')
   })
 })

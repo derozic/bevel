@@ -125,6 +125,79 @@ export function firstPartyBlurb(kind: BevelUnfurlKind): string {
   }
 }
 
+function productNames(kind: BevelUnfurlKind): string[] {
+  switch (kind) {
+    case 'preso':
+      return ['preso', 'pres0']
+    case 'plink':
+      return ['plink', 'magenta', 'comma', 'comma community journalism lab']
+    case 'neuron':
+      return ['2ndbrain', '2nd brain', 'second brain']
+    case 'olimbic':
+    case 'leaderboard':
+    case 'highlight':
+      return ['olimbic']
+    default:
+      return []
+  }
+}
+
+/** Homepage / product-name titles are not the object. Magenta types the path first. */
+export function looksLikeSiteTitle(
+  title: string,
+  kind: BevelUnfurlKind,
+  host = '',
+): boolean {
+  const t = title.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!t) return true
+  const hostBare = host.toLowerCase().replace(/^www\./, '')
+  if (hostBare && (t === hostBare || t === hostBare.split('.')[0])) return true
+  for (const name of productNames(kind)) {
+    if (t === name) return true
+    if (t.startsWith(name)) {
+      const rest = t.slice(name.length).trim()
+      if (!rest) return true
+      if (/^[-—–·|:,]/.test(rest)) return true
+    }
+  }
+  return false
+}
+
+/** Build the Magenta envelope: type the object, treat site-wide OG as empty. */
+export function unfurlEnvelope(input: {
+  url: string
+  title: string
+  description: string
+  image: string | null
+}): LinkPreview {
+  const kind = classifyBevelUrl(input.url)
+  const { kicker, cta } = unfurlMeta(kind)
+  let host = ''
+  try {
+    host = new URL(input.url).hostname.replace(/^www\./, '')
+  } catch {
+    host = ''
+  }
+  const derived = titleFromBevelUrl(input.url, kind)
+  const scraped = input.title.trim()
+  const siteGeneric = kind !== 'generic' && looksLikeSiteTitle(scraped, kind, host)
+  const title = (kind !== 'generic' && (siteGeneric || !scraped) ? derived : scraped).slice(0, 180)
+  const description = (
+    siteGeneric ? firstPartyBlurb(kind) : input.description.trim() || firstPartyBlurb(kind)
+  ).slice(0, 240)
+  const image = input.image && previewableUrl(input.image) ? input.image : null
+  return {
+    url: input.url,
+    site: host,
+    title,
+    description,
+    image,
+    kind,
+    kicker,
+    cta,
+  }
+}
+
 const BLOCKED_HOST_SUFFIXES = [
   '.local',
   '.internal',

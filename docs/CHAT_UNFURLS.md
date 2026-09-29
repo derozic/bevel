@@ -24,7 +24,9 @@ Same-origin filename regex is the only src the client will lift out of markdown 
 
 `GET /api/link-preview?url=` scrapes Open Graph for **generic** public https URLs after an SSRF deny list (loopback, RFC1918, `.internal`, `.local`, `.lvh.me`, nip.io). The crawler User-Agent is `BevelLinkPreview/1.0` so Magenta can keep preview hits out of visitor counts.
 
-When OG is empty, first-party cards still unfurl: title comes from the path (`/n/demo-neuron` → “demo neuron”), description from the kind blurb. **2ndbrain +** on the card POSTs `/api/brain/clip` and ingests an organism nugget onto the 2ndbrain `clips` track.
+When OG is empty **or site-wide homepage copy** (product name plus a tagline), first-party cards still unfurl: title comes from the path (`/n/demo-neuron` → “demo neuron”), description from the kind blurb. `2ndbra.in/n/demo-neuron` currently ships a homepage `<title>` with no object-level JSON, so the path is the object. JSON-LD `name` / `headline` is used when present. There is no public neuron JSON yet; do not scrape random `h1`s.
+
+**2ndbrain +** on the card POSTs `/api/brain/clip` and ingests an organism nugget onto the 2ndbrain `clips` track.
 
 First-party hosts skip “it is a webpage” and get a typed kicker + CTA:
 
